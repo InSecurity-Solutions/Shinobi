@@ -2694,6 +2694,11 @@ module.exports = function(s,config,lang){
                           pageOpen: 'rally',
                       },
                       {
+                          icon: 'ravelry',
+                          label: `${lang['Rally']}`,
+                          pageOpen: 'rally',
+                      },
+                      {
                           icon: 'eyedropper',
                           label: `${lang['FFprobe']}`,
                           pageOpen: 'cameraProbe',
