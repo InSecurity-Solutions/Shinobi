@@ -1277,6 +1277,7 @@ $(document).ready(function(e){
             break;
             case'substream_start':
                 loadedMonitors[d.mid].subStreamChannel = d.channel
+                loadedMonitors[d.mid].subStreamActive = true
                 showHideSubstreamActiveIcon(d.mid,true)
                 setTimeout(() => {
                     resetMonitorCanvas(d.mid,true,d.channel)
@@ -1284,6 +1285,7 @@ $(document).ready(function(e){
             break;
             case'substream_end':
                 loadedMonitors[d.mid].subStreamChannel = null
+                loadedMonitors[d.mid].subStreamActive = false
                 resetMonitorCanvas(d.mid,true,null)
                 showHideSubstreamActiveIcon(d.mid,false)
             break;
