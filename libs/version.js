@@ -1,5 +1,26 @@
 var exec = require('child_process').exec
 module.exports = function(s,config,lang,app,io){
+    function getLastUsedCommits(numberOfCommits = 3){
+        return new Promise((resolve) => {
+            exec(`git log -${numberOfCommits} --pretty=format:"%H"`, function(err, response){
+                try{
+                    if(err){
+                        console.error(err)
+                        resolve([])
+                    }else if(response){
+                        const commitIds = response.toString().split('\n');
+                        commitIds.shift();
+                        resolve(commitIds)
+                    }else{
+                        resolve([])
+                    }
+                }catch(err){
+                    console.error(err)
+                    resolve([])
+                }
+            })
+        })
+    }
     var getRepositoryCommitId = function(callback){
         exec(`git rev-parse HEAD`,function(err,response){
             if(response){
@@ -18,5 +39,6 @@ module.exports = function(s,config,lang,app,io){
     }
     s.onProcessReady(async () => {
         getRepositoryCommitId()
+        s.versionsUsed = await getLastUsedCommits(3);
     })
 }

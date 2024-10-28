@@ -11,13 +11,15 @@ module.exports = (config) => {
                     "Shinobi": s.currentVersion,
                     "Node.js": process.version,
                     "FFmpeg": s.ffmpegVersion,
-                    "isActivated": config.userHasSubscribed
+                    "isActivated": config.userHasSubscribed,
+                    "previousShinobi": s.versionsUsed,
                 },
                 Machine: {
                     "CPU Core Count": s.coreCount,
                     "Total RAM": s.totalmem,
                     "Operating System Platform": s.platform,
                 },
+
             }
             if(s.expiryDate)response.Versions["License Expires On"] = s.expiryDate
             return response
