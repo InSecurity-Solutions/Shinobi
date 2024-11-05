@@ -583,7 +583,7 @@ module.exports = (s,config,lang) => {
                     monitorDetails.detector_buffer_acodec !== 'no' &&
                     monitorDetails.detector_buffer_acodec !== 'auto'
                 ){
-                    outputMap += `-map 0:1 `
+                    outputMap += `-map 0:1? `
                 }
                 const secondsBefore = parseInt(monitorDetails.detector_buffer_seconds_before) || 5
                 let LiveStartIndex = parseInt(secondsBefore / 2 + 1)
