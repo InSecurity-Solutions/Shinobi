@@ -139,11 +139,11 @@ module.exports = function(s,config,lang,app,io){
             const monitorId = onvifOptions.mid
             const theDevice = s.group[groupKey].activeMonitors[monitorId].onvifConnection
             theUrl = addCredentialsToUrl({
-                username: onvifOptions.username,
-                password: onvifOptions.password,
+                username: theDevice.user,
+                password: theDevice.pass,
                 url: (await theDevice.services.media.getSnapshotUri({
                     ProfileToken : theDevice.current_profile.token,
-                })).GetSnapshotUriResponse.MediaUri.Uri
+                })).data.GetSnapshotUriResponse.MediaUri.Uri
             });
         }else{
             theUrl = addCredentialsToStreamLink({
