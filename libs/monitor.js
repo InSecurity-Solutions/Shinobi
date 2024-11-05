@@ -734,6 +734,13 @@ module.exports = function(s,config,lang){
             break;
             case'start':case'record':
                 await monitorStart(e)
+                s.tx({
+                    f: 'monitor_watch_on',
+                    id: monitorId,
+                    ke: groupKey,
+                    subStreamChannel: s.group[groupKey].activeMonitors[monitorId].subStreamChannel,
+                    warnings: s.group[groupKey].activeMonitors[monitorId].warnings || []
+                }, `MON_${groupKey}${monitorId}`)
             break;
             default:
                 console.log('No s.camera execute : ',selectedMode)
