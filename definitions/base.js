@@ -308,6 +308,10 @@ module.exports = function(s,config,lang){
                               "value": "rtsp"
                            },
                            {
+                              "name": "SRT",
+                              "value": "srt"
+                           },
+                           {
                               "name": "RTMP",
                               "value": "rtmp"
                            },
