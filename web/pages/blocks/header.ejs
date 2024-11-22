@@ -70,7 +70,7 @@
     %>
     <script>
         window.getAdminApiPrefix = function(piece){
-            return "<%=originalURL%><%= config.webPaths.adminApiPrefix %><%- $user.auth_token %>/"
+            return "<%= config.webPaths.adminApiPrefix %><%- $user.auth_token %>/"
         }
     </script>
     <% customAutoLoad.LibsCss.forEach(function(lib){ %>
