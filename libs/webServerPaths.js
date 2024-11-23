@@ -512,115 +512,6 @@ module.exports = function(s,config,lang,app,io){
             res.end(s.prettyPrint({ok:true}))
         })
     })
-    // /**
-    // * Page : Montage - stand alone squished view with gridstackjs
-    // */
-    // app.get([
-    //     config.webPaths.apiPrefix+':auth/grid/:ke',
-    //     config.webPaths.apiPrefix+':auth/grid/:ke/:group',
-    //     config.webPaths.apiPrefix+':auth/cycle/:ke',
-    //     config.webPaths.apiPrefix+':auth/cycle/:ke/:group'
-    // ], function(req,res) {
-    //     s.auth(req.params,function(user){
-    //         if(user.permissions.get_monitors==="0"){
-    //             res.end(user.lang['Not Permitted'])
-    //             return
-    //         }
-    //
-    //         req.params.protocol=req.protocol;
-    //         req.sql='SELECT * FROM Monitors WHERE mode!=? AND mode!=? AND ke=?';req.ar=['stop','idle',req.params.ke];
-    //         if(!req.params.id){
-    //             if(user.details.sub&&user.details.monitors&&user.details.allmonitors!=='1'){
-    //                 try{user.details.monitors=JSON.parse(user.details.monitors);}catch(er){}
-    //                 req.or=[];
-    //                 user.details.monitors.forEach(function(v,n){
-    //                     req.or.push('mid=?');req.ar.push(v)
-    //                 })
-    //                 req.sql+=' AND ('+req.or.join(' OR ')+')'
-    //             }
-    //         }else{
-    //             if(!user.details.sub||user.details.allmonitors!=='0'||user.details.monitors.indexOf(req.params.id)>-1){
-    //                 req.sql+=' and mid=?';req.ar.push(req.params.id)
-    //             }else{
-    //                 res.end(user.lang['There are no monitors that you can view with this account.']);
-    //                 return;
-    //             }
-    //         }
-    //         s.sqlQuery(req.sql,req.ar,function(err,r){
-    //             if(req.params.group){
-    //                 var filteredByGroupCheck = {};
-    //                 var filteredByGroup = [];
-    //                 r.forEach(function(v,n){
-    //                     var details = JSON.parse(r[n].details);
-    //                     try{
-    //                         req.params.group.split('|').forEach(function(group){
-    //                             var groups = JSON.parse(details.groups);
-    //                             if(groups.indexOf(group) > -1 && !filteredByGroupCheck[v.mid]){
-    //                                 filteredByGroupCheck[v.mid] = true;
-    //                                 filteredByGroup.push(v)
-    //                             }
-    //                         })
-    //                     }catch(err){
-    //
-    //                     }
-    //                 })
-    //                 r = filteredByGroup;
-    //             }
-    //             r.forEach(function(v,n){
-    //                 if(s.group[v.ke]&&s.group[v.ke].activeMonitors[v.mid]&&s.group[v.ke].activeMonitors[v.mid].watch){
-    //                     r[n].currentlyWatching=Object.keys(s.group[v.ke].activeMonitors[v.mid].watch).length
-    //                 }
-    //                 r[n].subStream={}
-    //                 var details = JSON.parse(r[n].details)
-    //                 if(details.snap==='1'){
-    //                     r[n].subStream.jpeg = '/'+req.params.auth+'/jpeg/'+v.ke+'/'+v.mid+'/s.jpg'
-    //                 }
-    //                 if(details.stream_channels&&details.stream_channels!==''){
-    //                     try{
-    //                         details.stream_channels=JSON.parse(details.stream_channels)
-    //                         r[n].channels=[]
-    //                         details.stream_channels.forEach(function(b,m){
-    //                             var streamURL
-    //                             switch(b.stream_type){
-    //                                 case'mjpeg':
-    //                                     streamURL='/'+req.params.auth+'/mjpeg/'+v.ke+'/'+v.mid+'/'+m
-    //                                 break;
-    //                                 case'hls':
-    //                                     streamURL='/'+req.params.auth+'/hls/'+v.ke+'/'+v.mid+'/'+m+'/s.m3u8'
-    //                                 break;
-    //                                 case'h264':
-    //                                     streamURL='/'+req.params.auth+'/h264/'+v.ke+'/'+v.mid+'/'+m
-    //                                 break;
-    //                                 case'flv':
-    //                                     streamURL='/'+req.params.auth+'/flv/'+v.ke+'/'+v.mid+'/'+m+'/s.flv'
-    //                                 break;
-    //                                 case'mp4':
-    //                                     streamURL='/'+req.params.auth+'/mp4/'+v.ke+'/'+v.mid+'/'+m+'/s.mp4'
-    //                                 break;
-    //                             }
-    //                             r[n].channels.push(streamURL)
-    //                         })
-    //                     }catch(err){
-    //                         s.userLog(req.params,{type:'Broken Monitor Object',msg:'Stream Channels Field is damaged. Skipping.'})
-    //                     }
-    //                 }
-    //             })
-    //             var page = config.renderPaths.grid
-    //             if(req.path.indexOf('/cycle/') > -1){
-    //                 page = config.renderPaths.cycle
-    //             }
-    //             s.renderPage(req,res,page,{
-    //                 data:Object.assign(req.params,req.query),
-    //                 baseUrl:req.protocol+'://'+req.hostname,
-    //                 config: s.getConfigWithBranding(req.hostname),
-    //                 lang:user.lang,
-    //                 $user:user,
-    //                 monitors:r,
-    //                 query:req.query
-    //             });
-    //         })
-    //     },res,req)
-    // });
     /**
     * API : Get TV Channels (Monitor Streams) json
      */
@@ -1128,6 +1019,7 @@ module.exports = function(s,config,lang,app,io){
         res.setHeader('Content-Type', 'application/json');
         s.auth(req.params,function(user){
             const searchQuery = s.getPostData(req,'search')
+            const andOnly = s.getPostData(req,'andOnly') == '1'
             const startTime = s.getPostData(req,'start')
             const endTime = s.getPostData(req,'end')
             const monitorId = req.params.id
@@ -1158,6 +1050,7 @@ module.exports = function(s,config,lang,app,io){
                 endTime,
                 searchQuery,
                 monitorRestrictions,
+                andOnly,
             }).then((response) => {
                 if(response && response.rows){
                     s.buildVideoLinks(response.rows,{
@@ -1528,8 +1421,8 @@ module.exports = function(s,config,lang,app,io){
     /**
     * API : Get Video File
      */
-     const videoRowCaches = {}
-     const videoRowCacheTimeouts = {}
+    const videoRowCaches = {}
+    const videoRowCacheTimeouts = {}
     app.get(config.webPaths.apiPrefix+':auth/videos/:ke/:id/:file', function (req,res){
         s.auth(req.params,function(user){
             const groupKey = req.params.ke

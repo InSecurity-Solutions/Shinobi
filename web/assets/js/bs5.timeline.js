@@ -106,8 +106,10 @@ $(document).ready(function(){
     }
     async function getVideosInGaps(gaps,monitorIds){
         var searchQuery = timeStripObjectSearchInput.val()
+        var andOnly = searchQuery.startsWith('and:')
         var videos = []
         var eventLimit = Object.values(loadedMonitors).length * 300
+        searchQuery = andOnly ? searchQuery.replace('and:','') : searchQuery;
         async function loopOnGaps(monitorId){
             for (let i = 0; i < gaps.length; i++) {
                 var range = gaps[i]
@@ -117,6 +119,7 @@ $(document).ready(function(){
                     endDate: range[1],
                     eventLimit,
                     searchQuery,
+                    andOnly: andOnly ? '1' : '0',
                     // archived: false,
                     // customVideoSet: wantCloudVideo ? 'cloudVideos' : null,
                 },null,dontShowDetectionOnTimeline)).videos;

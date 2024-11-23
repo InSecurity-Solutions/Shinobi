@@ -8477,13 +8477,30 @@ module.exports = function(s,config,lang){
                         "example": "person",
                      },
                      {
+                         id:'videosTable_tag_search_andonly',
+                         field: lang['Search Type'],
+                         default: '0',
+                         "fieldType": "select",
+                         possible:[
+                             {
+                                 "name": lang.OR,
+                                 "value": "0",
+                                 selected: true,
+                             },
+                             {
+                                 "name": lang.AND,
+                                 "value": "1"
+                             },
+                        ]
+                     },
+                     {
                          "class": "date_selector",
                          "field": lang.Date,
                      },
                      {
                          id:'videosTable_cloudVideos',
                          field: lang['Video Set'],
-                         default:'local',
+                         default: 'local',
                          "fieldType": "select",
                          possible:[
                            {
