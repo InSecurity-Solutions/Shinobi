@@ -1048,19 +1048,47 @@ module.exports = (s,config,lang) => {
             }
         }, 1000 * creationInterval * 2);
     }
+    function setUpChosenDetector(e){
+        const groupKey = e.ke
+        const monitorId = e.mid || e.id
+        const activeMonitor = getActiveMonitor(groupKey,monitorId);
+        const monitorConfig = getMonitorConfiguration(groupKey,monitorId);
+        const monitorDetails = monitorConfig.details;
+        let chosenDetector = monitorDetails.detectors_selected;
+        if(chosenDetector instanceof Array)chosenDetector = chosenDetector.join(',');
+        let sendToDetector = (data) => {
+            s.ocvTx({
+                f : 'frame',
+                mon : monitorDetails,
+                ke : groupKey,
+                id : monitorId,
+                time : s.formattedTime(),
+                frame : data
+            })
+        }
+        if(chosenDetector && !(chosenDetector.includes('all'))){
+            const pluginsGettingIt = chosenDetector.split(',').map(item => item.trim()).filter(item => !!item);
+            sendToDetector = (data) => {
+                for(pluginName of pluginsGettingIt){
+                    s.sendToDetector(pluginName, {
+                        f : 'frame',
+                        mon : monitorDetails,
+                        ke : groupKey,
+                        id : monitorId,
+                        time : s.formattedTime(),
+                        frame : data
+                    })
+                }
+            }
+        }
+        activeMonitor.forDetectorJpegOutputAlone = sendToDetector;
+    }
     function onDetectorJpegOutputAlone(e,d){
         if(s.isAtleatOneDetectorPluginConnected){
             const groupKey = e.ke
             const monitorId = e.mid || e.id
-            const monitorConfig = getMonitorConfiguration(groupKey,monitorId);
-            s.ocvTx({
-                f: 'frame',
-                mon: monitorConfig.details,
-                ke: groupKey,
-                id: monitorId,
-                time: s.formattedTime(),
-                frame: d
-            })
+            const activeMonitor = getActiveMonitor(groupKey,monitorId);
+            activeMonitor.forDetectorJpegOutputAlone(d)
         }
     }
     function onDetectorJpegOutputSecondary(e,buffer){
@@ -1227,6 +1255,7 @@ module.exports = (s,config,lang) => {
                         onDetectorJpegOutputSecondary(e,data)
                     })
                 }else{
+                    setUpChosenDetector(e)
 		            activeMonitor.spawn.stdio[4].on('data',function(data){
                         onDetectorJpegOutputAlone(e,data)
                     })
@@ -1236,6 +1265,7 @@ module.exports = (s,config,lang) => {
                     onDetectorJpegOutputSecondary(e,data)
                 })
             }else{
+                setUpChosenDetector(e)
                 activeMonitor.spawn.stdio[4].on('data',function(data){
                     onDetectorJpegOutputAlone(e,data)
                 })
