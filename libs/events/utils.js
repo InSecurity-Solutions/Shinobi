@@ -611,6 +611,7 @@ module.exports = (s,config,lang) => {
                     const secondBefore = (parseInt(monitorDetails.detector_buffer_seconds_before) || 5) + 1
                     s.insertCompletedVideo(monitorConfig,{
                         file : filename,
+                        objects: overlappingRecordings && d.details && d.details.matrices instanceof Array ? d.details.matrices : undefined,
                         endTime: moment(new Date()).subtract(secondBefore,'seconds')._d,
                     },function(err,response){
                         const autoCompressionEnabled = monitorDetails.auto_compress_videos === '1';
