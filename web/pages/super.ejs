@@ -92,6 +92,11 @@
                             <li class="nav-item">
                                 <a class="nav-link" data-bs-toggle="tab" data-bs-target="#superMountManager" role="tab"><%-lang['Mount Manager']%></a>
                             </li>
+                            <% customAutoLoad.superPageTabs.forEach(function(block){ %>
+                                <li class="nav-item">
+                                    <a class="nav-link" data-bs-toggle="tab" data-bs-target="#<%- block.target %>" role="tab"><%- block.label %></a>
+                                </li>
+                            <% }) %>
                         </ul>
                         <div class="card-body text-white" style="background:#263343">
                             <!-- Tab panes -->

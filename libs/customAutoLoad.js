@@ -345,6 +345,7 @@ module.exports = async (s,config,lang,app,io) => {
             LibsCss: [],
             AssetsJs: [],
             AssetsCss: [],
+            superPageTabs: [],
             superPageBlocks: [],
             superLibsJs: [],
             superRawJs: [],
