@@ -43,7 +43,7 @@ module.exports = function (s, config, lang) {
 
         return new Cam(options, function (error) {
             if (error) {
-                onvifEventLog(`ONVIF Event Error`,e)
+                onvifEventLog(`ONVIF Event Error`,error)
                 return
             }
             this.on('event', function (event) {
