@@ -6641,7 +6641,7 @@ module.exports = function(s,config,lang){
                       {
                          "name": "ip",
                          "field": lang['IP Address'],
-                         "description": lang[lang["fieldTextIp"]],
+                         "description": lang["fieldTextIp"],
                          "example": "10.1.100.1-10.1.100.254",
                       },
                       {
