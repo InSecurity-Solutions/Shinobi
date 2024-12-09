@@ -163,9 +163,20 @@ module.exports = function(s,config,lang,app,io){
     app.get(config.webPaths.apiPrefix+':auth/userInfo/:ke',function (req,res){
         var response = {ok:false};
         res.setHeader('Content-Type', 'application/json');
-        s.auth(req.params,function(user){
+        s.auth(req.params, async function(user){
             response.ok = true
-            response.user = user
+            const { rows } = await s.knexQueryPromise({
+                action: "select",
+                columns: "ke,uid,mail,details",
+                table: "Users",
+                where: [
+                    ['ke','=', req.params.ke],
+                    ['uid','=', user.uid],
+                ]
+            });
+            const userInfo =  rows[0];
+            userInfo.details = JSON.parse(userInfo.details)
+            response.user = userInfo;
             res.end(s.prettyPrint(response));
         },res,req);
     })
@@ -2132,6 +2143,67 @@ module.exports = function(s,config,lang,app,io){
             var endData = {
                 ok: true,
                 definitions: s.getLanguageFile(user.details.lang)
+            }
+            s.closeJsonResponse(res,endData)
+        },res,req)
+    })
+    /**
+    * API : Get Available Languages
+     */
+    app.get(config.webPaths.apiPrefix+':auth/languages/:ke',function (req,res){
+        s.auth(req.params,function(user){
+            var endData = {
+                ok: true,
+                list: s.listOfPossibleLanguages
+            }
+            s.closeJsonResponse(res,endData)
+        },res,req)
+    })
+    /**
+    * API : Get Storage Locations
+     */
+    app.get(config.webPaths.apiPrefix+':auth/storageLocations/:ke',function (req,res){
+        s.auth(req.params,function(user){
+            const endData = {
+                ok: true,
+                list: s.listOfStorage
+            }
+            s.closeJsonResponse(res,endData)
+        },res,req)
+    })
+    /**
+    * API : Get Hardware Acceleration choices
+     */
+    app.get(config.webPaths.apiPrefix+':auth/hardwareAccels/:ke',function (req,res){
+        s.auth(req.params,function(user){
+            const endData = {
+                ok: true,
+                list: s.listOfHwAccels
+            }
+            s.closeJsonResponse(res,endData)
+        },res,req)
+    })
+    /**
+    * API : Get Audio File choices
+     */
+    app.get(config.webPaths.apiPrefix+':auth/addStorage/:ke',function (req,res){
+        s.auth(req.params,function(user){
+            const endData = {
+                ok: true,
+                list: s.dir.addStorage
+            }
+            s.closeJsonResponse(res,endData)
+        },res,req)
+    })
+    /**
+    * API : Get Uploader choices
+     */
+    app.get(config.webPaths.apiPrefix+':auth/uploaderFields/:ke',function (req,res){
+        s.auth(req.params,function(user){
+            const fields = s.definitions["Account Settings"].blocks["Uploaders"];
+            const endData = {
+                ok: true,
+                fields
             }
             s.closeJsonResponse(res,endData)
         },res,req)
