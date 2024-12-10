@@ -136,6 +136,8 @@
    "Google Drive": "Google Drive",
    "Invert Y-Axis": "Invert Y-Axis",
    "Get Code": "Get Code",
+   "PTZ Control ID": "PTZ Control ID",
+   "ptzControlIdFieldText": "When using a Control Stick or GamePad you can choose an available number to use.",
    "PTZ Tracking": "PTZ Tracking",
    "PTZ Tracking Target": "PTZ Tracking Target",
    "Event Counts": "Event Counts",

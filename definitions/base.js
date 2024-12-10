@@ -126,6 +126,13 @@ module.exports = function(s,config,lang){
                       "possible": s.listOfStorage
                   },
                   {
+                     "name": "detail=ptz_id",
+                     "field": lang["PTZ Control ID"],
+                     "example": "1",
+                     "form-group-class": "h_c_input h_c_1",
+                     "description": lang["ptzControlIdFieldText"],
+                  },
+                  {
                      "name": "detail=auto_compress_videos",
                      "field": lang['Compress Completed Videos'],
                      "description": lang.compressCompletedVideosFieldText,

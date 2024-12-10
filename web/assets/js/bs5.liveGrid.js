@@ -771,6 +771,10 @@ function fullScreenLiveGridStream(monitorItem){
     }
     fullScreenInit(videoElement[0])
 }
+function fullScreenLiveGridStreamById(monitorId){
+    const monitorItem = liveGrid.find(`[data-mid="${monitorId}"]`)
+    fullScreenLiveGridStream(monitorItem)
+}
 function toggleJpegMode(){
     var sendData = {
         f: 'monitor',
@@ -1099,6 +1103,7 @@ $(document).ready(function(e){
     .on('click','.toggle-live-grid-monitor-ptz-controls',function(){
         var monitorItem = $(this).parents('[data-mid]').attr('data-mid')
         drawPtzControlsOnLiveGridBlock(monitorItem)
+        setGamepadMonitorSelection()
     })
     .on('click','.toggle-live-grid-monitor-menu,.mdl-overlay-menu-backdrop',function(){
         var monitorItem = $(this).parents('[data-mid]')
@@ -1112,6 +1117,7 @@ $(document).ready(function(e){
     .on('click','.toggle-live-grid-monitor-fullscreen',function(){
         var monitorItem = $(this).parents('[data-mid]')
         fullScreenLiveGridStream(monitorItem)
+        setGamepadMonitorSelection()
     })
     .on('click','.run-live-grid-monitor-pop',function(){
         var monitorId = $(this).parents('[data-mid]').attr('data-mid')
