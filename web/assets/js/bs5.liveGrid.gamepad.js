@@ -224,8 +224,11 @@ $(document).ready(function() {
                 }else if(buttonCode == 7){
                     sendPtzCommand('zoom_in', true)
                 }else if(buttonCode == 8){
-                    closeSnapshot()
-                    openSnapshot()
+                    if($('.popped-image').length > 0){
+                        closeSnapshot()
+                    }else{
+                        openSnapshot()
+                    }
                 }else if(buttonCode == 9){
                     sentPtzToHome()
                 }else if(buttonCode == 11){
@@ -281,22 +284,12 @@ $(document).ready(function() {
     }
 
     function openSnapshot(){
-        if(!$.confirm.e.is(':visible')){
-            getSnapshot(loadedMonitors[selectedMonitor],function(url){
-                $.confirm.create({
-                    title: lang.Snapshot,
-                    body: `<img src="${url}">`,
-                    clickOptions: {
-                        class: 'btn-primary',
-                        title: lang.Close,
-                    },
-                    clickCallback: async function(){}
-                })
-            })
-        }
+        getSnapshot(loadedMonitors[selectedMonitor],function(url){
+            popImage(url)
+        })
     }
     function closeSnapshot(){
-        $.confirm.e.modal('hide')
+        popImageClose()
     }
 
 
