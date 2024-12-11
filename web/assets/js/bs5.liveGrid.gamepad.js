@@ -97,9 +97,9 @@ $(document).ready(function() {
         })
     }
 
-    function setCameraFromButtonCode(buttonCode, preAdded){
+    function setCameraFromButtonCode(buttonCode = 0, preAdded){
+        const addedOneToButtonCode = preAdded ? buttonCode : parseInt(buttonCode) + 1
         try{
-            const addedOneToButtonCode = preAdded ? buttonCode : parseInt(buttonCode) + 1
             const monitor = loadedMonitors[monitorKeys[addedOneToButtonCode]];
             const isFullscreened = !!document.fullscreenElement;
             if(isFullscreened) {
@@ -113,6 +113,11 @@ $(document).ready(function() {
             })
 
         }catch(err){
+            new PNotify({
+                title: lang['Invalid Action'],
+                text: `${lang.ptzControlIdNotFound}<br><br>${lang['Button Code']} : ${addedOneToButtonCode}`,
+                type: 'warning'
+            });
             console.log('No Monitor Associated :', buttonCode)
         }
     }
@@ -325,7 +330,7 @@ $(document).ready(function() {
                 reportInterval = 200;
                 reportOnGamepad = reportOnXboxGamepad
                 buttonPressAction = setCameraFromButtonCode
-                console.log('Xbox Controller found!', buttonPressAction)
+                console.log('Xbox Controller found!')
             break;
             default:
                 reportInterval = 50;
