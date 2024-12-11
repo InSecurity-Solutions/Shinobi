@@ -36,6 +36,7 @@
     var originalURL = `${urlPrefix}`
 %>
 <%- include('blocks/header-favicon') %>
+<script>window.lang=<%- JSON.stringify(lang) %>;</script>
 <script>window.$user=<%- JSON.stringify($user) %>;</script>
 <script>window.urlPrefix = "<%- urlPrefix || '' %>";</script>
 <script>window.groupKey = "<%- groupKey || '' %>";</script>
@@ -85,4 +86,7 @@
 <script src="<%- urlPrefix %>assets/vendor/bootstrap5/js/bootstrap.bundle.min.js"></script>
 <script src="<%- urlPrefix %>assets/vendor/js/pnotify.custom.min.js"></script>
 <script src="<%- urlPrefix %>assets/vendor/js/jquery-ui.min.js"></script>
+<script src="<%- urlPrefix %>assets/js/bs5.extenders.js"></script>
 <script src="<%- urlPrefix %>assets/js/bs5.wallview.js"></script>
+<script src="<%- urlPrefix %>assets/js/bs5.wallview.gamepad.js"></script>
+<script src="<%- urlPrefix %>assets/js/bs5.websocket.js"></script>
