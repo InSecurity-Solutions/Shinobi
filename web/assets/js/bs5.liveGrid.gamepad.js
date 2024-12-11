@@ -28,14 +28,17 @@ $(document).ready(function() {
     var buttonsPressed = {}
     var hasGP = false;
     var repGP;
+    var reportInterval = 200
     var stickBase = 2048
     var stickMax = 4096
     var deadZoneThreshold = 0.35
     var outerDeadZone = 1.01
     var selectedMonitor = dashboardOptions().gamepadMonitorSelection;
     var monitorKeys = {};
-    var gp = null;
     var onMonitorOpenForGamepad = () => {}
+    var sequenceButtonPressList = []
+    var sequenceButtonPressTimeout = null
+    var buttonPressAction = null;
     window.setGamepadMonitorSelection = (monitorId) => {
         dashboardOptions('gamepadMonitorSelection', monitorId);
         selectedMonitor = `${monitorId}`;
@@ -94,9 +97,9 @@ $(document).ready(function() {
         })
     }
 
-    function setCameraFromButtonCode(buttonCode){
+    function setCameraFromButtonCode(buttonCode, preAdded){
         try{
-            const addedOneToButtonCode = parseInt(buttonCode) + 1
+            const addedOneToButtonCode = preAdded ? buttonCode : parseInt(buttonCode) + 1
             const monitor = loadedMonitors[monitorKeys[addedOneToButtonCode]];
             const isFullscreened = !!document.fullscreenElement;
             if(isFullscreened) {
@@ -227,7 +230,7 @@ $(document).ready(function() {
                         document.exitFullscreen()
                     }
                 }else{
-                    setCameraFromButtonCode(buttonCode)
+                    buttonPressAction(buttonCode)
                 }
             }, function(buttonCode){
                 if(buttonCode == 6){
@@ -258,7 +261,7 @@ $(document).ready(function() {
                     closeSnapshot()
                     openSnapshot()
                 }else{
-                    setCameraFromButtonCode(buttonCode)
+                    buttonPressAction(buttonCode)
                 }
             },function(buttonCode){
 
@@ -291,13 +294,11 @@ $(document).ready(function() {
         $.confirm.e.modal('hide')
     }
 
-    var reportOnGamepad = reportOnXboxGamepad;
 
     function startReporting(){
         if(hasGP){
             console.log('Reading Gamepad')
-            var gp = navigator.getGamepads()[0];
-            repGP = window.setInterval(reportOnGamepad,200);
+            repGP = window.setInterval(reportOnGamepad, reportInterval);
         }
     }
 
@@ -321,9 +322,28 @@ $(document).ready(function() {
     function setControllerType(gamepadId){
         switch(true){
             case gamepadId.includes('Xbox'):
+                reportInterval = 200;
                 reportOnGamepad = reportOnXboxGamepad
+                buttonPressAction = setCameraFromButtonCode
+                console.log('Xbox Controller found!', buttonPressAction)
+            break;
+            default:
+                reportInterval = 50;
+                reportOnGamepad = reportOnGenericGamepad
+                buttonPressAction = sequenceButtonPress
             break;
         }
+    }
+    var reportOnGamepad = reportOnXboxGamepad;
+
+    function sequenceButtonPress(buttonCode){
+        sequenceButtonPressList.push(buttonCode)
+        clearTimeout(sequenceButtonPressTimeout)
+        sequenceButtonPressTimeout = setTimeout(() => {
+            const newButtonCode = parseInt(sequenceButtonPressList.map(item => `${parseInt(item) + 1}`).join(''))
+            setCameraFromButtonCode(newButtonCode, true)
+            sequenceButtonPressList = []
+        },300)
     }
 
     if(canGame()) {
