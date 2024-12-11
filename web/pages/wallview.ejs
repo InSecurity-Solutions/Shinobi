@@ -39,8 +39,8 @@
 <script>window.lang=<%- JSON.stringify(lang) %>;</script>
 <script>window.$user=<%- JSON.stringify($user) %>;</script>
 <script>window.urlPrefix = "<%- urlPrefix || '' %>";</script>
-<script>window.groupKey = "<%- groupKey || '' %>";</script>
-<script>window.authKey = "<%- authKey || '' %>";</script>
+<script>window.groupKey = "<%- groupKey || '' %>";$user.ke = groupKey;</script>
+<script>window.authKey = "<%- authKey || '' %>";$user.auth_token = authKey;</script>
 <script>window.userHasSubscribed = <%- config.userHasSubscribed ? 'true' : 'false' %>;</script>
 <script src="<%- urlPrefix %>assets/vendor/js/socket.io.min.js"></script>
 <script src="<%- urlPrefix %>assets/vendor/js/jquery.min.js"></script>
@@ -87,6 +87,6 @@
 <script src="<%- urlPrefix %>assets/vendor/js/pnotify.custom.min.js"></script>
 <script src="<%- urlPrefix %>assets/vendor/js/jquery-ui.min.js"></script>
 <script src="<%- urlPrefix %>assets/js/bs5.extenders.js"></script>
+<script src="<%- urlPrefix %>assets/js/bs5.websocket.js"></script>
 <script src="<%- urlPrefix %>assets/js/bs5.wallview.js"></script>
 <script src="<%- urlPrefix %>assets/js/bs5.wallview.gamepad.js"></script>
-<script src="<%- urlPrefix %>assets/js/bs5.websocket.js"></script>

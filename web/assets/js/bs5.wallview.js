@@ -360,4 +360,5 @@ $(document).ready(function(){
         e.preventDefault()
         closeAllMonitors()
     })
-})
+    createWebsocket();
+});
