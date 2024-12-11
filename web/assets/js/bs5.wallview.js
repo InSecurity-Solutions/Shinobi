@@ -268,6 +268,15 @@ function openAllMonitors(){
     saveLayout()
 }
 
+function openMonitors(monitorIds, savePlaces){
+    $.each(monitorIds,function(n, monitorId){
+        selectMonitor(monitorId)
+    })
+    autoPlaceCurrentMonitorItems()
+    displayInfoScreen()
+    if(savePlaces)saveLayout()
+}
+
 function openNextMonitors(numberOf){
     var allLayouts = getAllLayouts()
     var ignoreMonitors = []

@@ -253,6 +253,12 @@ $(document).ready(function() {
                     }else{
                         document.exitFullscreen()
                     }
+                }else if(buttonCode == 12){
+                    toggleCycleLiveState(!!wallViewCycleTimer)
+                }else if(buttonCode == 14){
+                    cycleLiveMovePrev();
+                }else if(buttonCode == 15){
+                    cycleLiveMoveNext();
                 }else{
                     buttonPressAction(buttonCode)
                 }
