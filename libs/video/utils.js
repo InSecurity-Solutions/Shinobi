@@ -900,7 +900,7 @@ module.exports = (s,config,lang) => {
                 await fsP.writeFile(framePath, frameBuffer)
                 await s.createTimelapseFrameAndInsert(activeMonitor,location,frameFilename, frameTime._d)
             }catch(err){
-                console.error(err)
+                s.debugLog(err)
             }
         }
         // console.error('Completed Saving Frame from New Video!', framePath)
