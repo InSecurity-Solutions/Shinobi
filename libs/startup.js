@@ -89,7 +89,7 @@ module.exports = function(s,config,lang,io){
                                 });
                                 const monObj = Object.assign({},monitor,{id : monitor.mid})
                                 await s.camera('stop',monObj);
-                                await s.camera(monitor.mode,monObj);
+                                if(!config.safeMode)await s.camera(monitor.mode,monObj);
                                 checkAnother()
                             },1000)
                         }else{
@@ -420,7 +420,7 @@ module.exports = function(s,config,lang,io){
                 setTimeout(async () => {
                     await checkForStaticUsers()
                     //check for subscription
-                    checkSubscription(config.subscriptionId,function(hasSubcribed){
+                    checkSubscription(config.subscriptionId || config.peerConnectKey || config.p2pApiKey, function(hasSubcribed){
                         config.userHasSubscribed = hasSubcribed
                         //check terminal commander
                         checkForTerminalCommands(function(){
