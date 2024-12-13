@@ -10,7 +10,7 @@ module.exports = function(s,config,lang){
         return {}
     }
     function constructFilePath(groupKey, filePath){
-        return path.join(s.group[groupKey].mnt, filePath)
+        return path.join(s.group[groupKey].init.mnt_path, filePath)
     }
     const deleteObject = async (groupKey, filePath) => {
         const fullPath = constructFilePath(groupKey, filePath)
@@ -55,10 +55,9 @@ module.exports = function(s,config,lang){
         if(
            !s.group[e.ke].mnt &&
            userDetails.mnt !== '0' &&
-           userDetails.mnt_path &&
-           userDetails.mnt_dir
-        ){
-            checkDiskPathExists(userDetails.mnt_dir).then((response) => {
+           userDetails.mnt_path
+       ){
+            checkDiskPathExists(userDetails.mnt_path).then((response) => {
                 if(response.exists){
                     s.group[e.ke].mnt = userDetails.mnt_path;
                 }
@@ -85,6 +84,14 @@ module.exports = function(s,config,lang){
                 console.error(err);
             }
             callback()
+        });
+    }
+    function onMonitorStart(monitorConfig){
+        const groupKey = monitorConfig.ke;
+        const monitorId = monitorConfig.mid;
+        const saveLocation = constructFilePath(groupKey, s.group[groupKey].init.mnt_dir + groupKey + '/' + monitorId);
+        fs.mkdir(saveLocation, { recursive: true }).catch((err) => {
+            console.error('Making Directory fail', err)
         });
     }
     function uploadVideo(e,k,insertQuery){
@@ -213,8 +220,9 @@ module.exports = function(s,config,lang){
         onAccountSave: cloudDiskUseStartup,
         onInsertTimelapseFrame: onInsertTimelapseFrame,
         onDeleteTimelapseFrameFromCloud: onDeleteTimelapseFrameFromCloud,
-        onGetVideoData
-    })
+        onGetVideoData,
+    });
+    s.onMonitorStart(onMonitorStart);
     //return fields that will appear in settings
     return {
        "evaluation": "details.use_mnt !== '0'",
