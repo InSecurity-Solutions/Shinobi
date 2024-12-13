@@ -9240,6 +9240,13 @@ module.exports = function(s,config,lang){
                                   <input class="form-control form-control-sm" id="timeline-video-object-search" placeholder="${lang['Search Object Tags']}">
                               </div>
                               <div class="btn-group">
+                                  <select class="form-control form-control-sm" id="timeline-video-type">
+                                    <option value="">${lang.Local}</option>
+                                    <option value="cloud">${lang.Cloud}</option>
+                                    <option value="archive">${lang.Archive}</option>
+                                  </select>
+                              </div>
+                              <div class="btn-group">
                                   <a class="btn btn-sm btn-primary" timeline-action="autoGridSizer" title="${lang.autoResizeGrid}"><i class="fa fa-expand"></i></a>
                                   <a class="btn btn-sm btn-primary" timeline-action="playUntilVideoEnd" title="${lang.playUntilVideoEnd}"><i class="fa fa-step-forward"></i></a>
                                   <a class="btn btn-sm btn-primary btn-warning" timeline-action="dontShowDetection" title="${lang['Hide Detection on Stream']}"><i class="fa fa-grav"></i></a>

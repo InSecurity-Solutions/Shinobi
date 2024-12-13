@@ -9,6 +9,7 @@ $(document).ready(function(){
     var dateSelector = $('#timeline-date-selector');
     var sideMenuList = $(`#side-menu-link-timeline ul`)
     var monitorList = $(`#timeline-monitor-list`)
+    var videoTypeSelector = $(`#timeline-video-type`)
     var playToggles = timeStripControls.find('[timeline-action="playpause"]')
     var speedButtons = timeStripControls.find('[timeline-action="speed"]')
     var gridSizeButtons = timeStripControls.find('[timeline-action="gridSize"]')
@@ -106,6 +107,9 @@ $(document).ready(function(){
     }
     async function getVideosInGaps(gaps,monitorIds){
         var searchQuery = timeStripObjectSearchInput.val()
+        var videoType = videoTypeSelector.val()
+        var wantArchivedVideo = videoType === 'archive'
+        var wantCloudVideo = videoType === 'cloud' && !wantArchivedVideo
         var andOnly = searchQuery.startsWith('and:')
         var videos = []
         var eventLimit = Object.values(loadedMonitors).length * 300
@@ -120,8 +124,8 @@ $(document).ready(function(){
                     eventLimit,
                     searchQuery,
                     andOnly: andOnly ? '1' : '0',
-                    // archived: false,
-                    // customVideoSet: wantCloudVideo ? 'cloudVideos' : null,
+                    archived: wantArchivedVideo,
+                    customVideoSet: wantCloudVideo ? 'cloudVideos' : null,
                 },null,dontShowDetectionOnTimeline)).videos;
                 videos.push(...videosFound);
                 executeExtender('timelineGetVideosByMonitor', [monitorId, videosFound])
@@ -1056,6 +1060,9 @@ $(document).ready(function(){
         }
     })
     timeStripObjectSearchInput.change(function(){
+        refreshTimeline()
+    })
+    videoTypeSelector.change(function(){
         refreshTimeline()
     })
     timeStripVideoCanvas.on('dblclick','.timeline-video',function(){
