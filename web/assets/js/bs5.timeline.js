@@ -467,7 +467,7 @@ $(document).ready(function(){
     function setVideoInCanvas(newVideo){
         var monitorId = newVideo.mid
         var container = getVideoContainerInCanvas(newVideo)
-        .removeClass('no-video').find('.film').html(`<video muted src="${getApiPrefix('videos')}/${monitorId}/${newVideo.filename}"></video>`)
+        .removeClass('no-video').find('.film').html(`<video muted src="${newVideo.href}"></video>`)
         var vidEl = getVideoElInCanvas(newVideo)
         var objectContainer = getObjectContainerInCanvas(newVideo)
         vidEl.playbackRate = timelineSpeed

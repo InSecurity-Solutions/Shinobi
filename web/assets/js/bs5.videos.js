@@ -540,7 +540,7 @@ function getVideos(options,callback,noEvents){
         $.getJSON(`${getApiPrefix(customVideoSet ? customVideoSet : searchQuery ? `videosByEventTag` : `videos`)}${monitorId ? `/${monitorId}` : ''}?${requestQueries.concat([limit ? `limit=${limit}` : `noLimit=1`]).join('&')}`,function(data){
             var videos = data.videos.map((video) => {
                 return Object.assign({},video,{
-                    href: getFullOrigin(true) + video.href
+                    href: `${getFullOrigin(true) + video.href}${customVideoSet === 'cloudVideos' ? `?type=${video.type}` : ''}`
                 })
             })
             $.getJSON(`${getApiPrefix(`timelapse`)}${monitorId ? `/${monitorId}` : ''}?${requestQueries.concat([`noLimit=1`]).join('&')}`,function(timelapseFrames){
