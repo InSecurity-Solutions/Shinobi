@@ -46,7 +46,7 @@
     "node-shinobi": "^1.0.4",
     "node-ssh": "^12.0.4",
     "nodemailer": "^6.7.1",
-    "onvif": "^0.7.1",
+    "onvif": "^0.8.0",
     "pam-diff": "^1.1.0",
     "path": "^0.12.7",
     "pipe2pam": "^0.6.2",
