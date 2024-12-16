@@ -87,9 +87,9 @@ module.exports = function(s,config,lang){
         });
     }
     function onMonitorStart(monitorConfig){
+        const groupKey = monitorConfig.ke;
+        const monitorId = monitorConfig.mid;
         if(s.group[groupKey].mnt){
-            const groupKey = monitorConfig.ke;
-            const monitorId = monitorConfig.mid;
             const saveLocation = constructFilePath(groupKey, s.group[groupKey].init.mnt_dir + groupKey + '/' + monitorId);
             fs.mkdir(saveLocation, { recursive: true }).catch((err) => {
                 console.error('Making Directory fail', err)
