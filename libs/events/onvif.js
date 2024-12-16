@@ -49,6 +49,9 @@ module.exports = function (s, config, lang) {
             this.on('event', function (event) {
                 handleEvent(event, monitorConfig, onvifEventLog);
             })
+            this.on('eventsError', function (e) {
+                onvifEventLog(`ONVIF Event Error`,e)
+            })
 
         })
     }
