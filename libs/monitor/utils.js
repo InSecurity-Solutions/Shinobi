@@ -220,7 +220,7 @@ module.exports = (s,config,lang) => {
             }
             const temporaryImageFile = streamDir + s.gid(5) + '.jpg'
             const ffmpegCmd = splitForFFMPEG(`-y -loglevel warning -re ${inputOptions.join(' ')} -i "${url}" ${outputOptions.join(' ')} -f mjpeg -an -frames:v 1 "${temporaryImageFile}"`)
-            const snapProcess = spawn(onfig.ffmpegDir, ffmpegCmd, {detached: true})
+            const snapProcess = spawn(config.ffmpegDir, ffmpegCmd, {detached: true})
             snapProcess.stderr.on('data',function(data){
                 // s.debugLog(data.toString())
             })
