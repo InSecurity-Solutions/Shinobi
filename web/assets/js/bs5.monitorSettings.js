@@ -424,7 +424,9 @@ var copyMonitorSettingsToSelected = function(monitorConfig){
         })
         $.post(getApiPrefix()+'/configureMonitor/'+$user.ke+'/'+monitor.mid,{data:JSON.stringify(monitor)},function(d){
             debugLog(d)
-        })
+        }).fail(function(xhr, status, error) {
+            console.error(error)
+        });
         chosenMonitors[monitor.mid] = monitor;
     })
 }
@@ -826,6 +828,13 @@ editorForm.submit(function(e){
             })
         }
         debugLog(d)
+        setSubmitButton(editorForm, lang.Save, `check`, false)
+    }).fail((err) => {
+        new PNotify({
+            title: lang['Action Failed'],
+            text: JSON.stringify(err, null, 3),
+            type: 'danger'
+        })
         setSubmitButton(editorForm, lang.Save, `check`, false)
     })
     //
