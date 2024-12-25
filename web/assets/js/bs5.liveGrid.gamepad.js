@@ -265,14 +265,17 @@ $(document).ready(function() {
             getButtonsPressed(gp, function(buttonCode){
                 if(buttonCode == 10){
                     closeSnapshot()
+                    openSnapshot()
                 }else if(buttonCode == 11){
                     closeSnapshot()
-                    openSnapshot()
                 }else{
                     buttonPressAction(buttonCode)
                 }
             },function(buttonCode){
 
+            })
+            getAnalogStickValues(gp, 0, function(stick, x, y){
+                translatePointTiltStick(x, y)
             })
             getStickValue(gp, 2,function(value){
                 translateZoomAxis(value)

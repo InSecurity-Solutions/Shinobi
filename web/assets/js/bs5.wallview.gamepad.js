@@ -296,6 +296,9 @@ $(document).ready(function() {
             },function(buttonCode){
 
             })
+            getAnalogStickValues(gp, 0, function(stick, x, y){
+                translatePointTiltStick(x, y)
+            })
             getStickValue(gp, 2,function(value){
                 translateZoomAxis(value)
             })
