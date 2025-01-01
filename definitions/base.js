@@ -129,7 +129,6 @@ module.exports = function(s,config,lang){
                      "name": "detail=ptz_id",
                      "field": lang["PTZ Control ID"],
                      "example": "1",
-                     "form-group-class": "h_c_input h_c_1",
                      "description": lang["ptzControlIdFieldText"],
                   },
                   {
@@ -5018,7 +5017,6 @@ module.exports = function(s,config,lang){
                   },
                   {
                       "field": lang['Force Monitors Per Row'],
-                      "form-group-class":"st_force_mon_rows_input st_force_mon_rows_1",
                       attribute:'localStorage="montage_use"',
                       selector:'st_force_mon_rows',
                       "description": "",
@@ -5035,6 +5033,12 @@ module.exports = function(s,config,lang){
                              "value": "1"
                           }
                       ]
+                  },
+                  {
+                      "field": lang['Monitors per row'],
+                      "form-group-class":"st_force_mon_rows_input st_force_mon_rows_1",
+                      attribute:'localStorage="montage"',
+                      "placeholder": "3",
                   },
                   {
                       "field": lang['Browser Console Log'],

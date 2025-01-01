@@ -35,6 +35,9 @@ function getLiveGridData(){
 }
 function getMonitorsPerRow(){
     var x
+    if(dashboardOptions().montage_use != '1'){
+        return '4'
+    }
     switch(dashboardOptions().montage){
         case'1':
             x = '12'
