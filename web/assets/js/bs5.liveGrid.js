@@ -631,6 +631,7 @@ function closeLiveGridPlayer(monitorId,killElement){
         var loadedPlayer = loadedLiveGrids[monitorId]
         if(loadedPlayer){
             if(loadedPlayer.hls){loadedPlayer.hls.destroy()}
+            clearTimeout(loadedPlayer.m3uCheck)
             if(loadedPlayer.Poseidon){loadedPlayer.Poseidon.stop()}
             if(loadedPlayer.Base64){loadedPlayer.Base64.disconnect()}
             if(loadedPlayer.dash){loadedPlayer.dash.reset()}
