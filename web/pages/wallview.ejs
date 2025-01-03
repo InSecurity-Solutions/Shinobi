@@ -80,13 +80,9 @@
               <% }) %>
           </ul>
         </div>
-        <div class="dropdown d-inline-block">
-          <a class="btn btn-secondary dropdown-toggle" href="#" role="button" id="monitorListButton" data-bs-toggle="dropdown" aria-expanded="false">
-            <%- lang.Monitors %>
-          </a>
-          <ul id="wallview-monitorList" class="dropdown-menu" aria-labelledby="monitorListButton"></ul>
-        </div>
+        <a class="btn btn-secondary wallview-toggle-monitor-list" href="#"><%- lang.Monitors %></a>
     </div>
+    <div id="wallview-monitorList" class="d-none p-2"></div>
 </div>
 <script src="<%- urlPrefix %>assets/js/bs5.embed.utils.js"></script>
 <script src="<%- urlPrefix %>assets/vendor/js/poseidon.js"></script>

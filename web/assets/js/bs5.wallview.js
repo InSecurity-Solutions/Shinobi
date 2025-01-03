@@ -40,18 +40,44 @@ function getWindowName(){
     const theWindowChoice = urlParams.get('window');
     return theWindowChoice || '1'
 }
-function drawMonitorListItem(monitor){
-    wallViewMonitorList.append(`<li><a class="dropdown-item" select-monitor="${monitor.mid}" href="#"><i class="fa fa-check"></i> ${monitor.name}</a></li>`)
-}
 function drawMonitorList(){
     return new Promise((resolve) => {
         $.get(getApiPrefix('monitor'),function(monitors){
             $.each(monitors, function(n,monitor){
                 if(monitor.mode !== 'stop' && monitor.mode !== 'idle'){
                     loadedMonitors[monitor.mid] = monitor;
-                    drawMonitorListItem(monitor)
                 }
             })
+            var tags = getListOfTagsFromMonitors()
+            var monitorsOrdered = Object.values(loadedMonitors).sort((a, b) => a.name.localeCompare(b.name));
+            var allFound = [
+                {
+                    attributes: `tag=""`,
+                    class: `cursor-pointer wallview-open-monitor-group`,
+                    color: 'forestgreen',
+                    label: lang['All Monitors'],
+                }
+            ]
+            $.each(tags,function(tag,monitors){
+                allFound.push({
+                    attributes: `tag="${tag}"`,
+                    class: `cursor-pointer wallview-open-monitor-group`,
+                    color: 'blue',
+                    label: tag,
+                })
+            })
+            $.each(monitorsOrdered,function(monitorKey,monitor){
+                var monitorId = monitor.mid
+                var label = monitor.name
+                allFound.push({
+                    attributes: `select-monitor="${monitorId}"`,
+                    class: `cursor-pointer`,
+                    color: 'grey',
+                    label,
+                })
+            })
+            var html = allFound.map(item => `<div class="mb-1"><a class="btn d-block btn-primary btn-sm ${item.class}" ${item.attributes} href="#">${item.label}</a></div>`).join('')
+            wallViewMonitorList.html(html)
             resolve(monitors)
         })
     })
@@ -481,14 +507,14 @@ function selectMonitor(monitorId, css){
     });
     initiateLiveGridPlayer(loadedMonitor, subStreamChannel)
     attachVideoElementErrorHandler(monitorId)
-    getMonitorListItem(monitorId).addClass('active')
+    getMonitorListItem(monitorId).removeClass('btn-primary').addClass('btn-warning')
 }
 function deselectMonitor(monitorId){
     delete(selectedMonitors[monitorId])
     closeLiveGridPlayer(monitorId, true)
     var monitorItem = wallViewCanvas.find(`[live-stream="${monitorId}"]`);
     monitorItem.remove()
-    getMonitorListItem(monitorId).removeClass('active')
+    getMonitorListItem(monitorId).removeClass('btn-warning').addClass('btn-primary')
 }
 
 function getCurrentLayout(){
@@ -732,6 +758,31 @@ $(document).ready(function(){
     .on('click', '.wallview-close-all', function(e){
         e.preventDefault()
         closeAllMonitors()
+    })
+    .on('click', '.wallview-toggle-monitor-list', function(e){
+        e.preventDefault();
+        wallViewMonitorList.toggleClass('d-none')
+        return false;
+    })
+    .on('click', '.wallview-open-monitor-group', function(e){
+        e.preventDefault();
+        var el = $(this)
+        var tag = el.attr('tag')
+        if(!tag){
+            for(monitorId of Object.keys(loadedMonitors)){
+                selectMonitor(monitorId)
+            }
+        }else{
+            var tags = getListOfTagsFromMonitors()
+            var monitorIds = tags[tag]
+            for(monitorId of monitorIds){
+                selectMonitor(monitorId)
+            }
+        }
+        autoPlaceCurrentMonitorItems()
+        displayInfoScreen()
+        saveLayout()
+        return false;
     });
     createWebsocket(location.origin,{
         path: websocketPath
