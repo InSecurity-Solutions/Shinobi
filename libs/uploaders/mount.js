@@ -230,6 +230,7 @@ module.exports = function(s,config,lang){
        "evaluation": "details.use_mnt !== '0'",
        "name": lang["Mounted Drive Storage"],
        "color": "forestgreen",
+       "uploaderId": 'mnt',
        "info": [
            {
               "name": "detail=mnt_save",
