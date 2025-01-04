@@ -572,7 +572,7 @@ function drawInputMapSelectorHtml(options,parent){
 function getPluginsList(monitorConfig){
     return new Promise((resolve) => {
         const chosenDetectors = safeJsonParse(monitorConfig.details).detectors_selected || [];
-        $.get(getApiPrefix() + '/plugins/list',function(data){
+        $.get(getApiPrefix('plugins') + '/list',function(data){
             var plugins = data.plugins || {};
             var pluginNames = Object.keys(plugins)
             var disconnectedPlugins = chosenDetectors.filter(item => !pluginNames.includes(item));
@@ -596,6 +596,9 @@ function getPluginsList(monitorConfig){
             });
             detectorsSelected.html(html)
             resolve(plugins)
+        }).fail((err) => {
+            console.error(err);
+            resolve({})
         })
     })
 }
