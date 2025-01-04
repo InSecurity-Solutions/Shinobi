@@ -4483,7 +4483,6 @@ module.exports = function(s,config,lang){
                       "example": "",
                       "fieldType": "select",
                        id: 'copy_settings_monitors',
-                      "attribute": `copy="#monSectionLogging" style="min-height:100px" multiple`,
                       "form-group-class": "h_copy_settings_input h_copy_settings_1",
                       "possible": [
                          {
@@ -4984,9 +4983,35 @@ module.exports = function(s,config,lang){
                 "color": "navy",
                 "info": [
                     {
+                        "field": lang['Force Monitors Per Row'],
+                        attribute:'localStorage="montage_use"',
+                        selector:'st_force_mon_rows',
+                        "description": "",
+                        "default": "0",
+                        "example": "",
+                        "fieldType": "select",
+                        "possible": [
+                            {
+                               "name": lang.No,
+                               "value": "0"
+                            },
+                            {
+                               "name": lang.Yes,
+                               "value": "1"
+                            }
+                        ]
+                    },
+                    {
                         "field": lang['Monitors per row'],
-                        "placeholder": "3",
+                        "form-group-class":"st_force_mon_rows_input st_force_mon_rows_1",
                         attribute:'localStorage="montage"',
+                        "placeholder": "3",
+                    },
+                    {
+                          "field": lang.hlsOptions,
+                          "name": "localStorage=hlsOptions",
+                          fieldType:"textarea",
+                          "placeholder": "{}",
                     },
                 ]
             },
@@ -4994,51 +5019,20 @@ module.exports = function(s,config,lang){
                 "name": lang.Preferences,
                 "color": "navy",
                 "info": [
-                    {
+                   {
                         "field": lang['Clock Format'],
-                       "name": "detail=clock_date_format",
-                       "placeholder": "$DAYNAME $DAY $MONTHNAME $YEAR",
+                        "name": "detail=clock_date_format",
+                        "placeholder": "$DAYNAME $DAY $MONTHNAME $YEAR",
                    },
                    {
-                       "field": lang.CSS,
-                      "name": "detail=css",
-                      fieldType:"textarea",
-                      "placeholder": "#main_header{background:#b59f00}",
-                      "description": "",
-                      "default": "",
-                      "example": "",
-                      "possible": ""
-                  },
-                  {
-                        "field": lang.hlsOptions,
-                        "name": "localStorage=hlsOptions",
+                        "field": lang.CSS,
+                        "name": "detail=css",
                         fieldType:"textarea",
-                        "placeholder": "{}",
-                  },
-                  {
-                      "field": lang['Force Monitors Per Row'],
-                      attribute:'localStorage="montage_use"',
-                      selector:'st_force_mon_rows',
-                      "description": "",
-                      "default": "0",
-                      "example": "",
-                      "fieldType": "select",
-                      "possible": [
-                          {
-                             "name": lang.No,
-                             "value": "0"
-                          },
-                          {
-                             "name": lang.Yes,
-                             "value": "1"
-                          }
-                      ]
-                  },
-                  {
-                      "field": lang['Monitors per row'],
-                      "form-group-class":"st_force_mon_rows_input st_force_mon_rows_1",
-                      attribute:'localStorage="montage"',
-                      "placeholder": "3",
+                        "placeholder": "#main_header{background:#b59f00}",
+                        "description": "",
+                        "default": "",
+                        "example": "",
+                        "possible": ""
                   },
                   {
                       "field": lang['Browser Console Log'],
