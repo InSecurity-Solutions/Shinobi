@@ -2209,6 +2209,22 @@ module.exports = function(s,config,lang,app,io){
         },res,req)
     })
     /**
+    * API : Get Admin API Prefix
+     */
+    app.get(config.webPaths.apiPrefix+':auth/getAdminApiPrefix/:ke',function (req,res){
+        s.auth(req.params,function(user){
+            const endData = {
+                ok: true,
+                adminApiPrefix: config.webPaths.adminApiPrefix
+            }
+            if(user.details.sub){
+                endData.ok = false;
+                endData.adminApiPrefix = null;
+            }
+            s.closeJsonResponse(res,endData)
+        },res,req)
+    })
+    /**
     * Robots.txt
     */
     app.get('/robots.txt', function (req,res){
