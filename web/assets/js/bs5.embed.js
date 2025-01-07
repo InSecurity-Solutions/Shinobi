@@ -453,7 +453,7 @@ function signalCheckLiveStream(options){
                     }
                 })
             }
-            mainSocket.f({f:'monitor',ff:'watch_on',id:monitorId});
+            requestMonitorInit()
         }
         function succeededStreamCheck(){
             if(monitorConfig.signal_check_log == 1){
@@ -514,7 +514,7 @@ function signalCheckLiveStream(options){
         var errorStack = err.stack;
         function phraseFoundInErrorStack(x){return errorStack.indexOf(x) > -1}
         if(phraseFoundInErrorStack("The HTMLImageElement provided is in the 'broken' state.")){
-            mainSocket.f({f:'monitor',ff:'watch_on',id:monitorId});
+            requestMonitorInit()
         }
         clearInterval(liveGridData.signal);
         delete(liveGridData.signal);
@@ -564,12 +564,7 @@ $(document).ready(function(e){
         fullScreenLiveGridStream(monitorItem)
     })
     .on('click','.reconnect-live-grid-monitor',function(){
-        var monitorId = $(this).parents('[data-mid]').attr('data-mid')
-        mainSocket.f({
-            f: 'monitor',
-            ff: 'watch_on',
-            id: monitorId
-        })
+        requestMonitorInit()
     })
     .on('click','.toggle-live-grid-monitor-fullscreen',function(){
         var monitorItem = $(this).parents('[data-mid]')
@@ -581,11 +576,12 @@ $(document).ready(function(e){
                 // loadPreviouslyOpenedLiveGridBlocks()
             break;
             case'monitor_watch_off':case'monitor_stopping':
-                var monitorId = d.mid || d.id
-                closeLiveGridPlayer(monitorId,(d.f === 'monitor_watch_off'))
+                if(monitorId === d.id){
+                    closeLiveGridPlayer(monitorId,(d.f === 'monitor_watch_off'))
+                }
             break;
             case'monitor_status':
-                if(monitorId === d.mid && d.code === 2 || d.code === 3){
+                if(monitorId === d.id && (d.code === 2 || d.code === 3)){
                     setTimeout(function(){
                         requestMonitorInit()
                     },2000)
