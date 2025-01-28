@@ -33,7 +33,7 @@ Once complete open port `8080` of your Docker host in a web browser.
 > Please remember to check out the Environment Variables table further down this README.
 
 ```
-docker run -d --name='Shinobi' --memory=2g -p '8080:8080/tcp' -p '21:21/tcp' -v "$HOME/Shinobi/database":'/var/lib/mysql':'rw' -v "$HOME/Shinobi":'/home/Shinobi':'rw' registry.gitlab.com/shinobi-systems/shinobi:dev
+docker run -d --name='Shinobi' --memory=2g -p '8080:8080/tcp' -p '21:21/tcp' -v "$HOME/ShinobiDatabase":'/var/lib/mysql':'rw' -v "$HOME/Shinobi":'/home/Shinobi':'rw' registry.gitlab.com/shinobi-systems/shinobi:dev
 ```
 
 ## From Source
@@ -68,7 +68,7 @@ docker build -f Dockerfile.arm32v7 --tag shinobi-image:1.0 .
 > This command only works on Linux because of the temporary directory used. This location must exist in RAM. `-v "/dev/shm/shinobiStreams":'/dev/shm/streams':'rw'`. The timezone is also acquired from the host by the volume declaration of `-v '/etc/localtime':'/etc/localtime':'ro'`.
 
 ```
-docker run -d --name='Shinobi' --memory=2g -p '8080:8080/tcp' -p '21:21/tcp' -v "$HOME/Shinobi/database":'/var/lib/mysql':'rw' -v "$HOME/Shinobi":'/home/Shinobi':'rw' shinobi-image:1.0
+docker run -d --name='Shinobi' --memory=2g -p '8080:8080/tcp' -p '21:21/tcp' -v "$HOME/ShinobiDatabase":'/var/lib/mysql':'rw' -v "$HOME/Shinobi":'/home/Shinobi':'rw' shinobi-image:1.0
 ```
 
  > Host mount paths have been updated in this document.
@@ -79,7 +79,7 @@ docker run -d --name='Shinobi' --memory=2g -p '8080:8080/tcp' -p '21:21/tcp' -v 
  | Volumes                      | Description                                                                                                                                         |
  |------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------|
  | $HOME/Shinobi | Maps to the `/home/Shinobi` folder for the `customAutoLoad`, `plugins`, and `videos` folders inside and other files. Additionally you can edit the conf.json and super.json here. |
- | $HOME/Shinobi/database       | A map to `/var/lib/mysql` in the container. This is the database's core files.                                                                      |
+ | $HOME/ShinobiDatabase       | A map to `/var/lib/mysql` in the container. This is the database's core files.                                                                      |
 
 ### Environment Variables
 
