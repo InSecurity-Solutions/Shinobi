@@ -1,6 +1,8 @@
 ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
-# OUTDATED, Newest Docker method here :
+
+# This Docker method is only for integrated Database and simple volume mounts. For separate database and more elaborate installation please use this registry instead :
 https://gitlab.com/Shinobi-Systems/ShinobiDocker
+
 ⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐⭐
 
 
