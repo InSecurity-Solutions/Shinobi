@@ -7,11 +7,9 @@ const moduleName = 'connectToManagementServer'
 module.exports = (s,config,lang,app) => {
     if(!config.enableMgmtConnect){
         return;
-    }else if(!config.userHasSubscribed){
-        return console.log(lang.centralManagementNotEnabled)
     }
     const { modifyConfiguration, getConfiguration } = require('../system/utils.js')(config)
-    require('./libs/centralConnect.js')(s,config)
+    require('./libs/centralConnect.js')(s,config,lang)
     require('./libs/pairServer.js')(s,config)
 
     /**
@@ -29,7 +27,7 @@ module.exports = (s,config,lang,app) => {
             const configError = await modifyConfiguration(Object.assign(currentConfig,form))
             if(configError)s.systemLog(configError)
             try{
-                s.centralManagementWorker.terminate()
+                s.restartCentralManagement()
             }catch(err){
                 s.debugLog(err)
             }
@@ -51,7 +49,7 @@ module.exports = (s,config,lang,app) => {
                 const configError = await modifyConfiguration(currentConfig);
                 if(configError)s.systemLog(configError);
                 try{
-                    s.centralManagementWorker.terminate()
+                    s.restartCentralManagement()
                 }catch(err){
                     s.debugLog(err)
                 }

@@ -1,6 +1,6 @@
 const { Worker } = require('worker_threads')
 const fs = require('fs').promises;
-module.exports = (s,config) => {
+module.exports = (s,config,lang) => {
     const {
         modifyConfiguration,
     } = require('../../system/utils.js')(config)
@@ -9,6 +9,9 @@ module.exports = (s,config) => {
     } = require('./connectDetails.js')(s,config)
     const configPath = process.cwd() + '/conf.json'
     async function startWorker(){
+        if(!config.userHasSubscribed){
+            return console.log(lang.centralManagementNotEnabled)
+        }
         const configFromFile = JSON.parse(await fs.readFile(configPath, 'utf8'))
         configFromFile.timezone = config.timezone;
         console.log('Central Worker Starting...')
@@ -46,5 +49,14 @@ module.exports = (s,config) => {
         });
         s.centralManagementWorker = worker;
     }
-    startWorker()
+    s.onLoadedUsersAtStartup(() => {
+        startWorker()
+    })
+    s.restartCentralManagement = () => {
+        if(!s.centralManagementWorker){
+            startWorker()
+        }else{
+            s.centralManagementWorker.terminate()
+        }
+    };
 }

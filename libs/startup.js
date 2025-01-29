@@ -428,6 +428,7 @@ module.exports = function(s,config,lang,io){
                         checkForTerminalCommands(function(){
                             //load administrators (groups)
                             loadAdminUsers(function(){
+                                s.runExtensionsForArray('onLoadedUsersAtStartup', null, [])
                                 //load monitors (for groups)
                                 loadMonitors(function(){
                                     //check for orphaned videos
