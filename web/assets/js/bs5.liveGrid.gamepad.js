@@ -160,14 +160,6 @@ $(document).ready(function() {
         runPtzCommand(selectedMonitor, 'center')
     }
 
-    function startPatrol(){
-        return onvifStartPatrol(selectedMonitor)
-    }
-
-    function stopPatrol(){
-        return onvifStopPatrol(selectedMonitor)
-    }
-
     function translatePointTiltStick(x, y){
         if(x > stickBase && !lastPtzDirection['right']){
             lastPtzDirection['right'] = true
@@ -272,9 +264,10 @@ $(document).ready(function() {
             const gp = navigator.getGamepads()[0];
             getButtonsPressed(gp, function(buttonCode){
                 if(buttonCode == 10){
-                    startPatrol()
+                    closeSnapshot()
+                    openSnapshot()
                 }else if(buttonCode == 11){
-                    stopPatrol()
+                    closeSnapshot()
                 }else{
                     buttonPressAction(buttonCode)
                 }
@@ -306,7 +299,6 @@ $(document).ready(function() {
     function startReporting(){
         if(hasGP){
             console.log('Reading Gamepad')
-            window.clearInterval(repGP)
             repGP = window.setInterval(reportOnGamepad, reportInterval);
         }
     }
@@ -393,12 +385,6 @@ $(document).ready(function() {
         startReporting()
     })
     addOnTabAway('liveGrid', function () {
-        stopReporting()
-    })
-    addActionToExtender('windowFocus', function () {
-        if(tabTree.name === 'liveGrid')startReporting()
-    })
-    addActionToExtender('windowBlur', function () {
         stopReporting()
     })
 });

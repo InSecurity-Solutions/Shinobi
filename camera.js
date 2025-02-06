@@ -56,9 +56,7 @@ require('./libs/ffmpeg.js')(s,config,lang, async () => {
     //monitor/camera handlers
     require('./libs/monitor.js')(s,config,lang)
     //event functions : motion, object matrix handler
-    require('./libs/events.js')(s,config,lang,app,io)
-    //alarm events
-    require('./libs/alarms.js')(s,config,lang,app)
+    require('./libs/events.js')(s,config,lang)
     //recording functions
     require('./libs/videos.js')(s,config,lang)
     //plugins : websocket connected services..
@@ -99,16 +97,10 @@ require('./libs/ffmpeg.js')(s,config,lang, async () => {
     require('./libs/connectToManagementServer/index.js')(s,config,lang,app)
     //p2p, commander
     require('./libs/commander.js')(s,config,lang,app)
-    //failover
-    require('./libs/failover/index.js')(s,app,config,lang)
     //on-start actions, daemon(s) starter
     await require('./libs/startup.js')(s,config,lang)
     //cron
     require('./libs/cron.js')(s,config,lang)
     //video browser functions
     require('./libs/videoBrowser.js')(s,config,lang,app,io)
-    if(config.debugHeap){
-        //debugger
-        require('./libs/system/debugger.js')(s,config,lang,app,io)
-    }
 })

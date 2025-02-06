@@ -1,5 +1,4 @@
 var fs = require('fs')
-var path = require('path')
 var exec = require('child_process').exec
 module.exports = function(s,config,lang,app,io){
     const base64Prefix = '=?UTF-8?B?';
@@ -28,9 +27,6 @@ module.exports = function(s,config,lang,app,io){
         triggerEvent,
     } = require('./events/utils.js')(s,config,lang)
     const {
-        convertAviToMp4,
-    } = require('./video/utils.js')(s,config,lang)
-    const {
         deleteFilesInFolder,
     } = require('./basic/utils.js')(process.cwd(), config)
     if(config.dropInEventServer === true){
@@ -52,53 +48,7 @@ module.exports = function(s,config,lang,app,io){
             }
             return newPath;
         }
-        const processAviFile = async function({ filePath, monitorConfig }){
-            var ke = monitorConfig.ke
-            var mid = monitorConfig.mid
-            const tempMp4File = `${s.dir.streams}${ke}/${mid}/${(new Date()).getTime()}.mp4`
-            try{
-                await convertAviToMp4({
-                    input: filePath,
-                    output: tempMp4File,
-                })
-                await processMp4File({ filePath: tempMp4File, monitorConfig })
-                await deleteFile(tempMp4File, 6)
-            }catch(err){
-                console.error(err)
-            }
-        }
-        const processMp4File = async function({ filePath, monitorConfig }){
-            const stats = await fs.promises.stat(filePath)
-            const mid = monitorConfig.mid
-            const ke = monitorConfig.ke
-            var startTime = stats.ctime
-            var endTime = stats.mtime
-            var filename = getFileNameFromPath(filePath)
-            var shinobiFilename = s.formattedTime(startTime) + '.mp4'
-            var recordingPath = s.getVideoDirectory(monitorConfig) + shinobiFilename
-            var writeStream = fs.createWriteStream(recordingPath)
-            fs.createReadStream(filePath).pipe(writeStream)
-            writeStream.on('finish', () => {
-                s.insertCompletedVideo(monitorConfig,{
-                    file: shinobiFilename,
-                    events: [
-                        {
-                          id: mid,
-                          ke: ke,
-                          time: new Date(),
-                          details: {
-                              confidence: 100,
-                              name: filename,
-                              plug: "dropInEvent",
-                              reason: "ftpServer"
-                          }
-                        }
-                    ],
-                },function(){
-                })
-            })
-        }
-        var processFile = async function(filePath,monitorConfig){
+        var processFile = function(filePath,monitorConfig){
             var ke = monitorConfig.ke
             var mid = monitorConfig.mid
             var filename = getFileNameFromPath(filePath)
@@ -106,7 +56,7 @@ module.exports = function(s,config,lang,app,io){
                 var snapPath = s.dir.streams + ke + '/' + mid + '/s.jpg'
                 fs.rm(snapPath,async function(err){
                     await copyFileAsync(filePath, snapPath)
-                    const eventData = {
+                    triggerEvent({
                         id: mid,
                         ke: ke,
                         details: {
@@ -114,34 +64,42 @@ module.exports = function(s,config,lang,app,io){
                             name: filename,
                             plug: "dropInEvent",
                             reason: "ftpServer"
-                        }
-                    }
-                    try{
-                        eventData.frame = await fs.promises.readFile(filePath);
-                    }catch(err){
-
-                    }
-                    triggerEvent(eventData,config.dropInEventForceSaveEvent)
+                        },
+                    },config.dropInEventForceSaveEvent)
                 })
             }else{
                 var reason = "ftpServer"
-                if(search(filename.toLowerCase(),'.avi')){
-                    try{
-                        await processAviFile({ filePath, monitorConfig })
-                    }catch(err){
-                        console.log('dropInEvents : processAviFile : error',err)
-                        return;
-                    }
-                }
                 if(search(filename,'.mp4')){
-                    try{
-                        await processMp4File({ filePath, monitorConfig })
-                    }catch(err){
-                        console.log('dropInEvents : processMp4File : error',err)
-                        return;
-                    }
+                    fs.stat(filePath,function(err,stats){
+                        if(err)return;
+                        var startTime = stats.ctime
+                        var endTime = stats.mtime
+                        var shinobiFilename = s.formattedTime(startTime) + '.mp4'
+                        var recordingPath = s.getVideoDirectory(monitorConfig) + shinobiFilename
+                        var writeStream = fs.createWriteStream(recordingPath)
+                        fs.createReadStream(filePath).pipe(writeStream)
+                        writeStream.on('finish', () => {
+                            s.insertCompletedVideo(s.group[monitorConfig.ke].rawMonitorConfigurations[monitorConfig.mid],{
+                                file: shinobiFilename,
+                                events: [
+                                    {
+                                      id: mid,
+                                      ke: ke,
+                                      time: new Date(),
+                                      details: {
+                                          confidence: 100,
+                                          name: filename,
+                                          plug: "dropInEvent",
+                                          reason: "ftpServer"
+                                      }
+                                    }
+                                ],
+                            },function(){
+                            })
+                        })
+                    })
                 }
-                function completeAction(){
+                var completeAction = function(){
                     triggerEvent({
                         id: mid,
                         ke: ke,
@@ -151,7 +109,7 @@ module.exports = function(s,config,lang,app,io){
                             plug: "dropInEvent",
                             reason: reason
                         },
-                    }, config.dropInEventForceSaveEvent)
+                    },config.dropInEventForceSaveEvent)
                 }
                 if(search(filename,'.txt')){
                     fs.readFile(filePath,{encoding: 'utf-8'},function(err,data){
@@ -165,54 +123,45 @@ module.exports = function(s,config,lang,app,io){
                 }else{
                     completeAction()
                 }
+
             }
         }
-        function deleteFile(filePath, numberOfMinutes = 5){
-            // console.log(`QUEUE deleteFile in ${numberOfMinutes} minutes : `, filePath)
-            clearTimeout(fileQueue[filePath])
-            fileQueue[filePath] = setTimeout(async function(){
-                try{
-                    await fs.promises.rm(filePath, { recursive: true });
-                    // console.log('DONE deleteFile : ', filePath)
-                }catch(err){
-                    // console.log('ERROR deleteFile : ', filePath, err)
-                }
-                delete(fileQueue[filePath])
-            },1000 * 60 * numberOfMinutes)
-        }
-        async function onFileOrFolderFound(filePath, monitorConfig){
-            try{
-                const stats = await fs.promises.stat(filePath)
-                const isDirectory = stats.isDirectory();
-                if(isDirectory){
-                    const files = await fs.promises.readdir(filePath)
-                    if(files){
-                        files.forEach(function(filename){
-                            const fileInDirectory = path.join(filePath, filename);
-                            // console.log('File Found in FTP Directory : ', fileInDirectory)
-                            onFileOrFolderFound(fileInDirectory, monitorConfig)
+        var onFileOrFolderFound = function(filePath,deletionKey,monitorConfig){
+          fs.stat(filePath,function(err,stats){
+              if(!err){
+                    if(stats.isDirectory()){
+                        fs.readdir(filePath,function(err,files){
+                            if(files){
+                                files.forEach(function(filename){
+                                    onFileOrFolderFound(clipPathEnding(filePath) + '/' + filename,deletionKey,monitorConfig)
+                                })
+                            }else if(err){
+                                console.log(err)
+                            }
                         })
-                    }
-                    deleteFile(filePath, 6)
-                }else{
-                    if(!fileQueue[filePath]){
-                        // console.log('Processing File in FTP : ', filePath)
-                        await processFile(filePath, monitorConfig)
-                        if(config.dropInEventDeleteFileAfterTrigger){
-                            const aboveFolder = path.dirname(filePath);
-                            const monitorDirectory = path.join(s.dir.dropInEvents, monitorConfig.ke, monitorConfig.mid);
-                            if(aboveFolder !== monitorDirectory){
-                                // console.log('Delete aboveFolder', aboveFolder)
-                                deleteFile(aboveFolder)
-                            }else{
-                                deleteFile(filePath)
+                    }else{
+                        if(!fileQueue[filePath]){
+                            processFile(filePath,monitorConfig)
+                            if(config.dropInEventDeleteFileAfterTrigger){
+                                clearTimeout(fileQueue[filePath])
+                                fileQueue[filePath] = setTimeout(function(){
+                                    fs.rm(filePath, { recursive: true },(err) => {
+                                        delete(fileQueue[filePath])
+                                    })
+                                },1000 * 60 * 5)
                             }
                         }
                     }
-                }
-            }catch(err){
-                console.log(err)
-            }
+                    if(config.dropInEventDeleteFileAfterTrigger){
+                        clearTimeout(fileQueueForDeletion[deletionKey])
+                        fileQueueForDeletion[deletionKey] = setTimeout(function(){
+                            fs.rm(filePath, { recursive: true },(err) => {
+                                delete(fileQueueForDeletion[deletionKey])
+                            })
+                        },1000 * 60 * 5)
+                    }
+               }
+           })
         }
         var createDropInEventsDirectory = function(){
             try{
@@ -294,35 +243,21 @@ module.exports = function(s,config,lang,app,io){
                 ftpServer.on('login', ({connection, username, password}, resolve, reject) => {
                     s.basicOrApiAuthentication(username,password,function(err,user){
                         if(user){
-                            // console.log('FTP : login',username, password)
                             connection.on('STOR', (error, fileName) => {
-                                // console.log('FTP : STOR',fileName,error)
                                 if(!fileName)return;
-                                try{
-                                    const pathPieces = fileName.replace(s.dir.dropInEvents,'').split('/')
-                                    const ke = user.ke
-                                    const mid = pathPieces[1]
-                                    const monitorConfig = s.group[ke].rawMonitorConfigurations[mid];
-                                    const monitorDirectory = path.join(s.dir.dropInEvents, user.ke, mid);
-                                    if(monitorConfig){
-                                        onFileOrFolderFound(fileName, monitorConfig)
-                                    }else{
-                                        deleteFile(monitorDirectory, 0.1)
-                                        s.userLog({ ke, mid: '$USER' }, {
-                                            type: 'FTP Upload Error',
-                                            msg: lang.FTPMonitorIdNotFound
-                                        });
-                                        // console.log('Monitor ID Not Found or Not Active')
-                                    }
-                                }catch(err){
-                                    deleteFile(fileName, 0.1)
-                                    console.log('FTP Failed Processing')
-                                }
+                                var pathPieces = fileName.replace(s.dir.dropInEvents,'').split('/')
+                                var ke = pathPieces[0]
+                                var mid = pathPieces[1]
+                                var firstDroppedPart = pathPieces[2]
+                                var monitorEventDropDir = s.dir.dropInEvents + ke + '/' + mid + '/'
+                                var deleteKey = monitorEventDropDir + firstDroppedPart
+                                fs.mkdir(pathPieces.join('/'), { recursive: true }, (err) => {
+                                    onFileOrFolderFound(monitorEventDropDir + firstDroppedPart,deleteKey,Object.assign({},s.group[ke].rawMonitorConfigurations[mid]))
+                                })
                             })
                             resolve({root: s.dir.dropInEvents + user.ke})
                         }else{
-                            // console.log('FTP : AUTH FAIL')
-                            reject(new Error('Failed Authorization'))
+                            // reject(new Error('Failed Authorization'))
                         }
                     })
                 })

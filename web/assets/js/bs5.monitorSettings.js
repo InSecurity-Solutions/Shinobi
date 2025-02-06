@@ -16,7 +16,6 @@ var copySettingsSelector = $('#copy_settings')
 var monitorPresetsSelection = $('#monitorPresetsSelection')
 var monitorPresetsNameField = $('#monitorPresetsName')
 var detectorsSelected = $('#detectorsSelected')
-var monitorSettingsEventPtz = $('#monitorSettingsEventPtz')
 var monitorsList = monitorEditorWindow.find('.monitors_list')
 var editorForm = monitorEditorWindow.find('form')
 var tagsInput = monitorEditorWindow.find('[name="tags"]')
@@ -423,9 +422,12 @@ var copyMonitorSettingsToSelected = function(monitorConfig){
         $.each(chosenSections,function(n,section){
             monitor = alterSettings(section,monitor)
         })
-        configureMonitor(monitor).then(() => {
-            chosenMonitors[monitor.mid] = monitor;
-        })
+        $.post(getApiPrefix()+'/configureMonitor/'+$user.ke+'/'+monitor.mid,{data:JSON.stringify(monitor)},function(d){
+            debugLog(d)
+        }).fail(function(xhr, status, error) {
+            console.error(error)
+        });
+        chosenMonitors[monitor.mid] = monitor;
     })
 }
 window.getMonitorEditFormFields = function(){
@@ -450,11 +452,9 @@ window.getMonitorEditFormFields = function(){
     monitorConfig.details = getDetailValues(editorForm)
     // monitorConfig.details = safeJsonParse(monitorConfig.details)
     monitorConfig.details.substream = getSubStreamChannelFields()
-    monitorConfig.details.input_maps = getInputMapConnectionInfo()
-    monitorConfig.details.input_map_choices = getInputMapDesignations()
-    monitorConfig.details.stream_channels = getStreamChannelConnectionInfo()
-    monitorConfig.details.triggerMonitorsPtzTargets = getSelectedEventBasedPtzPresets()
-    monitorConfig.details.detectorLineCounterSettings = getLineCounterState()
+    monitorConfig.details.input_map_choices = monitorSectionInputMapsave()
+    // TODO : Input Maps and Stream Channels (does old way at the moment)
+
 
 //    if(monitorConfig.protocol=='rtsp'){monitorConfig.ext='mp4',monitorConfig.type='rtsp'}
     if(errorsFound.length > 0){
@@ -610,7 +610,6 @@ async function importIntoMonitorEditor(options){
     var monitorGroups = monitorDetails.groups ? safeJsonParse(monitorDetails.groups) : []
     monitorTags = monitorTags.concat(monitorGroups)
     loadMonitorGroupTriggerList()
-    loadEventBasedPtzRows()
 	if (monitorConfig.ke && monitorConfig.mid) {
 		$.get(getApiPrefix()+'/hls/'+monitorConfig.ke+'/'+monitorConfig.mid+'/detectorStream.m3u8',function(data){
 			$('#monEditBufferPreview').html(data)
@@ -726,14 +725,6 @@ async function importIntoMonitorEditor(options){
         }
     });
     //
-    if(monitorDetails.detectorLineCounter == '1'){
-        setTimeout(function(){
-            drawLineCounterCanvas(Object.assign({}, monitorConfig, { details: monitorDetails }))
-        },500)
-    }else{
-        clearLineCounterCanvas()
-    }
-    //
     await getPluginsList(monitorConfig)
     //
     copySettingsSelector.val('0').change()
@@ -831,7 +822,7 @@ editorForm.submit(function(e){
     }
     var monitorConfig = validation.monitorConfig
     setSubmitButton(editorForm, lang[`Please Wait...`], `spinner fa-pulse`, true)
-    configureMonitor(monitorConfig).then((d) => {
+    $.post(getApiPrefix()+'/configureMonitor/'+$user.ke+'/'+monitorConfig.mid,{data:JSON.stringify(monitorConfig)},function(d){
         if(d.ok === false){
             new PNotify({
                 title: lang['Action Failed'],
@@ -841,11 +832,19 @@ editorForm.submit(function(e){
         }
         debugLog(d)
         setSubmitButton(editorForm, lang.Save, `check`, false)
+    }).fail((err) => {
+        new PNotify({
+            title: lang['Action Failed'],
+            text: JSON.stringify(err, null, 3),
+            type: 'danger'
+        })
+        setSubmitButton(editorForm, lang.Save, `check`, false)
     })
     //
     if(copySettingsSelector.val() === '1'){
         copyMonitorSettingsToSelected(monitorConfig)
     }
+    monitorEditorWindow.modal('hide')
     return false;
 });
 //////////////////
@@ -856,7 +855,7 @@ var mapPlacementInit = function(){
         _this.find('.place').text(n+1)
     })
 }
-function getInputMapDesignations(){
+var monitorSectionInputMapsave = function(){
     var mapContainers = monitorEditorWindow.find('[input-mapping]');
     var stringForSave = {}
     mapContainers.each(function(q,t){
@@ -873,18 +872,6 @@ function getInputMapDesignations(){
     });
     return stringForSave
 }
-function getInputMapConnectionInfo(){
-    var el = monitorSectionInputMaps.find('.input-map')
-    var selectedMaps = []
-    el.each(function(n,v){
-        var map={}
-        $.each($(v).find('[map-detail]'),function(m,b){
-            map[$(b).attr('map-detail')]=$(b).val()
-        });
-        selectedMaps.push(map)
-    });
-    return selectedMaps
-}
 monitorSectionInputMaps.on('click','.delete',function(){
     $(this).parents('.input-map').remove()
     var inputs = $('[map-detail]')
@@ -897,6 +884,18 @@ monitorSectionInputMaps.on('click','.delete',function(){
     }
     mapPlacementInit()
 })
+monitorEditorWindow.on('change','[map-detail]',function(){
+    var el = monitorSectionInputMaps.find('.input-map')
+    var selectedMaps = []
+    el.each(function(n,v){
+        var map={}
+        $.each($(v).find('[map-detail]'),function(m,b){
+            map[$(b).attr('map-detail')]=$(b).val()
+        });
+        selectedMaps.push(map)
+    });
+    monitorEditorWindow.find('[detail="input_maps"]').val(JSON.stringify(selectedMaps)).change()
+})
 monitorEditorWindow.on('click','[input-mapping] .add_map_row',function(){
     drawInputMapSelectorHtml({},$(this).parents('[input-mapping]').find('.choices'))
 })
@@ -905,17 +904,17 @@ monitorEditorWindow.on('click','[input-mapping] .delete_map_row',function(){
 })
 //////////////////
 //Stream Channels
-function getStreamChannelConnectionInfo(){
+var monitorStreamChannelsave = function(){
     var el = monitorStreamChannels.find('.stream-channel')
     var selectedChannels = []
     el.each(function(n,v){
         var channel={}
         $.each($(v).find('[channel-detail]'),function(m,b){
-            channel[$(b).attr('channel-detail')] = $(b).val()
+            channel[$(b).attr('channel-detail')]=$(b).val()
         });
         selectedChannels.push(channel)
     });
-    return selectedChannels
+    monitorEditorWindow.find('[detail="stream_channels"]').val(JSON.stringify(selectedChannels)).change()
 }
 var channelPlacementInit = function(){
     $('.stream-channel').each(function(n,v){
@@ -1042,7 +1041,11 @@ function setFieldVisibility(){
 }
 monitorStreamChannels.on('click','.delete',function(){
     $(this).parents('.stream-channel').remove()
+    monitorStreamChannelsave()
     channelPlacementInit()
+})
+monitorEditorWindow.on('change','[channel-detail]',function(){
+    monitorStreamChannelsave()
 })
 monitorEditorWindow.find('.probe-monitor-settings').click(function(){
     $.pB.submit(buildMonitorURL())
@@ -1182,7 +1185,7 @@ editorForm.find('[name="type"]').change(function(e){
             loadedMonitor[n] = n === 'details' ? safeJsonParse(v) : v
         })
         if(d.new === true){
-            drawMonitorIconToMenu(newMonitorData, true)
+            drawMonitorIconToMenu(newMonitorData)
         }
         switch(newMonitorData.mode){
             case'start':case'record':
@@ -1201,8 +1204,7 @@ editorForm.find('[name="type"]').change(function(e){
             redAlertNotify({
                 title: lang['Monitor Saved'],
                 text: '<b>'+newMonitorData.name+'</b> <small>'+newMonitorData.mid+'</small> has been saved.',
-                type: 'success',
-                hide: true
+                type: 'success'
             })
         }
     }
@@ -1242,61 +1244,6 @@ editorForm.find('[name="type"]').change(function(e){
         monitorTriggerTags.forEach((tag) => {
             triggerTagsInput.tagsinput('add',tag);
         });
-    }
-    async function loadEventBasedPtzRows(){
-        monitorSettingsEventPtz.empty();
-        var triggerMonitorsPtzTargets = monitorEditorSelectedMonitor && monitorEditorSelectedMonitor.details.triggerMonitorsPtzTargets ? monitorEditorSelectedMonitor.details.triggerMonitorsPtzTargets : {}
-        for(monitorId in triggerMonitorsPtzTargets){
-            const presetToken = triggerMonitorsPtzTargets[monitorId];
-            drawEventBasedPtzRow(monitorId, presetToken)
-        }
-    }
-    async function drawEventBasedPtzRow(monitorId, presetToken){
-        var monitorOptions = Object.values(loadedMonitors).map(monitor => createOptionHtml({
-            label: monitor.name,
-            value: monitor.mid,
-            selected: monitor.mid === monitorId,
-        })).join('');
-        var tempId = generateId();
-        var html = `<tr associated-ptz-row="${tempId}" class="monitorSettingsEventPtz-row">
-            <td><select class="form-control selected-monitor">${monitorOptions}</select></td>
-            <td><select class="form-control selected-preset">${monitorId ? await getMonitorOnvifPresetsHtml(monitorId, presetToken) : ''}</select></td>
-            <td class="text-end"><a class="btn btn-sm btn-danger remove-row"><i class="fa fa-trash-o"></i></a></td>
-        </tr>`
-        monitorSettingsEventPtz.html(html)
-        if(monitorId && presetToken){
-            monitorSettingsEventPtz.find(`[associated-ptz-row="${tempId}"] .selected-preset`).val(padToThreeDigits(presetToken))
-        }
-    }
-    async function getMonitorOnvifPresetsHtml(monitorId, selectedPreset = ''){
-        var isOnvif = loadedMonitors[monitorId].details.is_onvif === '1';
-        if(!isOnvif)return;
-        var onvifPresets = await runPtzCommand(monitorId, 'getPresets');
-        if(onvifPresets.length === 0 && selectedPreset){
-            return createOptionHtml({
-                label: selectedPreset,
-                value: padToThreeDigits(selectedPreset),
-                selected: true,
-            })
-        }else{
-            return onvifPresets.map(preset => createOptionHtml({
-                label: preset.name,
-                value: padToThreeDigits(preset.token),
-                selected: preset.token === selectedPreset,
-            })).join('');
-        }
-    }
-    function getSelectedEventBasedPtzPresets(){
-        var selected = {};
-        monitorEditorWindow.find('.monitorSettingsEventPtz-row').each(function(n,v){
-            var el = $(v);
-            var monitorId = el.find('.selected-monitor').val();
-            var presetToken = el.find('.selected-preset').val();
-            if(monitorId && presetToken){
-                selected[monitorId] = padToThreeDigits(presetToken);
-            }
-        });
-        return selected;
     }
     window.writeToMonitorSettingsWindow = function(monitorValues){
         $.each(monitorValues,function(key,value){
@@ -1395,21 +1342,6 @@ editorForm.find('[name="type"]').change(function(e){
     });
     monitorEditorWindow.find('.probe_config').click(function(){
         $.pB.submit(buildMonitorURL(),true)
-    });
-    monitorEditorWindow.on('change', '.monitorSettingsEventPtz-row .selected-monitor', async function(){
-        var el = $(this);
-        var monitorId = el.val();
-        var presetField = el.parents('.monitorSettingsEventPtz-row').find('.selected-preset');
-        var html = await getMonitorOnvifPresetsHtml(monitorId);
-        presetField.html(html)
-    })
-    .on('click', '.monitorSettingsEventPtz-row .remove-row', function(){
-        var el = $(this);
-        var theRow = el.parents('.monitorSettingsEventPtz-row');
-        theRow.remove();
-    })
-    .on('click','.monitor-settings-event-ptz-add',function(){
-        drawEventBasedPtzRow()
     });
     onWebSocketEvent(function (d){
         //     new PNotify({

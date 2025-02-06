@@ -158,61 +158,22 @@ function getVideoSnapshot(videoElement,cb){
     cb(base64,image_data,c.width,c.height)
 }
 
-function runPtzCommand(monitorId,switchChosen,options = {}){
-    return new Promise((resolve) => {
-        switch(switchChosen){
-            case'setHome':
-                $.getJSON(getApiPrefix(`control`) + '/' + monitorId + '/setHome',function(data){
-                    resolve(data)
-                })
-            break;
-            case'getPresets':
-                $.get(getApiPrefix(`onvifPresets`) + '/' + monitorId,function(data){
-                    resolve(data.presets || [])
-                })
-            break;
-            case'setPreset':
-                // presetToken
-                // presetName
-                $.post(getApiPrefix(`onvifSetPreset`) + '/' + monitorId,options,function(data){
-                    resolve(data)
-                })
-            break;
-            case'goToPreset':
-                // presetToken
-                $.post(getApiPrefix(`onvifGoToPreset`) + '/' + monitorId,options,function(data){
-                    resolve(data)
-                })
-            break;
-            case'removePreset':
-                // presetToken
-                $.post(getApiPrefix(`onvifRemovePreset`) + '/' + monitorId,options,function(data){
-                    resolve(data)
-                })
-            break;
-            case'startPatrol':
-                // startingPresetToken
-                // patrolIndexTimeout
-                $.post(getApiPrefix(`onvifStartPatrol`) + '/' + monitorId,options,function(data){
-                    resolve(data)
-                })
-            break;
-            case'stopPatrol':
-                $.get(getApiPrefix(`onvifStopPatrol`) + '/' + monitorId,function(data){
-                    resolve(data)
-                })
-            break;
-            default:
-                mainSocket.f({
-                    f: 'control',
-                    direction: switchChosen,
-                    id: monitorId,
-                    ke: $user.ke
-                })
-                resolve()
-            break;
-        }
-    })
+function runPtzCommand(monitorId,switchChosen){
+    switch(switchChosen){
+        case'setHome':
+            $.getJSON(getApiPrefix(`control`) + '/' + monitorId + '/setHome',function(data){
+                console.log(data)
+            })
+        break;
+        default:
+            mainSocket.f({
+                f: 'control',
+                direction: switchChosen,
+                id: monitorId,
+                ke: $user.ke
+            })
+        break;
+    }
 }
 function runPtzMove(monitorId,switchChosen,doMove){
     mainSocket.f({
@@ -331,7 +292,7 @@ function buildStreamUrl(monitorId){
 
 function buildEmbedUrl(monitor){
     var monitorId = monitor.mid;
-    var streamURL = `${getApiPrefix(`embed`)}/${monitorId}/fullscreen|jquery|gui|relative?host=${location.origin + location.pathname}`
+    var streamURL = `${getApiPrefix(`embed`)}/${monitorId}/fullscreen|jquery|gui|relative?host=${location.pathname}`
     return streamURL;
 }
 
@@ -556,12 +517,11 @@ function importMonitor(textData){
         var parsedData = textData instanceof Object ? textData : safeJsonParse(mergeConcattedJsonString(textData))
         function postMonitor(v){
             var monitorId = v.mid
-            configureMonitor(v)
-            // $.post(`${getApiPrefix('configureMonitor')}/${monitorId}`,{
-            //     data: JSON.stringify(v,null,3)
-            // },function(d){
-            //     debugLog(d)
-            // })
+            $.post(`${getApiPrefix('configureMonitor')}/${monitorId}`,{
+                data: JSON.stringify(v,null,3)
+            },function(d){
+                debugLog(d)
+            })
         }
         //zoneminder one monitor
         if(parsedData.monitor){
@@ -686,14 +646,14 @@ function launchImportMonitorWindow(callback){
         reader.readAsText(f);
     });
 }
-function redAlertNotify({ title, text, type, hide = false }) {
+function redAlertNotify({ title, text, type }) {
     var redAlertNotice = redAlertNotices[title];
     if (redAlertNotice) {
         redAlertNotice.update({
             title: title,
             text: text,
             type: type,
-            hide: hide,
+            hide: false,
             delay: 30000
         });
     } else {
@@ -701,7 +661,7 @@ function redAlertNotify({ title, text, type, hide = false }) {
             title: title,
             text: text,
             type: type,
-            hide: hide,
+            hide: false,
             delay: 30000
         });
         redAlertNotices[title].on('close', function() {
@@ -723,7 +683,7 @@ function buildPosePoints(bodyParts, x, y){
     }
     return theArray;
 }
-async function drawMatrices(event, options, autoRemoveTimeout, drawTrails){
+function drawMatrices(event, options, autoRemoveTimeout, drawTrails){
     var theContainer = options.theContainer
     var height = options.height
     var width = options.width
@@ -787,15 +747,6 @@ async function drawMatrices(event, options, autoRemoveTimeout, drawTrails){
     }
     $.each(event.details.matrices, processMatrix);
     $.each(moreMatrices, processMatrix);
-    var detectionDrawDelay = detectionDrawDelays[monitorId];
-    if(detectionDrawDelay){
-        await (new Promise((resolve) => {
-            setTimeout(() => {
-                resolve()
-            }, detectionDrawDelay * 1000)
-        }))
-        // console.log(`Delayed Draw by ${detectionDrawDelay} seconds`)
-    }
     var addedEls = theContainer.append(html)
     if(autoRemoveTimeout){
         addedEls = addedEls.find('.fresh-detected-object').removeClass('fresh-detected-object')
@@ -837,118 +788,6 @@ function muteMonitorAudio(monitorId,buttonEl){
     var volumeIcon = monitorMutes[monitorId] !== 1 ? 'volume-up' : 'volume-off'
     if(buttonEl)buttonEl.find('i').removeClass('fa-volume-up fa-volume-off').addClass('fa-' + volumeIcon)
 }
-function getLoadedMonitors(unusedParameter, runningOnly, asArray){
-    const theMonitors = asArray ? [] : {}
-    if(asArray){
-        return Object.values(loadedMonitors)
-    }else{
-        $.each(loadedMonitors,function(monitorId,monitor){
-            if(
-                !runningOnly ||
-                monitor.mode === 'start' ||
-                monitor.mode === 'record'
-            ){
-                theMonitors[monitor.mid] = monitor
-            }
-        })
-    }
-    return theMonitors;
-}
-function getMonitorAfter(monitorLiveId, getValue, monitors = loadedMonitors) {
-    let passedMentioned = false;
-    let foundProp = null;
-    let foundValue = null;
-    for (var prop in monitors) {
-        if (passedMentioned) {
-            foundProp = prop;
-            foundValue = monitors[prop];
-            break;
-        } else if (monitorLiveId === prop) {
-            passedMentioned = true;
-        }
-    }
-    if (!foundProp) {
-        for (var prop in monitors) {
-            foundProp = prop;
-            foundValue = monitors[prop];
-            break;
-        }
-    }
-
-    return getValue ? foundValue : foundProp;
-}
-function getMonitorsAfter(monitorLiveId, numberOf, monitors = loadedMonitors) {
-    let passedMentioned = !monitorLiveId || false;
-    let iterated = 0;
-    const foundMonitors = {};
-    let wrapped = false;
-
-    // First pass: find monitors after the specified one
-    for (var prop in monitors) {
-        if (passedMentioned) {
-            if (iterated === numberOf) {
-                return foundMonitors;
-            }
-            ++iterated;
-            foundMonitors[prop] = monitors[prop];
-        } else if (monitorLiveId === prop) {
-            passedMentioned = true;
-        }
-    }
-
-    // If not enough monitors were found after the specified one, wrap around to the beginning
-    if (iterated < numberOf) {
-        for (var prop in monitors) {
-            if (iterated === numberOf) {
-                return foundMonitors;
-            }
-            ++iterated;
-            foundMonitors[prop] = monitors[prop];
-        }
-    }
-
-    return foundMonitors;
-}
-function getMonitorBefore(monitorLiveId, getValue, monitors = loadedMonitors) {
-    const monitorKeys = Object.keys(monitors);
-    const index = monitorKeys.indexOf(monitorLiveId);
-
-    let previousKey;
-    if (index === -1) {
-        // If the monitorLiveId is not found, start from the end
-        previousKey = monitorKeys[monitorKeys.length - 1];
-    } else if (index === 0) {
-        // If it's the first monitor, wrap around to the last one
-        previousKey = monitorKeys[monitorKeys.length - 1];
-    } else {
-        // Otherwise, get the previous monitor
-        previousKey = monitorKeys[index - 1];
-    }
-
-    return getValue ? monitors[previousKey] : previousKey;
-}
-function getMonitorsBefore(monitorLiveId, numberOf, monitors = loadedMonitors) {
-    const monitorKeys = Object.keys(monitors);
-    const index = monitorKeys.indexOf(monitorLiveId);
-    const foundMonitors = {};
-
-    let startIndex;
-    if (index === -1) {
-        // If the monitorLiveId is not found, start from the end
-        startIndex = monitorKeys.length - 1;
-    } else {
-        // Start from the monitor before the specified one
-        startIndex = index - 1;
-    }
-
-    for (let i = 0; i < numberOf; i++) {
-        const currentIndex = (startIndex - i + monitorKeys.length) % monitorKeys.length; // Wrap around using modulo
-        const key = monitorKeys[currentIndex];
-        foundMonitors[key] = monitors[key];
-    }
-
-    return foundMonitors;
-}
 function getMonitorsFromIds(monitorIds){
     var foundMonitors = []
     monitorIds.forEach((monitorId) => {
@@ -956,33 +795,17 @@ function getMonitorsFromIds(monitorIds){
     })
     return foundMonitors
 }
-function getListOfTagsFromMonitors(unusedParameter, tagsOnly){
+function getListOfTagsFromMonitors(){
     var listOftags = {}
     $.each(loadedMonitors,function(monitorId,monitor){
         if(monitor.tags){
            monitor.tags.split(',').forEach((tag) => {
                if(!listOftags[tag])listOftags[tag] = [];
-               if(!tagsOnly)listOftags[tag].push(monitorId)
+               listOftags[tag].push(monitorId)
            })
         }
     })
-    return tagsOnly ? Object.keys(listOftags) : listOftags
-}
-function getMonitorsIdsFromTagGroup(tag){
-    var searchingFor = tag.split(',').map(item => item.trim())
-    var listOfMonitors = []
-    $.each(getLoadedMonitors(),function(monitorLiveId,monitor){
-        if(monitor.tags){
-            for(tag of searchingFor){
-                if(monitor.tags.includes(tag)){
-                    const monitorId = monitor.mid;
-                    listOfMonitors.push({ monitorId });
-                    break;
-                }
-            }
-        }
-    })
-    return listOfMonitors
+    return listOftags
 }
 function sanitizeTagList(tags){
     var allTags = getListOfTagsFromMonitors()
@@ -1318,57 +1141,6 @@ function getRowsMonitorId(rowEl){
 function getMonitorEmbedLink(monitorConfig){
     return `${getApiPrefix('embed')}/${monitorConfig.mid}/fullscreen|jquery|relative`
 }
-function getMonitorIconPath(monitorId){
-    return `${getApiPrefix('icon') + '/' + monitorId}?_time=${new Date()}`
-}
-function setMode(monitorId, mode) {
-    const _this = this;
-    return new Promise((resolve) => {
-        $.getJSON(`${getApiPrefix('monitor')}/${monitorId}/${mode}`,function(data){
-            resolve(data)
-        }).fail((err) => {
-            console.log('Failed Mode Change Trying Again...', monitorId)
-            _this.setMode(monitorId, mode).then(resolve)
-        })
-    });
-}
-function deleteMonitor(monitorId, filesToo) {
-    return new Promise((resolve) => {
-        const _this = this;
-        const url = `${getApiPrefix('configureMonitor')}/${monitorId}/delete${filesToo ? `?deleteFiles=true` : ''}`;
-        $.getJSON(url, (data) => {
-            if(data.ok){
-                delete(loadedMonitors[monitorId])
-            }
-            resolve(data)
-        });
-    });
-}
-function deleteMonitorWithConfirm(monitorId, afterDelete) {
-    const monitor = loadedMonitors[monitorId]
-    $.confirm.create({
-        title: lang['Delete']+' '+monitor.name,
-        body: '<p>'+lang.DeleteMonitorsText+'</p>',
-        clickOptions: [
-            {
-                title:lang['Delete']+' '+lang['Monitors'],
-                class:'btn-danger',
-                callback: async function(){
-                    await deleteMonitor(monitorId, false);
-                    if(afterDelete)afterDelete(monitorId)
-                }
-            },
-            {
-                title:lang['Delete Monitors and Files'],
-                class:'btn-danger',
-                callback: async function(){
-                    await deleteMonitor(monitorId, true);
-                    if(afterDelete)afterDelete(monitorId)
-                }
-            }
-        ]
-    })
-}
 function getRunningMonitors(asArray){
     const foundMonitors = {}
     $.each(loadedMonitors,function(monitorId,monitor){
@@ -1383,47 +1155,6 @@ function getRunningMonitors(asArray){
 }
 function buildFileBinUrl(data){
     return apiBaseUrl + '/fileBin/' + data.ke + '/' + data.mid + '/' + data.name
-}
-async function configureMonitor(monitorConfig){
-    const _this = this;
-    return new Promise((resolve) => {
-        const monitorId = monitorConfig.mid;
-        mainSocket.f({
-            f: 'addOrEditMonitor',
-            mid: monitorId,
-            form: monitorConfig,
-        },function(response){
-            resolve(response)
-        });
-    })
-}
-async function getMonitors(monitorId){
-    const _this = this;
-    return new Promise((resolve) => {
-        mainSocket.f({
-            f: 'getMonitors',
-            mid: monitorId,
-        },function(response){
-            resolve(response)
-        });
-    })
-}
-function getMonitorStatus(item){
-    return definitions['Monitor Status Codes'][item.code] || item.status || lang.Initializing
-}
-function incrementString(strNum) {
-    const originalLength = strNum.length;
-    let numericValue = parseInt(strNum, 10);
-    numericValue += 1;
-    let incrementedStr = numericValue.toString();
-    while (incrementedStr.length < originalLength) {
-        incrementedStr = '0' + incrementedStr;
-    }
-    return incrementedStr;
-}
-function padToThreeDigits(input) {
-  const numericValue = parseInt(input, 10);
-  return numericValue.toString().padStart(3, '0');
 }
 $(document).ready(function(){
     $('body')

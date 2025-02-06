@@ -1,9 +1,8 @@
 module.exports = (s,config,lang) => {
     const fs = require('fs');
-    const fsPromises = require('fs').promises;
     const URL = require('url');
     const events = require('events');
-    const Mp4Frag = require('shinobi-mp4frag');
+    const Mp4Frag = require('mp4frag');
     const treekill = require('tree-kill');
     const exec = require('child_process').exec;
     const spawn = require('child_process').spawn;
@@ -35,13 +34,11 @@ module.exports = (s,config,lang) => {
     const {
         scanForOrphanedVideos,
         reEncodeVideoAndBinOriginalAddToQueue,
-        isApplicableVideosDirectory,
     } = require('../video/utils.js')(s,config,lang)
     const {
         selectNodeForOperation,
         bindMonitorToChildNode
     } = require('../childNode/utils.js')(s,config,lang)
-    s.mp4FragMemoryFreed = {}
     const isMasterNode = (
         (
             config.childNodes.enabled === true &&
@@ -55,7 +52,6 @@ module.exports = (s,config,lang) => {
         const processPID = proc && proc.pid ? parseInt(`${proc.pid}`) : null
         return new Promise((resolve,reject) => {
             let alreadyResolved = false
-            let killTimer = null;
             function doResolve(response){
                 if(alreadyResolved)return;
                 alreadyResolved = true;
@@ -78,33 +74,16 @@ module.exports = (s,config,lang) => {
             }
             try{
                 proc.removeAllListeners()
-                proc.on('error',(error) => {
-                    sendError(error.toString())
-                })
                 proc.on('exit',() => {
                     response.msg = 'proc.on.exit'
                     clearTimeout(killTimer)
                     doResolve(response)
-                    // treekill(processPID)
+                    treekill(processPID)
                 });
-                if(proc.killed || !proc.stdin || !proc.stdin.writable){
-                    doResolve(response)
-                    return
-                }
                 if(proc && proc.stdin) {
-                    proc.stdin.on('error', (err) => {
-                        if (err.code !== 'EPIPE') {
-                            console.error('processKill Stdin error:', err);
-                        }
-                        clearTimeout(killTimer)
-                        doResolve(response)
-                        treekill(processPID)
-                    });
-                    try{
-                        proc.stdin.write("q\r\n");
-                    }catch(err){}
+                    proc.stdin.write("q\r\n");
                 }
-                killTimer = setTimeout(() => {
+                let killTimer = setTimeout(() => {
                     if(proc && proc.kill){
                         if(s.isWin){
                             response.msg = 'taskkill'
@@ -171,32 +150,10 @@ module.exports = (s,config,lang) => {
             clearInterval(activeMonitor.objectCountIntervals);
             clearTimeout(activeMonitor.timeoutToRestart)
             clearTimeout(activeMonitor.fatalErrorTimeout);
-            clearTimeout(activeMonitor.trigger_timer)
-            delete(activeMonitor.trigger_timer)
-            clearTimeout(activeMonitor.initialHeartBeat)
-            clearInterval(activeMonitor.detector_notrigger_timeout)
-            delete(activeMonitor.detector_notrigger_timeout)
-            clearTimeout(activeMonitor.noViewerCountDisableSubstream)
-            clearTimeout(activeMonitor.motion_lock)
-            clearTimeout(activeMonitor.resetFatalErrorCountTimer)
             delete(activeMonitor.onvifConnection)
-            delete(activeMonitor.buildingTimelapseVideo)
             // if(activeMonitor.onChildNodeExit){
             //     activeMonitor.onChildNodeExit()
             // }
-            if(activeMonitor.mp4frag){
-                var mp4FragChannels = Object.keys(activeMonitor.mp4frag)
-                mp4FragChannels.forEach(function(channel){
-                    activeMonitor.mp4frag[channel].resetCache()
-                    activeMonitor.mp4frag[channel].removeAllListeners()
-                    activeMonitor.mp4frag[channel].once('unpipe', () => {
-                        activeMonitor.mp4frag[channel].reset()
-                        activeMonitor.mp4frag[channel].destroy()
-                        activeMonitor.mp4frag[channel] = null
-                        delete(activeMonitor.mp4frag[channel])
-                    })
-                })
-            }
             try{
                 activeMonitor.spawn.stdio.forEach(function(stdio){
                   try{
@@ -208,19 +165,12 @@ module.exports = (s,config,lang) => {
             }catch(err){
                 // s.debugLog(err)
             }
-            try{
-                if(activeMonitor.emitterChannel){
-                    Object.keys(activeMonitor.emitterChannel).forEach(function(channel){
-                        activeMonitor.emitterChannel[channel].removeAllListeners()
-                        delete(activeMonitor.emitterChannel[channel])
-                    })
-                }
-                if(activeMonitor.emitter){
-                    activeMonitor.emitter.removeAllListeners()
-                    delete(activeMonitor.emitter)
-                }
-            }catch(err){
-                s.debugLog(err)
+            if(activeMonitor.mp4frag){
+                var mp4FragChannels = Object.keys(activeMonitor.mp4frag)
+                mp4FragChannels.forEach(function(channel){
+                    activeMonitor.mp4frag[channel].removeAllListeners()
+                    delete(activeMonitor.mp4frag[channel])
+                })
             }
             if(config.childNodes.enabled === true && config.childNodes.mode === 'child' && config.childNodes.host){
                 s.cx({f:'clearCameraFromActiveList',ke:groupKey,id:e.id})
@@ -269,7 +219,7 @@ module.exports = (s,config,lang) => {
                 })
             }
             const temporaryImageFile = streamDir + s.gid(5) + '.jpg'
-            const ffmpegCmd = splitForFFMPEG(`-y -threads 1 -loglevel warning -re ${inputOptions.join(' ')} -i "${url}" ${outputOptions.join(' ')} -f mjpeg -an -frames:v 1 "${temporaryImageFile}"`)
+            const ffmpegCmd = splitForFFMPEG(`-y -loglevel warning -re ${inputOptions.join(' ')} -i "${url}" ${outputOptions.join(' ')} -f mjpeg -an -frames:v 1 "${temporaryImageFile}"`)
             const snapProcess = spawn(config.ffmpegDir, ffmpegCmd, {detached: true})
             snapProcess.stderr.on('data',function(data){
                 // s.debugLog(data.toString())
@@ -388,7 +338,7 @@ module.exports = (s,config,lang) => {
                     msg: lang["Process Started"],
                     cmd: ffmpegCommandString,
                 },
-            },true);
+            });
             const subStreamProcess = spawn(config.ffmpegDir,ffmpegCommandParsed,{detached: true,stdio: stdioPipes})
             attachStreamChannelHandlers({
                 ke: groupKey,
@@ -429,15 +379,17 @@ module.exports = (s,config,lang) => {
             });
 
             subStreamProcess.on('close',(data) => {
-                subStreamProcess.removeAllListeners()  // <-- add this
                 if(!activeMonitor.allowDestroySubstream){
-                    s.userLog({
-                        ke: groupKey,
-                        mid: monitorId,
-                    },{
-                        type: lang["Substream Process"],
-                        msg: lang["Process Crashed for Monitor"],
-                    },true)
+                    subStreamProcess.stderr.on('data',(data) => {
+                        s.userLog({
+                            ke: groupKey,
+                            mid: monitorId,
+                        },
+                        {
+                            type: lang["Substream Process"],
+                            msg: lang["Process Crashed for Monitor"],
+                        })
+                    })
                     setTimeout(() => {
                         spawnSubstreamProcess(e)
                     },2000)
@@ -482,10 +434,7 @@ module.exports = (s,config,lang) => {
         const fields = options.fields
         const number = options.number
         const ffmpegProcess = options.ffmpegProcess
-        const groupKey = options.ke
-        const monitorId = options.mid
         const activeMonitor = s.group[options.ke].activeMonitors[options.mid]
-        const monitorConfig = s.group[options.ke].rawMonitorConfigurations[options.mid]
         const pipeNumber = number + config.pipeAddition;
         if(!activeMonitor.emitterChannel[pipeNumber]){
             activeMonitor.emitterChannel[pipeNumber] = new events.EventEmitter().setMaxListeners(0);
@@ -493,21 +442,8 @@ module.exports = (s,config,lang) => {
        let frameToStreamAdded
        switch(fields.stream_type){
            case'mp4':
-               if(activeMonitor.mp4frag[pipeNumber]){
-                   activeMonitor.mp4frag[pipeNumber].resetCache()
-                   activeMonitor.mp4frag[pipeNumber].removeAllListeners()
-                   activeMonitor.mp4frag[pipeNumber].destroy()
-                   activeMonitor.mp4frag[pipeNumber] = null
-               }
-               if(!activeMonitor.mp4frag[pipeNumber]){
-                   const debugOutputPrefix = `${groupKey}, ${monitorId}, ${monitorConfig.name}, pipe: ${pipeNumber}`;
-                   activeMonitor.mp4frag[pipeNumber] = new Mp4Frag({ segmentCount: 2, cacheInterval: 60000, debug: config.debugMp4Frag || false, debugOutputPrefix });
-                   if(config.debugMp4Frag){
-                       activeMonitor.mp4frag[pipeNumber].on('memoryfreed',function(freed){
-                           s.mp4FragMemoryFreed[debugOutputPrefix] = [freed, new Date()]
-                       })
-                   }
-               }
+               delete(activeMonitor.mp4frag[pipeNumber])
+               if(!activeMonitor.mp4frag[pipeNumber])activeMonitor.mp4frag[pipeNumber] = new Mp4Frag();
                ffmpegProcess.stdio[pipeNumber].pipe(activeMonitor.mp4frag[pipeNumber],{ end: false })
            break;
            case'mjpeg':
@@ -583,7 +519,6 @@ module.exports = (s,config,lang) => {
             clearTimeout(streamViewerCountTimeouts[req.originalUrl])
             streamViewerCountTimeouts[req.originalUrl] = setTimeout(() => {
                 setActiveViewer(groupKey,monitorId,connectionId,false)
-                delete streamViewerCountTimeouts[timeoutKey]
             },5000)
         }else{
             s.debugLog(`User is Logged in, Don't add to viewer count`);
@@ -596,9 +531,9 @@ module.exports = (s,config,lang) => {
         const monitorConfig = copyMonitorConfiguration(groupKey,monitorId);
         const streamType = monitorConfig.details.stream_type;
         const analyzeDuration = (parseInt(monitorConfig.details.aduration) / 1000) || 10000;
-        activeMonitor.initialHeartBeat = null
+        let initialHeartBeat = null
         if(streamType !== 'useSubstream'){
-            activeMonitor.initialHeartBeat = setTimeout(() => {
+            initialHeartBeat = setTimeout(() => {
                 resetStreamCheck({
                     ke: groupKey,
                     mid: monitorId,
@@ -606,10 +541,10 @@ module.exports = (s,config,lang) => {
             }, analyzeDuration);
         }
         activeMonitor.spawn_exit = async function(){
-            clearTimeout(activeMonitor.initialHeartBeat)
+            clearTimeout(initialHeartBeat)
             if(activeMonitor.isStarted === true){
                 if(e.details.loglevel !== 'quiet'){
-                    s.userLog(e,{type:lang['Process Unexpected Exit'],msg:{msg:lang.unexpectedExitText,cmd:activeMonitor.ffmpeg}}, true);
+                    s.userLog(e,{type:lang['Process Unexpected Exit'],msg:{msg:lang.unexpectedExitText,cmd:activeMonitor.ffmpeg}});
                 }
                 await fatalError(e,'Process Unexpected Exit');
                 scanForOrphanedVideos(e,{
@@ -624,14 +559,14 @@ module.exports = (s,config,lang) => {
         activeMonitor.spawn.on('end',activeMonitor.spawn_exit)
         activeMonitor.spawn.on('exit',activeMonitor.spawn_exit)
         activeMonitor.spawn.on('error',function(er){
-            s.userLog(e,{type:'Spawn Error',msg:er},true);fatalError(e,'Spawn Error')
+            s.userLog(e,{type:'Spawn Error',msg:er});fatalError(e,'Spawn Error')
         })
         s.userLog(e,{
             type: lang['Process Started'],
             msg: {
                 cmd: activeMonitor.ffmpeg
             }
-        }, true)
+        })
     }
     async function deleteMonitorData(groupKey,monitorId){
         // deleteVideos
@@ -735,17 +670,17 @@ module.exports = (s,config,lang) => {
             const groupKey = options.ke
             const monitorId = options.id || options.mid
             const deleteFiles = options.deleteFiles === undefined ? true : options.deleteFiles
-            const monitorConfig = Object.assign({}, s.group[groupKey].rawMonitorConfigurations[monitorId])
             s.userLog({
                 ke: groupKey,
-                mid: '$USER'
+                mid: monitorId
             },{
                 type: lang.monitorDeleted,
                 msg: `${lang.byUser} : ${userId}`
-            }, true);
-            await s.camera('stop', {
+            });
+            s.camera('stop', {
                 ke: groupKey,
                 mid: monitorId,
+                delete: 1,
             });
             s.tx({
                 f: 'monitor_delete',
@@ -771,7 +706,6 @@ module.exports = (s,config,lang) => {
             delete(s.group[groupKey].activeMonitors[monitorId]);
             delete(s.group[groupKey].rawMonitorConfigurations[monitorId]);
             response.msg = `${lang.monitorDeleted} ${lang.byUser} : ${userId}`
-            s.runExtensionsForArray('onMonitorDelete', null, [monitorConfig, options])
         }catch(err){
             response.ok = false
             response.err = err
@@ -831,11 +765,15 @@ module.exports = (s,config,lang) => {
             if(activeMonitor.last_frame){delete(activeMonitor.last_frame)}
             if(activeMonitor.isStarted !== true){return}
             await cameraDestroy(e)
+            clearTimeout(activeMonitor.trigger_timer)
+            delete(activeMonitor.trigger_timer)
+            clearInterval(activeMonitor.detector_notrigger_timeout)
+            clearTimeout(activeMonitor.fatalErrorTimeout);
             activeMonitor.isStarted = false
             activeMonitor.isRecording = false
             s.tx({f:'monitor_stopping',mid:monitorId,ke:groupKey,time:s.formattedTime()},'GRP_'+groupKey);
-            // s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true})
-            s.userLog(e,{type:lang['Monitor Stopped'],msg:lang.MonitorStoppedText}, true);
+            s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true})
+            s.userLog(e,{type:lang['Monitor Stopped'],msg:lang.MonitorStoppedText});
             clearTimeout(activeMonitor.delete)
             if(e.delete === 1){
                 activeMonitor.delete = setTimeout(function(){
@@ -869,7 +807,7 @@ module.exports = (s,config,lang) => {
         const monitorId = e.mid || e.id
         const groupKey = e.ke
         s.tx({f:'monitor_idle',mid:monitorId,ke:groupKey,time:s.formattedTime()},'GRP_'+groupKey);
-        s.userLog(e,{type:lang['Monitor Idling'],msg:lang.MonitorIdlingText},true);
+        s.userLog(e,{type:lang['Monitor Idling'],msg:lang.MonitorIdlingText});
         s.sendMonitorStatus({
             id: monitorId,
             ke: groupKey,
@@ -903,7 +841,6 @@ module.exports = (s,config,lang) => {
             clearTimeout(streamViewerCountTimeouts[uniqueId])
             streamViewerCountTimeouts[uniqueId] = setTimeout(() => {
                 monitorRemoveViewer(e,cn)
-                delete streamViewerCountTimeouts[uniqueId]
             },e.monitorTimeout)
         }
     }
@@ -1028,7 +965,7 @@ module.exports = (s,config,lang) => {
         s.userLog({
             ke: groupKey,
             mid: monitorId,
-        },restartMessage, true)
+        },restartMessage)
         scanForOrphanedVideos({
             ke: groupKey,
             mid: monitorId,
@@ -1230,14 +1167,13 @@ module.exports = (s,config,lang) => {
         const groupKey = e.ke
         const monitorId = e.mid || e.id
         const activeMonitor = getActiveMonitor(groupKey,monitorId)
-        const monitorConfig = s.group[groupKey].rawMonitorConfigurations[monitorId]
         const detectorEnabled = e.details.detector === '1'
         activeMonitor.spawn.stdio[5].on('data',function(data){
             resetStreamCheck(e)
         })
         //emitter for mjpeg
         if(!e.details.stream_mjpeg_clients||e.details.stream_mjpeg_clients===''||isNaN(e.details.stream_mjpeg_clients)===false){e.details.stream_mjpeg_clients=20;}else{e.details.stream_mjpeg_clients=parseInt(e.details.stream_mjpeg_clients)}
-        activeMonitor.emitter = (new events.EventEmitter()).setMaxListeners(e.details.stream_mjpeg_clients);
+        activeMonitor.emitter = new events.EventEmitter().setMaxListeners(e.details.stream_mjpeg_clients);
         if(detectorEnabled && e.details.detector_audio === '1'){
             if(activeMonitor.audioDetector){
               activeMonitor.audioDetector.stop()
@@ -1280,17 +1216,15 @@ module.exports = (s,config,lang) => {
         }
         if(e.details.record_timelapse === '1'){
             var timelapseRecordingDirectory = s.getTimelapseFrameDirectory(e)
-            activeMonitor.spawn.stdio[7].on('data', async function(data){
+            activeMonitor.spawn.stdio[7].on('data', function(data){
                 try{
                     var fileStream = activeMonitor.recordTimelapseWriter
                     if(!fileStream){
                         var currentDate = s.formattedTime(null,'YYYY-MM-DD')
                         var filename = s.formattedTime() + '.jpg'
                         var location = timelapseRecordingDirectory + currentDate + '/'
-                        try{
-                            await fsPromises.mkdir(location)
-                        }catch(err){
-                            s.debugLog(err)
+                        if(!fs.existsSync(location)){
+                            fs.mkdirSync(location)
                         }
                         fileStream = fs.createWriteStream(location + filename)
                         fileStream.on('error', err => s.debugLog(err))
@@ -1342,21 +1276,8 @@ module.exports = (s,config,lang) => {
        const streamType = e.details.stream_type;
        switch(streamType){
            case'mp4':
-               if(activeMonitor.mp4frag['MAIN']){
-                   activeMonitor.mp4frag['MAIN'].resetCache()
-                   activeMonitor.mp4frag['MAIN'].removeAllListeners()
-                   activeMonitor.mp4frag['MAIN'].destroy()
-                   activeMonitor.mp4frag['MAIN'] = null
-               }
-               if(!activeMonitor.mp4frag['MAIN']){
-                   const debugOutputPrefix = `${groupKey}, ${monitorId}, ${monitorConfig.name}, pipe: MAIN`;
-                   activeMonitor.mp4frag['MAIN'] = new Mp4Frag({ segmentCount: 2, cacheInterval: 60000, debug: config.debugMp4Frag || false, debugOutputPrefix });
-                   if(config.debugMp4Frag){
-                       activeMonitor.mp4frag['MAIN'].on('memoryfreed',function(freed){
-                           s.mp4FragMemoryFreed[debugOutputPrefix] = [freed, new Date()]
-                       })
-                   }
-               }
+               delete(activeMonitor.mp4frag['MAIN'])
+               if(!activeMonitor.mp4frag['MAIN'])activeMonitor.mp4frag['MAIN'] = new Mp4Frag()
                activeMonitor.mp4frag['MAIN'].on('error',function(error){
                    s.userLog(e,{type:lang['Mp4Frag'],msg:{error:error}})
                })
@@ -1418,7 +1339,7 @@ module.exports = (s,config,lang) => {
         const activeMonitor = getActiveMonitor(groupKey,monitorId)
         const monitorConfig = getMonitorConfiguration(groupKey,monitorId)
         const monitorDetails = monitorConfig.details
-        const autoCompressionEnabled = !config.disableAutoCompressVideos && monitorDetails.auto_compress_videos === '1'
+        const autoCompressionEnabled = monitorDetails.auto_compress_videos === '1'
         var checkLog = function(d,x){return d.indexOf(x)>-1}
         activeMonitor.spawn.stdio[8].on('data',function(d){
             d=d.toString();
@@ -1426,7 +1347,7 @@ module.exports = (s,config,lang) => {
                 var filename = d.split('.')[0].split(' [')[0].trim()+'.'+e.ext
                 s.insertCompletedVideo(e,{
                     file: filename,
-                    events: activeMonitor ? activeMonitor.detector_motion_count || [] : []
+                    events: activeMonitor.detector_motion_count
                 },function(err,response){
                     s.userLog(e,{type:lang['Video Finished'],msg:{filename:d}})
                     if(
@@ -1467,8 +1388,9 @@ module.exports = (s,config,lang) => {
     async function doFatalErrorCatch(e,d){
         const groupKey = e.ke
         const monitorId = e.mid || e.id
-        let activeMonitor = getActiveMonitor(groupKey,monitorId)
+        const activeMonitor = getActiveMonitor(groupKey,monitorId)
         if(activeMonitor.isStarted === true){
+            const activeMonitor = getActiveMonitor(groupKey,monitorId)
             activeMonitor.isStarted = false
             await cameraDestroy(e)
             activeMonitor.isStarted = true
@@ -1484,7 +1406,6 @@ module.exports = (s,config,lang) => {
         const activeMonitor = getActiveMonitor(groupKey,monitorId)
         activeMonitor.spawn.stderr.on('data',async function(d){
             d=d.toString();
-            let forceSave = false
             switch(true){
                 case checkLog(d,'Not Enough Bandwidth'):
                     activeMonitor.criticalErrors['453'] = true
@@ -1492,22 +1413,18 @@ module.exports = (s,config,lang) => {
                 case checkLog(d,'No space left on device'):
                     s.checkUserPurgeLock(groupKey)
                     s.purgeDiskForGroup(groupKey)
-                    forceSave = true
                 break;
                 case checkLog(d,'error parsing AU headers'):
-                    s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingTextAudio},true);
+                    s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingTextAudio});
                 break;
                 case checkLog(d,'error while decoding'):
-                    s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingText},true);
+                    s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingText});
                 break;
-                case d.startsWith('DTS'):
                 case checkLog(d,'pkt->duration = 0'):
                 case checkLog(d,'[hls @'):
-                case checkLog(d,'bad cseq'):
                 case checkLog(d,'Past duration'):
                 case checkLog(d,'Last message repeated'):
                 case checkLog(d,'Non-monotonous DTS'):
-                case checkLog(d,'Non-monotonic DTS'):
                 case checkLog(d,'NULL @'):
                 case checkLog(d,'RTP: missed'):
                 case checkLog(d,'deprecated pixel format used'):
@@ -1516,8 +1433,7 @@ module.exports = (s,config,lang) => {
                 case checkLog(d,'Could not find tag for vp8'):
                 case checkLog(d,'Only VP8 or VP9 Video'):
                 case checkLog(d,'Could not write header'):
-                    forceSave = true
-                    return s.userLog(e,{type:lang['Incorrect Settings Chosen'],msg:{msg:d}},true)
+                    return s.userLog(e,{type:lang['Incorrect Settings Chosen'],msg:{msg:d}})
                 break;
                 case checkLog(d,'Connection refused'):
                 case checkLog(d,'Connection timed out'):
@@ -1526,20 +1442,18 @@ module.exports = (s,config,lang) => {
                 case checkLog(d,'bad vlc'):
                 case checkLog(d,'does not contain an image sequence pattern or a pattern is invalid.'):
                 case checkLog(d,'error dc'):
-                    forceSave = true
                     // activeMonitor.timeoutToRestart = setTimeout(() => {
                     //     doFatalErrorCatch(e,d)
                     // },15000)
                 break;
                 case checkLog(d,'Could not find codec parameters'):
                 case checkLog(d,'No route to host'):
-                    forceSave = true;
                     activeMonitor.timeoutToRestart = setTimeout(async () => {
                         doFatalErrorCatch(e,d)
                     },60000)
                 break;
             }
-            s.userLog(e,{type:"FFMPEG STDERR",msg:d}, forceSave)
+            s.userLog(e,{type:"FFMPEG STDERR",msg:d})
         })
     }
     function setNoEventsDetector(e){
@@ -1557,7 +1471,7 @@ module.exports = (s,config,lang) => {
                 fetchTimeout(detector_notrigger_webhook_url,10000,{
                     method: webhookMethod
                 }).catch((err) => {
-                    s.userLog(d,{type:lang["Event Webhook Error"],msg:{error:err,data:data}},true)
+                    s.userLog(d,{type:lang["Event Webhook Error"],msg:{error:err,data:data}})
                 })
             }
             if(currentConfig.detector_notrigger_command_enable === '1' && !s.group[groupKey].activeMonitors[monitorId].detector_notrigger_command){
@@ -1601,33 +1515,22 @@ module.exports = (s,config,lang) => {
         const theGroup = s.group[groupKey]
         const activeMonitor = theGroup.activeMonitors[monitorId]
         const monitorConfig = theGroup.rawMonitorConfigurations[monitorId]
-        const isMacOS = s.platform === 'darwin';
+        const isMacOS = s.platform !== 'darwin';
         const isWatchOnly = monitorConfig.mode === 'start'
         const isRecord = monitorConfig.mode === 'record'
         const isWatchOnlyOrRecord = isWatchOnly || isRecord;
         const streamTypeIsJPEG = e.details.stream_type === 'jpeg'
         const streamTypeIsHLS = e.details.stream_type === 'hls'
-        const jpegApiEnabled = config.liveJpegApiEnabled && e.details.snap === '1'
+        const jpegApiEnabled = e.details.snap === '1'
         const typeIsDashcam = e.type === 'dashcam' || e.type === 'socket'
         const typeIsMjpeg = e.type === 'mjpeg'
         const typeIsH264 = e.type === 'h264'
         const typeIsLocal = e.type === 'local'
         const doPingTest = e.type !== 'socket' && e.type !== 'dashcam' && e.protocol !== 'udp' && e.type !== 'local' && e.details.skip_ping !== '1';
-        let startMonitorInQueue
-        if(config.monitorStartQueueDisabled){
-            if(!theGroup.startMonitorInQueue){
-                theGroup.startMonitorInQueue = {}
-            }
-            if(!theGroup.startMonitorInQueue[monitorId]){
-                theGroup.startMonitorInQueue[monitorId] = createQueueAwaited(config.monitorStartQueueDelay, 1)
-            }
-            startMonitorInQueue = theGroup.startMonitorInQueue[monitorId]
-        }else{
-            if(!theGroup.startMonitorInQueue){
-                theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
-            }
-            startMonitorInQueue = theGroup.startMonitorInQueue
+        if(!theGroup.startMonitorInQueue){
+            theGroup.startMonitorInQueue = createQueueAwaited(0.5, 1)
         }
+        const startMonitorInQueue = theGroup.startMonitorInQueue
         if(!activeMonitor.isStarted)return;
         // e = monitor object
         clearTimeout(activeMonitor.resetFatalErrorCountTimer)
@@ -1643,127 +1546,122 @@ module.exports = (s,config,lang) => {
         //create host string without username and password
         const strippedHost = stripAuthFromHost(e)
         async function doOnThisMachine(callback){
+            await createCameraFolders(e)
+            activeMonitor.allowStdinWrite = false
+            setMotionLock(e)
+            //start "no motion" checker
+            if(e.details.detector === '1' && e.details.detector_notrigger === '1'){
+                setNoEventsDetector(e)
+            }
+            if(config.childNodes.mode !== 'child' && s.platform!=='darwin' && (e.functionMode === 'record' || (e.functionMode === 'start'&&e.details.detector_record_method==='sip'))){
+                if(activeMonitor.fswatch && activeMonitor.fswatch.close){
+                  activeMonitor.fswatch.close()
+                }
+                activeMonitor.fswatch = fs.watch(e.dir, {encoding : 'utf8'}, (event, filename) => {
+                    switch(event){
+                        case'change':
+                            resetRecordingCheck(e)
+                        break;
+                    }
+                });
+            }
+            if(
+                isMacOS &&
+                isWatchOnlyOrRecord &&
+                (streamTypeIsJPEG || streamTypeIsHLS || jpegApiEnabled)
+            ){
+                if(activeMonitor.fswatchStream && activeMonitor.fswatchStream.close){
+                    activeMonitor.fswatchStream.close()
+                }
+                activeMonitor.fswatchStream = fs.watch(activeMonitor.sdir, {encoding : 'utf8'}, () => {
+                    resetStreamCheck(e)
+                })
+            }
+            if(!activeMonitor.criticalErrors['453'])s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true});
+            //check host to see if has password and user in it
+            clearTimeout(activeMonitor.recordingChecker)
             try{
-                await createCameraFolders(e)
-                activeMonitor.allowStdinWrite = false
-                setMotionLock(e)
-                //start "no motion" checker
-                if(e.details.detector === '1' && e.details.detector_notrigger === '1'){
-                    setNoEventsDetector(e)
-                }
-                if(config.childNodes.mode !== 'child' && s.platform!=='darwin' && (e.functionMode === 'record' || (e.functionMode === 'start'&&e.details.detector_record_method==='sip'))){
-                    if(activeMonitor.fswatch && activeMonitor.fswatch.close){
-                      activeMonitor.fswatch.close()
-                    }
-                    activeMonitor.fswatch = fs.watch(e.dir, {encoding : 'utf8'}, (event, filename) => {
-                        switch(event){
-                            case'change':
-                                resetRecordingCheck(e)
-                            break;
-                        }
-                    });
-                }
-                if(
-                    isMacOS &&
-                    isWatchOnlyOrRecord &&
-                    (streamTypeIsJPEG || streamTypeIsHLS || jpegApiEnabled)
-                ){
-                    if(activeMonitor.fswatchStream && activeMonitor.fswatchStream.close){
-                        activeMonitor.fswatchStream.close()
-                    }
-                    activeMonitor.fswatchStream = fs.watch(activeMonitor.sdir, {encoding : 'utf8'}, () => {
-                        resetStreamCheck(e)
-                    })
-                }
-                // if(!activeMonitor.criticalErrors['453'])s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true});
-                //check host to see if has password and user in it
-                clearTimeout(activeMonitor.recordingChecker)
-                try{
-                    await cameraDestroy(e)
-                }catch(err){
-                    // s.debugLog(err)
-                }
-                async function startVideoProcessor(err,pingResponse){
-                    pingResponse = pingResponse ? pingResponse : {success: true}
-                    return new Promise((resolve) => {
-                        if(pingResponse.success === true){
-                            activeMonitor.isRecording = true
-                            try{
-                                createCameraFfmpegProcess(e).then((mainProcess) => {
-                                    if(mainProcess){
-                                        createEventCounter(e)
-                                        createCameraStreamHandlers(e)
-                                        if(typeIsDashcam){
-                                            setTimeout(function(){
-                                                activeMonitor.allowStdinWrite = true
-                                                s.txToDashcamUsers({
-                                                    f : 'enable_stream',
-                                                    ke : groupKey,
-                                                    mid : monitorId
-                                                },groupKey)
-                                            },30000)
-                                        }
-                                        if(
-                                            isRecord ||
-                                            typeIsMjpeg ||
-                                            typeIsH264 ||
-                                            typeIsLocal
-                                        ){
-                                            catchNewSegmentNames(e)
-                                            cameraFilterFfmpegLog(e)
-                                        }
-                                        if(isRecord){
-                                            s.sendMonitorStatus({
-                                                id: monitorId,
-                                                ke: groupKey,
-                                                status: lang.Recording,
-                                                code: 3
-                                            });
-                                        }else{
-                                            s.sendMonitorStatus({
-                                                id: monitorId,
-                                                ke: groupKey,
-                                                status: lang.Watching,
-                                                code: 2
-                                            });
-                                        }
+                await cameraDestroy(e)
+            }catch(err){
+                // s.debugLog(err)
+            }
+            async function startVideoProcessor(err,pingResponse){
+                pingResponse = pingResponse ? pingResponse : {success: true}
+                return new Promise((resolve) => {
+                    if(pingResponse.success === true){
+                        activeMonitor.isRecording = true
+                        try{
+                            createCameraFfmpegProcess(e).then((mainProcess) => {
+                                if(mainProcess){
+                                    createEventCounter(e)
+                                    createCameraStreamHandlers(e)
+                                    if(typeIsDashcam){
+                                        setTimeout(function(){
+                                            activeMonitor.allowStdinWrite = true
+                                            s.txToDashcamUsers({
+                                                f : 'enable_stream',
+                                                ke : groupKey,
+                                                mid : monitorId
+                                            },groupKey)
+                                        },30000)
                                     }
-                                    s.onMonitorStartExtensions.forEach(function(extender){
-                                        extender(Object.assign({},theGroup.rawMonitorConfigurations[monitorId]),e)
-                                    })
-                                    resolve()
+                                    if(
+                                        isRecord ||
+                                        typeIsMjpeg ||
+                                        typeIsH264 ||
+                                        typeIsLocal
+                                    ){
+                                        catchNewSegmentNames(e)
+                                        cameraFilterFfmpegLog(e)
+                                    }
+                                    if(isRecord){
+                                        s.sendMonitorStatus({
+                                            id: monitorId,
+                                            ke: groupKey,
+                                            status: lang.Recording,
+                                            code: 3
+                                        });
+                                    }else{
+                                        s.sendMonitorStatus({
+                                            id: monitorId,
+                                            ke: groupKey,
+                                            status: lang.Watching,
+                                            code: 2
+                                        });
+                                    }
+                                }
+                                s.onMonitorStartExtensions.forEach(function(extender){
+                                    extender(Object.assign(theGroup.rawMonitorConfigurations[monitorId],{}),e)
                                 })
-                            }catch(err){
-                                console.log('Failed to Load',monitorId,groupKey)
-                                console.log(err)
                                 resolve()
-                            }
-                          }else{
-                              s.onMonitorPingFailedExtensions.forEach(function(extender){
-                                  extender(Object.assign(theGroup.rawMonitorConfigurations[monitorId],{}),e)
-                              })
-                              s.userLog(e,{type:lang["Ping Failed"],msg:lang.skipPingText1},true);
-                              fatalError(e,"Ping Failed").then(() => {
-                                  resolve();
-                              });
-                          }
-                    })
-                }
-                if(doPingTest){
-                    try{
-                        const testResult = await asyncConnectionTest(strippedHost,e.port,2000)
-                        await startVideoProcessor(testResult.err,testResult.response)
-                    }catch(err){
-                        await startVideoProcessor()
-                    }
-                }else{
+                            })
+                        }catch(err){
+                            console.log('Failed to Load',monitorId,groupKey)
+                            console.log(err)
+                            resolve()
+                        }
+                      }else{
+                          s.onMonitorPingFailedExtensions.forEach(function(extender){
+                              extender(Object.assign(theGroup.rawMonitorConfigurations[monitorId],{}),e)
+                          })
+                          s.userLog(e,{type:lang["Ping Failed"],msg:lang.skipPingText1});
+                          fatalError(e,"Ping Failed").then(() => {
+                              resolve();
+                          });
+                      }
+                })
+            }
+            if(doPingTest){
+                try{
+                    const testResult = await asyncConnectionTest(strippedHost,e.port,2000)
+                    await startVideoProcessor(testResult.err,testResult.response)
+                }catch(err){
                     await startVideoProcessor()
                 }
-                if(callback)callback()
-            }catch(err){
-                await fatalError(e,"Failed to run on Machine");
-                if(callback)callback()
+            }else{
+                await startVideoProcessor()
             }
+            if(callback)callback()
         }
         async function doOnChildMachine(){
             function startVideoProcessor(){
@@ -1812,20 +1710,18 @@ module.exports = (s,config,lang) => {
         const activeMonitor = getActiveMonitor(groupKey,monitorId)
         const monitorConfig = copyMonitorConfiguration(groupKey,monitorId)
         const monitorDetails = monitorConfig.details
-        if(!activeMonitor || !monitorDetails)return await cameraDestroy(e);
         const maxCount = !monitorDetails.fatal_max || isNaN(monitorDetails.fatal_max) ? 0 : parseFloat(monitorDetails.fatal_max);
         clearTimeout(activeMonitor.fatalErrorTimeout);
-        if(!activeMonitor.errorFatalCount)activeMonitor.errorFatalCount = 0
         ++activeMonitor.errorFatalCount;
         if(activeMonitor.isStarted === true){
             activeMonitor.fatalErrorTimeout = setTimeout(function(){
                 if(maxCount !== 0 && activeMonitor.errorFatalCount > maxCount){
-                    s.userLog(e,{type:lang["Fatal Error"],msg:`${lang.onFatalErrorExit}, ${errorMessage}`},true);
+                    s.userLog(e,{type:lang["Fatal Error"],msg:lang.onFatalErrorExit});
                     s.camera('stop',{mid:monitorId,ke:groupKey})
                 }else{
                     launchMonitorProcesses(monitorConfig)
                 };
-            },activeMonitor.errorFatalCount >= 3 ? 1000 * 60 * 10 : 5000);
+            },5000);
         }else{
             await cameraDestroy(e)
         }
@@ -1842,13 +1738,12 @@ module.exports = (s,config,lang) => {
     async function monitorStart(e){
         const groupKey = e.ke
         const monitorId = e.mid || e.id
-        let monitorConfig = getMonitorConfiguration(groupKey,monitorId);
+        const monitorConfig = getMonitorConfiguration(groupKey,monitorId);
         monitorConfigurationMigrator(e)
         s.initiateMonitorObject({ke:groupKey,mid:monitorId})
         const activeMonitor = getActiveMonitor(groupKey,monitorId)
         if(!monitorConfig){
-            monitorConfig = s.cleanMonitorObject(e)
-            s.group[groupKey].rawMonitorConfigurations[monitorId] = monitorConfig
+            s.group[groupKey].rawMonitorConfigurations[monitorId] = s.cleanMonitorObject(e)
         }
         if(activeMonitor.isStarted === true){
             s.debugLog('Monitor Already Started!')
@@ -1890,15 +1785,11 @@ module.exports = (s,config,lang) => {
             activeMonitor.isRecording = false
         }
         //set up fatal error handler
+        activeMonitor.errorFatalCount = 0;
         delete(activeMonitor.childNode)
         if(e.details.detector_ptz_follow === '1'){
             // setHomePositionPreset(e)
             moveToHomePosition(e)
-        }
-        if(!isApplicableVideosDirectory(e.details.dir, false)){
-             e.details.dir = ''
-             activeMonitor.details.dir = ''
-             monitorConfig.details.dir = ''
         }
         try{
             await launchMonitorProcesses(e)
@@ -1912,7 +1803,7 @@ module.exports = (s,config,lang) => {
         const monitorId = e.mid || e.id
         const activeMonitor = getActiveMonitor(groupKey,monitorId);
         //parse Objects
-        (['cords','detector_filters','input_map_choices']).forEach(function(v){
+        (['detector_cascades','cords','detector_filters','input_map_choices']).forEach(function(v){
             if(e.details && e.details[v]){
                 try{
                     if(!e.details[v] || e.details[v] === '')e.details[v] = '{}'
@@ -1947,8 +1838,8 @@ module.exports = (s,config,lang) => {
         (['stream_channels','input_maps']).forEach(function(v){
             if(e.details&&e.details[v]&&(e.details[v] instanceof Array)===false){
                 try{
-                    e.details[v] = s.parseJSON(e.details[v]);
-                    if(!e.details[v])e.details[v] = [];
+                    e.details[v]=JSON.parse(e.details[v]);
+                    if(!e.details[v])e.details[v]=[];
                 }catch(err){
                     e.details[v]=[];
                 }
@@ -1996,126 +1887,10 @@ module.exports = (s,config,lang) => {
         monitorConfig.details.stream_channels = ''
         monitorConfig.details.input_maps = ''
         delete(monitorConfig.details.input_map_choices)
-        if(monitorConfig.details.substream && monitorConfig.details.substream.fulladdress)delete(monitorConfig.details.substream.fulladdress);
+        delete(monitorConfig.details.substream)
         return monitorConfig
     }
-    function getMonitors(groupKey, monitorId, authKey, isRestricted, monitorPermissions, monitorRestrictions, cannotSeeImportantSettings, search){
-        return new Promise((resolve) => {
-            const whereQuery = [
-                ['ke','=',groupKey],
-                monitorRestrictions
-            ];
-            if(!!search){
-                const searchQuery = search.split(',');
-                const whereQuerySearch = []
-                for(item of searchQuery){
-                    if(item){
-                        whereQuerySearch.push(
-                            whereQuerySearch.length === 0 ? ['name','LIKE',`%${item.trim()}%`] : ['or', 'name','LIKE',`%${item}%`],
-                            ['or','mid','LIKE',`%${item.trim()}%`]
-                        );
-                    }
-                }
-                whereQuery.push(whereQuerySearch)
-            }
-            s.knexQuery({
-                action: "select",
-                columns: "*",
-                table: "Monitors",
-                where: whereQuery
-            },(err,r) => {
-                if(err){
-                    return []
-                }
-                try{
-                    r.forEach(function(v,n){
-                        const monitorId = v.mid;
-                        v.details = JSON.parse(v.details)
-                        var details = v.details;
-                        if(isRestricted && !monitorPermissions[`${monitorId}_monitor_edit`] || cannotSeeImportantSettings){
-                            r[n] = removeSenstiveInfoFromMonitorConfig(v);
-                        }
-                        if(s.group[v.ke] && s.group[v.ke].activeMonitors[v.mid]){
-                            const activeMonitor = s.group[v.ke].activeMonitors[v.mid]
-                            r[n].currentlyWatching = Object.keys(activeMonitor.watch).length
-                            r[n].currentCpuUsage = activeMonitor.currentCpuUsage
-                            r[n].status = activeMonitor.monitorStatus
-                            r[n].code = activeMonitor.monitorStatusCode
-                            r[n].subStreamChannel = activeMonitor.subStreamChannel
-                            r[n].subStreamActive = !!activeMonitor.subStreamProcess
-                        }
-                        function getStreamUrl(type,channelNumber){
-                            var streamURL
-                            if(channelNumber){channelNumber = '/'+channelNumber}else{channelNumber=''}
-                            switch(type){
-                                case'mjpeg':
-                                    streamURL='/'+authKey+'/mjpeg/'+v.ke+'/'+v.mid+channelNumber
-                                break;
-                                case'hls':
-                                    streamURL='/'+authKey+'/hls/'+v.ke+'/'+v.mid+channelNumber+'/s.m3u8'
-                                break;
-                                case'h264':
-                                    streamURL='/'+authKey+'/h264/'+v.ke+'/'+v.mid+channelNumber
-                                break;
-                                case'flv':
-                                    streamURL='/'+authKey+'/flv/'+v.ke+'/'+v.mid+channelNumber+'/s.flv'
-                                break;
-                                case'mp4':
-                                    streamURL='/'+authKey+'/mp4/'+v.ke+'/'+v.mid+channelNumber+'/s.mp4'
-                                break;
-                                case'useSubstream':
-                                    try{
-                                        const monitorConfig = s.group[v.ke].rawMonitorConfigurations[v.mid]
-                                        const monitorDetails = monitorConfig.details
-                                        const subStreamChannelNumber = 1 + (monitorDetails.stream_channels || []).length
-                                        const subStreamType = monitorConfig.details.substream.output.stream_type
-                                        streamURL = getStreamUrl(subStreamType,subStreamChannelNumber)
-                                    }catch(err){
-                                        s.debugLog(err)
-                                    }
-                                break;
-                            }
-                            return streamURL
-                        }
-                        var buildStreamURL = function(type,channelNumber){
-                            var streamURL = getStreamUrl(type,channelNumber)
-                            if(streamURL){
-                                if(!r[n].streamsSortedByType[type]){
-                                    r[n].streamsSortedByType[type]=[]
-                                }
-                                r[n].streamsSortedByType[type].push(streamURL)
-                                r[n].streams.push(streamURL)
-                            }
-                            return streamURL
-                        }
-                        if(!details.tv_channel_id||details.tv_channel_id==='')details.tv_channel_id = 'temp_'+s.gid(5)
-                        if(details.snap==='1'){
-                            r[n].snapshot = '/'+authKey+'/jpeg/'+v.ke+'/'+v.mid+'/s.jpg'
-                        }
-                        r[n].streams=[]
-                        r[n].streamsSortedByType={}
-                        buildStreamURL(details.stream_type)
-                        if(details.stream_channels&&details.stream_channels!==''){
-                            details.stream_channels=s.parseJSON(details.stream_channels)
-                            details.stream_channels.forEach(function(b,m){
-                                buildStreamURL(b.stream_type,m.toString())
-                            })
-                        }
-                    })
-                    resolve(r);
-                }catch(err){
-                    console.log('getMonitors fail, trying again...')
-                    setTimeout(function(){
-                        getMonitors(groupKey, monitorId, authKey, isRestricted, monitorPermissions, monitorRestrictions, cannotSeeImportantSettings, search).then((response) => {
-                            resolve(response)
-                        })
-                    },2000)
-                }
-            })
-        })
-    }
     return {
-        getMonitors,
         monitorStop,
         monitorIdle,
         monitorStart,

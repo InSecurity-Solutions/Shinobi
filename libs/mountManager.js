@@ -1,9 +1,6 @@
 const path = require('path')
 module.exports = (s,config,lang,app,io) => {
     // for unix-based systems only (has /etc/fstab)
-    const {
-        isValidPath,
-    } = require('./basic/utils.js')(process.cwd(),config)
     if(s.isWin){
         app.all([
             'list',
@@ -27,7 +24,6 @@ module.exports = (s,config,lang,app,io) => {
         update,
         remove,
         list,
-        listWithSizes,
         remountAll,
         remount,
         unmount,
@@ -39,7 +35,7 @@ module.exports = (s,config,lang,app,io) => {
      */
     app.get(config.webPaths.superApiPrefix+':auth/mountManager/list', function (req,res){
         s.superAuth(req.params, async (resp) => {
-            const response = await listWithSizes();
+            const response = await list();
             s.closeJsonResponse(res, response);
         },res,req);
     });
@@ -52,12 +48,8 @@ module.exports = (s,config,lang,app,io) => {
             const response = { ok: false }
             if(sourceTarget && localPath){
                 try{
-                    if(!isValidPath(localPath) || !isValidPath(sourceTarget, '//')){
-                        response.error = lang['Invalid Data']
-                    }else{
-                        const createDirResponse = await createMountPoint(localPath)
-                        response.createDirResponse = createDirResponse
-                    }
+                    const createDirResponse = await createMountPoint(localPath)
+                    response.createDirResponse = createDirResponse
                 }catch(err){
                     console.error(err)
                 }

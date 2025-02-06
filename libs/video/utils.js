@@ -14,9 +14,6 @@ module.exports = (s,config,lang) => {
         hmsToSeconds,
         moveFile,
     } = require('../basic/utils.js')(process.cwd(),config)
-    const {
-        convertAviToMp4,
-    } = require('./aviUtils.js')(s,config,lang)
     const chunkReadSize = 4096;
     // orphanedVideoCheck : new function
     const checkIfVideoIsOrphaned = (monitor,videosDirectory,filename) => {
@@ -70,6 +67,7 @@ module.exports = (s,config,lang) => {
                 let videosFound = 0;
                 const videosDirectory = s.getVideoDirectory(monitor)
                 const tempDirectory = s.getStreamsDirectory(monitor)
+
                 // Write the `sh` script
                 try{
                     fs.writeFileSync(
@@ -728,7 +726,7 @@ module.exports = (s,config,lang) => {
             }catch(err){
 
             }
-            const filePaths = videos.reverse().map(video => {
+            const filePaths = videos.map(video => {
                 const monitorConfig = s.group[video.ke].rawMonitorConfigurations[video.mid];
                 const filePath = path.join(s.getVideoDirectory(video), `${s.formattedTime(video.time)}.mp4`);
                 return filePath
@@ -892,7 +890,7 @@ module.exports = (s,config,lang) => {
                 if(code === 0){
                     resolve(buffer);
                 }else{
-                    reject(new Error(`FFmpeg process exited with code ${code} : ${ffmpegArgs.join(' ')}`));
+                    reject(new Error(`FFmpeg process exited with code ${code}`));
                 }
             });
 
@@ -1011,17 +1009,6 @@ module.exports = (s,config,lang) => {
             return false;
         }
     };
-    function isApplicableVideosDirectory(givenDirectory, addStorageOnly){
-        if(!addStorageOnly && (givenDirectory === '' || !givenDirectory))return true
-        let canDo = false;
-        const addStorageLocations = (s.dir.addStorage).map(item => item.path);
-        for(aLocation of addStorageLocations){
-            if(givenDirectory === aLocation.replace('__DIR__', s.mainDirectory)){
-                canDo = true
-            }
-        }
-        return canDo
-    }
     return {
         reEncodeVideoAndReplace,
         stitchMp4Files,
@@ -1040,8 +1027,6 @@ module.exports = (s,config,lang) => {
         readChunkForMoov,
         checkMoovAtBeginning,
         checkMoovAtEnd,
-        hasMoovAtom,
-        convertAviToMp4,
-        isApplicableVideosDirectory,
+        hasMoovAtom
     }
 }

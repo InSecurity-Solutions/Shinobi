@@ -8,8 +8,8 @@ const {
 } = require('./common.js')
 module.exports = function(s,config,lang,io){
     const {
-        applyPermissionsToUser,
-    } = require('./user/permissionSets.js')(s,config,lang)
+        ptzControl
+    } = require('./control/ptz.js')(s,config,lang)
     const {
         legacyFilterEvents
     } = require('./events/utils.js')(s,config,lang)
@@ -161,7 +161,6 @@ module.exports = function(s,config,lang,io){
             const onSuccess = (r) => {
                 r = r[0];
                 const Emitter = createStreamEmitter(d,cn)
-                if(!Emitter) return
                 validatedAndBindAuthenticationToSocketConnection(cn,d,true)
                 var contentWriter
                 cn.closeSocketVideoStream = function(){
@@ -195,7 +194,6 @@ module.exports = function(s,config,lang,io){
             const onSuccess = (r) => {
                 r=r[0];
                 const Emitter = createStreamEmitter(d,cn)
-                if(!Emitter) return
                 validatedAndBindAuthenticationToSocketConnection(cn,d,true)
                 var contentWriter
                 cn.closeSocketVideoStream = function(){
@@ -213,152 +211,90 @@ module.exports = function(s,config,lang,io){
             }
         })
         //unique MP4 socket stream
-        cn.once('MP4', function(d, cb) {
-            if (!s.group[d.ke] || !s.group[d.ke].activeMonitors || !s.group[d.ke].activeMonitors[d.id]) {
-                cn.disconnect();
-                return;
+        cn.on('MP4',function(d, cb){
+            if(!s.group[d.ke]||!s.group[d.ke].activeMonitors||!s.group[d.ke].activeMonitors[d.id]){
+                cn.disconnect();return;
             }
-
-            cn.ip = cn.request.connection.remoteAddress;
-            let mp4frag;
-            let onSegment;
-            let onInitialized;
-            let cleanedUp = false;
-
-            // Max number of segments that may be buffered in the socket's
-            // writable queue before we consider the client dead/too slow.
-            // Each mp4 segment is ~50-200kB; 10 queued = 0.5-2MB per client.
-            const MAX_BUFFERED_SEGMENTS = 10;
-
-            var tx = function(z){cn.emit('data',z);}
-            const cleanup = () => {
-                if (cleanedUp) return;
-                cleanedUp = true;
-                if (mp4frag) {
-                    if (onSegment) mp4frag.removeListener('segment', onSegment);
-                    if (onInitialized) mp4frag.removeListener('initialized', onInitialized);
-                    mp4frag = null;
-                }
-                cn.removeAllListeners('MP4Command');
-                cn.socketVideoStream = null;
-            };
-
+            cn.ip=cn.request.connection.remoteAddress;
+            var toUTC = function(){
+                return new Date().toISOString();
+            }
+            var tx=function(z){cn.emit('data',z);}
             const onFail = (msg) => {
-                tx({f: 'stop_reconnect', msg: msg, token_used: d.auth, ke: d.ke});
-                cleanup();
+                tx({f:'stop_reconnect',msg:msg,token_used:d.auth,ke:d.ke});
                 cn.disconnect();
-            };
-
+            }
             const onSuccess = (r) => {
                 r = r[0];
-                validatedAndBindAuthenticationToSocketConnection(cn, d);
-
-                mp4frag = s.group[d.ke].activeMonitors[d.id].mp4frag[d.channel];
-                if (!mp4frag) {
-                    onFail('MP4 fragment not available');
-                    return;
-                }
-
-                // Define handlers
-                onSegment = function(data) {
-                    if (!cn.connected || cleanedUp) return;
-                    // Check how many packets are already buffered in the socket's
-                    // writable queue. If the client is too slow or has gone away
-                    // without a clean disconnect, the buffer grows unboundedly.
-                    // Image 1 from heap snapshot showed 91 chunks queued on one socket.
-                    try {
-                        const buffered = cn.conn.transport.socket._writableState.buffered;
-                        if (buffered && buffered.length > MAX_BUFFERED_SEGMENTS) {
-                            s.debugLog(`MP4 client buffer overflow (${buffered.length} chunks), disconnecting ${cn.id}`);
-                            cleanup();
-                            cn.disconnect();
-                            return;
-                        }
-                    } catch(e) {
-                        // transport structure not accessible, skip check
-                    }
+                validatedAndBindAuthenticationToSocketConnection(cn,d)
+                var mp4frag = s.group[d.ke].activeMonitors[d.id].mp4frag[d.channel];
+                var onInitialized = () => {
+                    cn.emit('mime', mp4frag.mime);
+                    mp4frag.removeListener('initialized', onInitialized);
+                };
+                //event listener
+                var onSegment = function(data){
                     cn.emit('segment', data);
                 };
-
-                onInitialized = function() {
-                    if (cn.connected && !cleanedUp) {
-                        cn.emit('mime', mp4frag.mime);
-                        mp4frag.removeListener('initialized', onInitialized);
+                cn.closeSocketVideoStream = function(){
+                    if(mp4frag){
+                        mp4frag.removeListener('segment', onSegment)
+                        mp4frag.removeListener('initialized', onInitialized)
                     }
-                };
-
-                // Mark as active MP4 stream so global disconnect handler routes correctly
-                cn.socketVideoStream = true;
-                cn.closeSocketVideoStream = cleanup;
-
-                // Handle socket disconnect — once only, guarded by cleanedUp flag
-                cn.once('disconnect', cleanup);
-
-                // MP4 command handler — registered once per connection
-                cn.on('MP4Command', function(msg) {
-                    if (!cn.connected || cleanedUp) return;
-
-                    try {
+                }
+                if (cb) cb(null, true);
+                cn.on('MP4Command',function(msg){
+                    try{
                         switch (msg) {
-                            case 'mime': {
-                                const mime = mp4frag.mime;
+                            case 'mime' ://client is requesting mime
+                                var mime = mp4frag.mime;
                                 if (mime) {
-                                    setImmediate(() => cn.emit('mime', mime));
+                                    cn.emit('mime', mime);
                                 } else {
                                     mp4frag.on('initialized', onInitialized);
                                 }
-                                break;
-                            }
-                            case 'initialization': {
-                                const initialization = mp4frag.initialization;
-                                setImmediate(() => cn.emit('initialization', initialization));
-                                break;
-                            }
-                            case 'segment': {
-                                const segment = mp4frag.segment;
+                            break;
+                            case 'initialization' ://client is requesting initialization segment
+                                cn.emit('initialization', mp4frag.initialization);
+                            break;
+                            case 'segment' ://client is requesting a SINGLE segment
+                                var segment = mp4frag.segment;
                                 if (segment) {
-                                    setImmediate(() => cn.emit('segment', segment));
+                                    cn.emit('segment', segment);
                                 } else {
                                     mp4frag.once('segment', onSegment);
                                 }
-                                break;
-                            }
-                            case 'segments': {
-                                mp4frag.removeListener('segment', onSegment);
-                                mp4frag.on('segment', onSegment);
-                                const currentSegment = mp4frag.segment;
-                                if (currentSegment) {
-                                    setImmediate(() => cn.emit('segment', currentSegment));
+                            break;
+                            case 'segments' ://client is requesting ALL segments
+                                //send current segment first to start video asap
+                                var segment = mp4frag.segment;
+                                if (segment) {
+                                    cn.emit('segment', segment);
                                 }
-                                break;
-                            }
-                            case 'pause':
-                                mp4frag.removeListener('segment', onSegment);
-                                break;
-
-                            case 'resume':
-                                mp4frag.removeListener('segment', onSegment);
+                                //add listener for segments being dispatched by mp4frag
                                 mp4frag.on('segment', onSegment);
-                                break;
-
-                            case 'stop':
-                                cleanup();
-                                break;
+                            break;
+                            case 'pause' :
+                                mp4frag.removeListener('segment', onSegment);
+                            break;
+                            case 'resume' :
+                                mp4frag.on('segment', onSegment);
+                            break;
+                            case 'stop' ://client requesting to stop receiving segments
+                                cn.closeSocketVideoStream()
+                            break;
                         }
-                    } catch(err) {
-                        console.error('MP4Command error:', err);
-                        onFail(err.message);
+                    }catch(err){
+                        onFail(err)
                     }
-                });
-
-                if (cb) cb(null, true);
-            };
-            if (s.group[d.ke] && s.group[d.ke].users && s.group[d.ke].users[d.auth]) {
-                onSuccess(s.group[d.ke].users[d.auth]);
-            } else {
-                streamConnectionAuthentication(d, cn.ip).then(onSuccess).catch(onFail);
+                })
             }
-        });
+            if(s.group[d.ke]&&s.group[d.ke].users&&s.group[d.ke].users[d.auth]){
+                onSuccess(s.group[d.ke].users[d.auth]);
+            }else{
+                streamConnectionAuthentication(d,cn.ip).then(onSuccess).catch(onFail)
+            }
+        })
         //main socket control functions
         cn.on('f',function(d){
             if(!cn.ke&&d.f==='init'){//socket login
@@ -366,9 +302,9 @@ module.exports = function(s,config,lang,io){
                 cn.ip = (ipAddress.indexOf('127.0.0.1') > -1 || ipAddress.indexOf('localhost') > -1) && d.ipAddress ?  d.ipAddress : ipAddress;
                 tx=function(z){if(!z.ke){z.ke=cn.ke;};cn.emit('f',z);}
                 const onFail = (msg) => {
-                    tx({ok:false,msg: msg ? msg.stack || msg : lang['Not Authorized'],token_used:d.auth,ke:d.ke});cn.disconnect();
+                    tx({ok:false,msg:'Not Authorized',token_used:d.auth,ke:d.ke});cn.disconnect();
                 }
-                const onSuccess = async (r) => {
+                const onSuccess = (r) => {
                     r = r[0];
                     cn.join('GRP_'+d.ke);cn.join('CPU');
                     cn.ke=d.ke,
@@ -378,14 +314,11 @@ module.exports = function(s,config,lang,io){
     //                    if(!s.group[d.ke].vid)s.group[d.ke].vid={};
                     if(!s.group[d.ke].users)s.group[d.ke].users={};
     //                    s.group[d.ke].vid[cn.id]={uid:d.uid};
-                    r.details = JSON.parse(r.details);
-                    await applyPermissionsToUser(r)
-                    // cn.checkedPermissions = s.checkPermission(r)
                     s.group[d.ke].users[d.auth] = {
                         cnid: cn.id,
                         uid: r.uid,
                         mail: r.mail,
-                        details: r.details,
+                        details: JSON.parse(r.details),
                         logged_in_at: s.timeObject(new Date).format(),
                         login_type: 'Dashboard'
                     }
@@ -394,7 +327,8 @@ module.exports = function(s,config,lang,io){
                     if(s.group[d.ke].users[d.auth].details.get_server_log!=='0'){
                         cn.join('GRPLOG_'+d.ke)
                     }
-                    s.userLog({ke:d.ke,mid:'$USER'},{type:lang['Websocket Connected'],msg:{mail:r.mail,id:d.uid,ip:cn.ip}})
+                    s.group[d.ke].users[d.auth].lang = s.getLanguageFile(s.group[d.ke].users[d.auth].details.lang)
+                    s.userLog({ke:d.ke,mid:'$USER'},{type:s.group[d.ke].users[d.auth].lang['Websocket Connected'],msg:{mail:r.mail,id:d.uid,ip:cn.ip}})
                     if(!s.group[d.ke].activeMonitors){
                         s.group[d.ke].activeMonitors={}
                         if(!s.group[d.ke].activeMonitors){s.group[d.ke].activeMonitors={}}
@@ -413,15 +347,15 @@ module.exports = function(s,config,lang,io){
                         }
                     })
                     try{
-                        // (s.group[d.ke] ? Object.values(s.group[d.ke].rawMonitorConfigurations) : []).forEach((monitor) => {
-                        //     s.cameraSendSnapshot({
-                        //         mid: monitor.mid,
-                        //         ke: monitor.ke,
-                        //         mon: monitor
-                        //     },{
-                        //         useIcon: true
-                        //     })
-                        // })
+                        (s.group[d.ke] ? Object.values(s.group[d.ke].rawMonitorConfigurations) : []).forEach((monitor) => {
+                            s.cameraSendSnapshot({
+                                mid: monitor.mid,
+                                ke: monitor.ke,
+                                mon: monitor
+                            },{
+                                useIcon: true
+                            })
+                        })
                     }catch(err){
                         s.debugLog(err)
                     }
@@ -434,17 +368,8 @@ module.exports = function(s,config,lang,io){
             }
             if((d.id||d.uid||d.mid)&&cn.ke){
             try{
+                d.callbackResponse = {ok: true}
                 switch(d.f){
-                    case'requestSnapshot':
-                        var monitorId = d.id || d.mid;
-                        s.cameraSendSnapshot({
-                            mid: monitorId,
-                            ke: cn.ke,
-                            mon: s.group[cn.ke].rawMonitorConfigurations[monitorId]
-                        },{
-                            useIcon: true
-                        })
-                    break;
                     case'monitorOrder':
                         if(d.monitorOrder && d.monitorOrder instanceof Object){
                             s.knexQuery({
@@ -457,7 +382,7 @@ module.exports = function(s,config,lang,io){
                                 ]
                             },(err,r) => {
                                 if(r && r[0]){
-                                    var details = JSON.parse(r[0].details)
+                                    details = JSON.parse(r[0].details)
                                     details.monitorOrder = d.monitorOrder
                                     s.knexQuery({
                                         action: "update",
@@ -488,7 +413,7 @@ module.exports = function(s,config,lang,io){
                                 if(r && r[0]){
                                     const monitorListOrder = {}
                                     const orderKeys = Object.keys(d.monitorListOrder)
-                                    var details = JSON.parse(r[0].details)
+                                    details = JSON.parse(r[0].details)
                                     orderKeys.forEach((orderKey) => {
                                         const monitorIds = d.monitorListOrder[orderKey]
                                         const uniqueList = {}
@@ -690,7 +615,9 @@ module.exports = function(s,config,lang,io){
 					    },(err,r) => {
 					        if(err) {
 					            console.log(err)
-					            callback({total:0, limit:pageSize, videos:[]})
+					            setTimeout(function(){
+					                callback({total:0, limit:pageSize, videos:[]})
+					            },2000)
 					        } else {
 					            s.buildVideoLinks(r,{
 					                videoParam: videoSet === 'cloud' ? `cloudVideos` : "videos",
@@ -782,6 +709,13 @@ module.exports = function(s,config,lang,io){
                         })
                     break;
                 }
+                if(d.callbackId && !d.hasResponded){
+                    tx({
+                        f:'callback',
+                        callbackId: d.callbackId,
+                        args: [d.callbackResponse]
+                    })
+                }
             }catch(er){
                 s.systemLog('ERROR CATCH 1',er)
             }
@@ -795,14 +729,17 @@ module.exports = function(s,config,lang,io){
         // super page socket functions
         cn.on('super',function(d){
             if(!cn.init&&d.f=='init'){
-                d.ok=s.superAuth({ auth: d.auth },function(data){
+                d.ok=s.superAuth(d.auth ? { auth: d.auth } : {mail:d.mail,pass:d.pass},function(data){
                     cn.mail = data.$user.mail
                     cn.join('$');
-                    s.superUsersApi[d.auth].cnid = cn.id
+                    var tempSessionKey = d.auth || s.gid(30)
+                    cn.superSessionKey = tempSessionKey
+                    s.superUsersApi[tempSessionKey] = data
+                    s.superUsersApi[tempSessionKey].cnid = cn.id
                     cn.ip=cn.request.connection.remoteAddress
                     s.userLog({ke:'$',mid:'$USER'},{type:lang['Websocket Connected'],msg:{for:lang['Superuser'],id:cn.mail,ip:cn.ip}})
                     cn.init='super';
-                    s.tx({f:'init_success',mail:cn.mail},cn.id);
+                    s.tx({f:'init_success',mail:cn.mail,superSessionKey:tempSessionKey},cn.id);
                 })
                 if(d.ok===false){
                     cn.disconnect();
@@ -836,10 +773,6 @@ module.exports = function(s,config,lang,io){
                                 })
                                 updateProcess.stdout.on('data',function(data){
                                     s.systemLog('Update Info',data.toString())
-                                })
-                                updateProcess.on('close', function(){
-                                    updateProcess.removeAllListeners()
-                                    delete updateProcess
                                 })
                             break;
                             case'restart':
@@ -914,21 +847,19 @@ module.exports = function(s,config,lang,io){
                         ['uid','=',d.uid],
                     ],
                     limit: 1
-                },async (err,r) => {
+                },(err,r) => {
                     if(r && r[0]){
                         r = r[0]
                         cn.ke=d.ke,cn.uid=d.uid,cn.auth=d.auth;
                         if(!s.group[d.ke])s.group[d.ke]={};
                         if(!s.group[d.ke].users)s.group[d.ke].users={};
                         if(!s.group[d.ke].dashcamUsers)s.group[d.ke].dashcamUsers={};
-                        r.details = JSON.parse(r.details);
-                        await applyPermissionsToUser(r)
                         s.group[d.ke].users[d.auth]={
                             cnid: cn.id,
                             ke : d.ke,
                             uid:r.uid,
                             mail:r.mail,
-                            details: r.details,
+                            details:JSON.parse(r.details),
                             logged_in_at:s.timeObject(new Date).format(),
                             login_type:'Streamer'
                         }
@@ -1017,6 +948,7 @@ module.exports = function(s,config,lang,io){
                 break;
             }
         })
+         //functions for retrieving cron announcements
         cn.on('disconnect', function () {
             if(cn.socketVideoStream){
                 cn.closeSocketVideoStream()
@@ -1031,15 +963,19 @@ module.exports = function(s,config,lang,io){
                         })
                     }
                 }else if(!cn.embedded){
-                    if(s.group[cn.ke] && s.group[cn.ke].users && s.group[cn.ke].users[cn.auth]){
+                    if(s.group[cn.ke].users[cn.auth]){
                         s.tx({f:'user_status_change',ke:cn.ke,uid:cn.uid,status:0})
                         s.userLog({ke:cn.ke,mid:'$USER'},{type:lang['Websocket Disconnected'],msg:{mail:s.group[cn.ke].users[cn.auth].mail,id:cn.uid,ip:cn.ip}})
                         delete(s.group[cn.ke].users[cn.auth]);
                     }
-                    if(s.group[cn.ke] && s.group[cn.ke].dashcamUsers && s.group[cn.ke].dashcamUsers[cn.auth]){
-                        delete(s.group[cn.ke].dashcamUsers[cn.auth]);
-                    }
+                    if(s.group[cn.ke].dashcamUsers && s.group[cn.ke].dashcamUsers[cn.auth])delete(s.group[cn.ke].dashcamUsers[cn.auth]);
                 }
+            }
+            if(cn.cron){
+                delete(s.cron);
+            }
+            if(cn.superSessionKey){
+                delete(s.superUsersApi[cn.superSessionKey])
             }
             s.onWebSocketDisconnectionExtensions.forEach(function(extender){
                 extender(cn)

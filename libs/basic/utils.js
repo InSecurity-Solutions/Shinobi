@@ -6,11 +6,7 @@ const fetch  = require('node-fetch');
 const FormData = require('form-data');
 const { AbortController } = require('node-abort-controller')
 const DigestFetch = require('digest-fetch')
-const https = require('https');
 module.exports = (processCwd,config) => {
-    let httpsAgent = new https.Agent({
-        rejectUnauthorized: false,
-    });
     const parseJSON = (string) => {
         var parsed
         try{
@@ -94,7 +90,7 @@ module.exports = (processCwd,config) => {
     }
     const fetchTimeout = (url, ms, { signal, ...options } = {}) => {
         const controller = new AbortController();
-        const promise = fetch(url, { signal: controller.signal, agent: httpsAgent, ...options });
+        const promise = fetch(url, { signal: controller.signal, ...options });
         if (signal) signal.addEventListener("abort", () => controller.abort());
         const timeout = setTimeout(() => controller.abort(), ms);
         return promise.finally(() => clearTimeout(timeout));
@@ -139,6 +135,71 @@ module.exports = (processCwd,config) => {
             theRequester = fetch
         }
         return theRequester(requestUrl,requestOptions)
+    }
+    const checkSubscription = (subscriptionId,callback,suppressCheckNotice = false) => {
+        function subscriptionFailed(){
+            console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            console.error('This Install of Shinobi is NOT Activated')
+            console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            s.systemLog('This Install of Shinobi is NOT Activated')
+            console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+            console.log('https://licenses.shinobi.video/subscribe')
+        }
+        if(subscriptionId && subscriptionId !== 'sub_XXXXXXXXXXXX' && !config.disableOnlineSubscriptionCheck){
+            var url = 'https://licenses.shinobi.video/subscribe/check?subscriptionId=' + subscriptionId
+            var hasSubcribed = false
+            fetchTimeout(url,30000,{
+                method: 'GET',
+            })
+            .then(response => response.text())
+            .then(function(body){
+                var json = s.parseJSON(body)
+                hasSubcribed = json && !!json.ok
+                var i;
+                for (i = 0; i < s.onSubscriptionCheckExtensions.length; i++) {
+                    const extender = s.onSubscriptionCheckExtensions[i]
+                    hasSubcribed = extender(hasSubcribed,json,subscriptionId)
+                }
+                callback(hasSubcribed)
+                if(hasSubcribed){
+                    if(!suppressCheckNotice){
+                        s.systemLog('This Install of Shinobi is Activated')
+                        if(!json.expired && json.timeExpires){
+                            s.systemLog(`This License expires on ${json.timeExpires}`)
+                        }
+                    }
+                }else{
+                    subscriptionFailed()
+                }
+            }).catch((err) => {
+                if(err)console.log(err)
+                subscriptionFailed()
+                callback(false)
+            })
+        }else{
+            var i;
+            for (i = 0; i < s.onSubscriptionCheckExtensions.length; i++) {
+                const extender = s.onSubscriptionCheckExtensions[i]
+                hasSubcribed = extender(false,{},subscriptionId)
+            }
+            if(hasSubcribed === false){
+                subscriptionFailed()
+            }
+            callback(hasSubcribed)
+        }
+    }
+    function checkAgainSubscription(){
+        let checkCount = 1
+        return setInterval(function(){
+            if(checkCount === 28){
+                checkSubscription(config.subscriptionId || config.peerConnectKey || config.p2pApiKey, function(hasSubcribed){
+                    config.userHasSubscribed = hasSubcribed
+                }, true);
+                checkCount = 1;
+            }
+            ++checkCount;
+        }, 1000 * 60 * 60 * 24);
     }
     function isEven(value) {
         if (value%2 == 0)
@@ -212,105 +273,6 @@ module.exports = (processCwd,config) => {
             console.error(`Error deleting files: ${error.message}`);
         }
     }
-    function setTimeoutPromise(theTime){
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                resolve()
-            },theTime)
-        })
-    }
-    function cleanStringsInObject(obj, isWithinDetectorFilters = false) {
-      for (let key in obj) {
-        if (obj.hasOwnProperty(key)) {
-          // Check if we're entering the detector_filters structure
-          const enteringDetectorFilters = !isWithinDetectorFilters &&
-                                       (key === 'detector_filters' ||
-                                       (key === 'details' &&
-                                        typeof obj[key] === 'object' &&
-                                        obj[key].hasOwnProperty('detector_filters')));
-
-          // Determine if we're currently within detector_filters
-          let currentIsWithinDetectorFilters = isWithinDetectorFilters || enteringDetectorFilters;
-
-          // Special handling for stringified detector_filters
-          if ((key === 'detector_filters' || (key === 'details' && obj[key].hasOwnProperty('detector_filters')))) {
-            const detectorFiltersTarget = key === 'details' ? obj[key] : obj;
-            const detectorFiltersKey = key === 'details' ? 'detector_filters' : key;
-
-            if (typeof detectorFiltersTarget[detectorFiltersKey] === 'string') {
-              try {
-                const parsed = JSON.parse(detectorFiltersTarget[detectorFiltersKey]);
-                detectorFiltersTarget[detectorFiltersKey] = cleanStringsInObject(parsed, true);
-                continue; // Skip further processing as we've replaced and cleaned it
-              } catch (e) {
-                currentIsWithinDetectorFilters = true;
-              }
-            }
-          }
-
-          if (typeof obj[key] === 'string') {
-            try {
-              const parsed = JSON.parse(obj[key]);
-              obj[key] = cleanStringsInObject(parsed, currentIsWithinDetectorFilters);
-            } catch (e) {
-              if (currentIsWithinDetectorFilters) {
-                // Special handling for detector_filters - allow comparison operators
-                obj[key] = obj[key].replace(/[^\w\s.\-=+(){}\[\]*$@!`^%#:?\/&,><=!'|"]/gi, '');
-              } else {
-                // Normal string cleaning
-                obj[key] = obj[key].replace(/[^\w\s.\-=+(){}\[\]*$@!`^%#:?\/&,'|"]/gi, '');
-              }
-            }
-          }
-          else if (typeof obj[key] === 'object' && obj[key] !== null) {
-            if (enteringDetectorFilters && key === 'details') {
-              cleanStringsInObject(obj[key].detector_filters, true);
-              cleanStringsInObject(obj[key], false);
-            } else {
-              cleanStringsInObject(obj[key], currentIsWithinDetectorFilters);
-            }
-          }
-          else if (Array.isArray(obj[key])) {
-            obj[key].forEach((item, index) => {
-              if (typeof item === 'string') {
-                try {
-                  const parsed = JSON.parse(item);
-                  obj[key][index] = cleanStringsInObject(parsed, currentIsWithinDetectorFilters);
-                } catch (e) {
-                  if (currentIsWithinDetectorFilters) {
-                    obj[key][index] = item.replace(/[^\w\s.\-=+(){}\[\]*$@!`^%#:?\/&,><=!'|"]/gi, '');
-                  } else {
-                    obj[key][index] = item.replace(/[^\w\s.\-=+(){}\[\]*$@!`^%#:?\/&,'|"]/gi, '');
-                  }
-                }
-              } else if (typeof item === 'object' && item !== null) {
-                cleanStringsInObject(item, currentIsWithinDetectorFilters);
-              }
-            });
-          }
-        }
-      }
-      return obj;
-    }
-    function convertNumbersToStrings(form) {
-        if (!form || !form.details || typeof form.details !== 'object') {
-            return form;
-        }
-        for (let key in form.details) {
-            if (typeof form.details[key] === 'number') {
-                form.details[key] = form.details[key].toString();
-            }
-        }
-        return form;
-    }
-    function isValidPath(givenPath, startsWithIgnore){
-        let checkPath = `${givenPath}`
-        if(!givenPath)return false;
-        if(startsWithIgnore && givenPath.startsWith(startsWithIgnore)){
-            checkPath = checkPath.replace(startsWithIgnore,'')
-        }
-        return /^(\/?[a-z0-9A-Z\-_. ]+)*\/?$/.test(checkPath.replace('__DIR__',processCwd))
-    }
     return {
         parseJSON: parseJSON,
         stringJSON: stringJSON,
@@ -323,6 +285,8 @@ module.exports = (processCwd,config) => {
         utcToLocal: utcToLocal,
         localToUtc: localToUtc,
         formattedTime: formattedTime,
+        checkSubscription: checkSubscription,
+        checkAgainSubscription,
         isEven: isEven,
         fetchTimeout: fetchTimeout,
         fetchDownloadAndWrite: fetchDownloadAndWrite,
@@ -333,9 +297,5 @@ module.exports = (processCwd,config) => {
         setDefaultIfUndefined,
         deleteFilesInFolder,
         moveFile,
-        setTimeoutPromise,
-        cleanStringsInObject,
-        convertNumbersToStrings,
-        isValidPath,
     }
 }

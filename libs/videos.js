@@ -7,7 +7,6 @@ module.exports = function(s,config,lang){
     } = require('./childNode/childUtils.js')(s,config,lang)
     const {
         postProcessCompletedMp4Video,
-        isApplicableVideosDirectory,
     } = require('./video/utils.js')(s,config,lang)
     /**
      * Gets the video directory of the supplied video or monitor database row.
@@ -18,11 +17,10 @@ module.exports = function(s,config,lang){
         if(e.mid&&!e.id){e.id=e.mid};
         s.checkDetails(e)
         if(e.details&&e.details.dir&&e.details.dir!==''){
-            if(isApplicableVideosDirectory(e.details.dir, true)){
-                return s.checkCorrectPathEnding(e.details.dir)+e.ke+'/'+e.id+'/'
-            }
+            return s.checkCorrectPathEnding(e.details.dir)+e.ke+'/'+e.id+'/'
+        }else{
+            return s.dir.videos+e.ke+'/'+e.id+'/';
         }
-        return s.dir.videos+e.ke+'/'+e.id+'/'
     }
     /**
      * Creates available API based URLs for streaming
@@ -82,7 +80,7 @@ module.exports = function(s,config,lang){
                 ext: k.ext || e.ext,
                 status: 1,
                 details: s.s(k.details),
-                objects: (k.objects || '').substring(0,509),
+                objects: k.objects || '',
                 size: k.filesize,
                 end: k.endTime,
             }
@@ -110,7 +108,6 @@ module.exports = function(s,config,lang){
         e.dir = s.getVideoDirectory(e)
         k.dir = e.dir.toString()
         const activeMonitor = s.group[e.ke].activeMonitors[e.id]
-        const monitorEventsCounted = activeMonitor ? activeMonitor.detector_motion_count || [] : []
         //get file directory
         k.fileExists = fs.existsSync(k.dir+k.file)
         if(k.fileExists!==true){
@@ -128,7 +125,8 @@ module.exports = function(s,config,lang){
         if(k.fileExists === true){
             //close video row
             k.details = k.details && k.details instanceof Object ? k.details : {}
-            var listOTags = monitorEventsCounted.filter(row => row.details.reason === 'object').map(row => row.details.matrices.map(matrix => matrix.tag).join(',')).join(',').split(',')
+            var listOEvents = activeMonitor.detector_motion_count || []
+            var listOTags = listOEvents.filter(row => row.details.reason === 'object').map(row => row.details.matrices.map(matrix => matrix.tag).join(',')).join(',').split(',')
             if(listOTags && !k.objects){
                 k.objects = [...new Set(listOTags)].filter(item => !!item).join(',');
             }else if(k.objects[0] instanceof Object){
@@ -150,7 +148,7 @@ module.exports = function(s,config,lang){
                     ext: k.ext,
                     size: k.filesize,
                     filesize: k.filesize,
-                    objects: k.objects.substring(0, 509),
+                    objects: k.objects.substring(0, 510),
                     time: s.timeObject(k.startTime).format('YYYY-MM-DD HH:mm:ss'),
                     end: s.timeObject(k.endTime).format('YYYY-MM-DD HH:mm:ss')
                 }
@@ -158,6 +156,8 @@ module.exports = function(s,config,lang){
                 sendVideoToMasterNode(filePath,response)
             }else{
                 var href = '/videos/'+e.ke+'/'+e.mid+'/'+k.filename
+
+                const monitorEventsCounted = activeMonitor.detector_motion_count
                 s.txWithSubPermissions({
                     f: 'video_build_success',
                     hrefNoAuth: href,
@@ -196,8 +196,8 @@ module.exports = function(s,config,lang){
                     })
                 })
             }
-            s.group[e.ke].activeMonitors[e.mid].detector_motion_count = []
         }
+        s.group[e.ke].activeMonitors[e.mid].detector_motion_count = []
     }
     s.deleteVideo = function(e){
         return new Promise((resolve) => {
@@ -426,8 +426,6 @@ module.exports = function(s,config,lang){
                                             fileComplete()
                                         }
                                     })
-                                }else{
-                                    fileComplete()
                                 }
                             })
                         }
@@ -470,12 +468,20 @@ module.exports = function(s,config,lang){
             req.headerWrite['content-disposition']='attachment; filename="'+req.query.downloadName+'"';
         }
         res.writeHead(req.writeCode,req.headerWrite);
-        res.on('close', () => {
-            try{ file.destroy() }catch(e){}
+        res.on('finish', () => {
+           file.close();
         });
-        file.on('error', (err) => {
-            s.debugLog('streamMp4FileOverHttp file error', err)
-            try{ res.end() }catch(e){}
+
+        res.on('close', () => {
+           file.close();
+        });
+
+        res.on('disconnect', () => {
+           file.close();
+        });
+
+        file.on('close',function(){
+            res.end()
         });
         file.pipe(res)
         return file

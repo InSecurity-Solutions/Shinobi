@@ -134,16 +134,14 @@ $(document).ready(function() {
         }
     }
 
-    function getMonitorFromButtonCode(buttonCode = 0, preAdded){
-        const addedOneToButtonCode = preAdded ? buttonCode : parseInt(buttonCode) + 1
-        const monitor = loadedMonitors[monitorKeys[addedOneToButtonCode]];
-        const monitorId = monitor.mid;
-        return { monitor, monitorId }
-    }
-
     function setCameraFromButtonCode(buttonCode = 0, preAdded){
+        const addedOneToButtonCode = preAdded ? buttonCode : parseInt(buttonCode) + 1
         try{
-            const { monitor, monitorId } = getMonitorFromButtonCode(buttonCode, preAdded)
+            console.log('addedOneToButtonCode', addedOneToButtonCode)
+            console.log('monitorKeys', monitorKeys)
+            const monitor = loadedMonitors[monitorKeys[addedOneToButtonCode]];
+            console.log('monitor', monitor)
+            const monitorId = monitor.mid;
             const isFullscreened = !!document.fullscreenElement;
             if(isFullscreened) {
                 document.exitFullscreen()
@@ -180,14 +178,6 @@ $(document).ready(function() {
 
     function sentPtzToHome(){
         runPtzCommand(selectedMonitor, 'center')
-    }
-
-    function startPatrol(){
-        return onvifStartPatrol(selectedMonitor)
-    }
-
-    function stopPatrol(){
-        return onvifStopPatrol(selectedMonitor)
     }
 
     function translatePointTiltStick(x, y){
@@ -296,9 +286,10 @@ $(document).ready(function() {
             const gp = navigator.getGamepads()[0];
             getButtonsPressed(gp, function(buttonCode){
                 if(buttonCode == 10){
-                    startPatrol()
+                    // closeSnapshot()
                 }else if(buttonCode == 11){
-                    stopPatrol()
+                    // closeSnapshot()
+                    // openSnapshot()
                 }else{
                     buttonPressAction(buttonCode)
                 }

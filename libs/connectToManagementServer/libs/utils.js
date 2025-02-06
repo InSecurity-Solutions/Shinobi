@@ -1,14 +1,11 @@
-const crypto = require('crypto');
 function prettyPrint(obj){
     return JSON.stringify(obj,null,3)
 }
-function generateId(x) {
-    if (!x) { x = 10; }
-    const bytes = Math.ceil(x * 3 / 4);
-    return crypto.randomBytes(bytes)
-        .toString('base64')
-        .replace(/[+/=]/g, '')
-        .slice(0, x);
+function generateId(x){
+    if(!x){x=10};var t = "";var p = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    for( var i=0; i < x; i++ )
+        t += p.charAt(Math.floor(Math.random() * p.length));
+    return t;
 }
 function parseJSON(string){
     var parsed

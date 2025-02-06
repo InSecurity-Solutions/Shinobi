@@ -19,20 +19,7 @@ module.exports = function(s,config,lang){
         resetAllStorageCounters,
     } = require("./user/utils.js")(s,config,lang);
     require("./user/logger.js")(s,config,lang)
-    const diskUsedEmitterTimeouts = {}
-    let purgeDiskGroup = (groupKey,callback) => {
-        const { usedSpace, sizeLimit, addStorageUse } = s.group[groupKey];
-        if(usedSpace >= sizeLimit * 0.8){
-            s.runExtensionsForArray('onDiskFull', null, [groupKey, usedSpace, sizeLimit])
-        }
-        for(let storageName in addStorageUse){
-            var storageItem = addStorageUse[storageName];
-            if(storageItem.usedSpace >= storageItem.sizeLimit * 0.8){
-                s.runExtensionsForArray('onAddStorageDiskFull', null, [groupKey, storageItem.usedSpace, storageItem.sizeLimit, storageName])
-            }
-        }
-        callback()
-    }
+    let purgeDiskGroup = () => {}
     const runQuery = async.queue(function(groupKey, callback) {
         purgeDiskGroup(groupKey,callback)
     }, 1);
@@ -95,22 +82,16 @@ module.exports = function(s,config,lang){
     s.sendDiskUsedAmountToClients = function(groupKey){
         //send the amount used disk space to connected users
         if(s.group[groupKey]&&s.group[groupKey].init){
-            clearTimeout(diskUsedEmitterTimeouts[groupKey])
-            diskUsedEmitterTimeouts[groupKey] = setTimeout(() => {
-                if(s.group[groupKey]&&s.group[groupKey].init){
-                    delete diskUsedEmitterTimeouts[groupKey]
-                    s.tx({
-                        f: 'diskUsed',
-                        size: s.group[groupKey].usedSpace,
-                        usedSpace: s.group[groupKey].usedSpace,
-                        usedSpaceVideos: s.group[groupKey].usedSpaceVideos,
-                        usedSpaceFilebin: s.group[groupKey].usedSpaceFilebin,
-                        usedSpaceTimelapseFrames: s.group[groupKey].usedSpaceTimelapseFrames,
-                        limit: s.group[groupKey].sizeLimit,
-                        addStorage: s.group[groupKey].addStorageUse,
-                    },'GRP_'+groupKey);
-                }
-            },1000)
+            s.tx({
+                f: 'diskUsed',
+                size: s.group[groupKey].usedSpace,
+                usedSpace: s.group[groupKey].usedSpace,
+                usedSpaceVideos: s.group[groupKey].usedSpaceVideos,
+                usedSpaceFilebin: s.group[groupKey].usedSpaceFilebin,
+                usedSpaceTimelapseFrames: s.group[groupKey].usedSpaceTimelapseFrames,
+                limit: s.group[groupKey].sizeLimit,
+                addStorage: s.group[groupKey].addStorageUse,
+            },'GRP_'+groupKey);
         }
     }
     s.sendCloudDiskUsedAmountToClients = function(groupKey){
@@ -123,16 +104,13 @@ module.exports = function(s,config,lang){
         }
     }
     //user log
-    s.userLog = function(e, x, forceSave){
+    s.userLog = function(e,x){
         if(e.id && !e.mid)e.mid = e.id
         if(!x||!e.mid){return}
-        let doSave = forceSave;
         if(
-            forceSave ||
             (e.details && e.details.sqllog === '1') ||
             e.mid.indexOf('$') > -1
         ){
-            doSave = true
             s.knexQuery({
                 action: "insert",
                 table: "Logs",
@@ -152,7 +130,7 @@ module.exports = function(s,config,lang){
         }
         s.tx(logEvent,'GRPLOG_'+e.ke);
         s.onUserLogExtensions.forEach(function(extender){
-            extender(logEvent, doSave)
+            extender(logEvent)
         })
     }
     s.loadGroup = function(e){
@@ -184,14 +162,7 @@ module.exports = function(s,config,lang){
         s.sendDiskUsedAmountToClients(e.ke)
         s.sendCloudDiskUsedAmountToClients(e.ke)
         // create monitor management queue
-        if(!theGroup.startMonitorInQueue){
-            theGroup.startMonitorInQueue = config.monitorStartQueueDisabled ? {} : createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
-        }
-    }
-    s.unloadGroupApps = function(user){
-        s.unloadGroupAppExtensions.forEach(function(extender){
-            extender(user)
-        })
+        theGroup.startMonitorInQueue = createQueueAwaited(0.5, 1)
     }
     s.loadGroupApps = function(e){
         // e = user
@@ -217,10 +188,8 @@ module.exports = function(s,config,lang){
                 })
                 //disk Used Emitter
                 if(!s.group[e.ke].diskUsedEmitter){
-                    const emitter = new events.EventEmitter()
-                    emitter.setMaxListeners(4)
-                    s.group[e.ke].diskUsedEmitter = emitter
-                    emitter.on('setCloud',function(currentChange,storagePoint){
+                    s.group[e.ke].diskUsedEmitter = new events.EventEmitter()
+                    s.group[e.ke].diskUsedEmitter.on('setCloud',function(currentChange,storagePoint){
                         var amount = currentChange.amount
                         var storageType = currentChange.storageType
                         var cloudDisk = s.group[e.ke].cloudDiskUse[storageType]
@@ -249,7 +218,7 @@ module.exports = function(s,config,lang){
                         s.sendCloudDiskUsedAmountToClients(e.ke)
                     })
                     if(config.cron.deleteOverMax === true){
-                        emitter.on('purgeCloud',function(storageType,storagePoint){
+                        s.group[e.ke].diskUsedEmitter.on('purgeCloud',function(storageType,storagePoint){
                             deleteCloudVideos(e.ke,storageType,storagePoint,function(){
                                 deleteCloudTimelapseFrames(e.ke,storageType,storagePoint,function(){
 
@@ -258,7 +227,7 @@ module.exports = function(s,config,lang){
                         })
                     }
                     //s.setDiskUsedForGroup
-                    emitter.on('set',function(currentChange,storageType){
+                    s.group[e.ke].diskUsedEmitter.on('set',function(currentChange,storageType){
                         //validate current values
                         if(!s.group[e.ke].usedSpace){
                             s.group[e.ke].usedSpace=0
@@ -288,7 +257,7 @@ module.exports = function(s,config,lang){
                         //remove value just used from queue
                         s.sendDiskUsedAmountToClients(e.ke)
                     })
-                    emitter.on('setAddStorage',function(data,storageType){
+                    s.group[e.ke].diskUsedEmitter.on('setAddStorage',function(data,storageType){
                         var currentSize = data.size
                         var storageIndex = data.storageIndex
                         //validate current values
@@ -369,6 +338,7 @@ module.exports = function(s,config,lang){
                     formDetails.edit_days = details.edit_days
                     formDetails.use_admin = details.use_admin
                     formDetails.use_ldap = details.use_ldap
+                    formDetails.landing_page = details.landing_page
                     //check
                     if(details.edit_days == "0"){
                         formDetails.days = details.days;
@@ -385,8 +355,6 @@ module.exports = function(s,config,lang){
                         if(details.video_delete){formDetails.video_delete = details.video_delete;}
                         if(details.video_view){formDetails.video_view = details.video_view;}
                         if(details.monitor_edit){formDetails.monitor_edit = details.monitor_edit;}
-                        if(details.edit_permissions){formDetails.edit_permissions = details.edit_permissions;}
-                        if(details.permissionSet){formDetails.permissionSet = details.permissionSet;}
                         if(details.size){formDetails.size = details.size;}
                         if(details.days){formDetails.days = details.days;}
                     }

@@ -12,12 +12,14 @@ module.exports = (s,config,lang) => {
         const cameraCountChecks = [
             { kind: 'ec2', maxCameras: 2, condition: config.isEC2 },
             { kind: 'highCoreCount', maxCameras: 50, condition: config.isHighCoreCount },
-            { kind: 'default', maxCameras: s.cameraCount, condition: true },
+            { kind: 'default', maxCameras: 15, condition: true },
         ];
-        const monitorCountOnSystem = getTotalMonitorCount();
-        for (const check of cameraCountChecks) {
-            if (check.condition && monitorCountOnSystem >= check.maxCameras) {
-                return false;
+        if (!config.userHasSubscribed) {
+            const monitorCountOnSystem = getTotalMonitorCount();
+            for (const check of cameraCountChecks) {
+                if (check.condition && monitorCountOnSystem >= check.maxCameras) {
+                    return false;
+                }
             }
         }
         return true;

@@ -2,25 +2,14 @@ const fs = require('fs');
 const spawn = require('child_process').spawn;
 const {
     mergeDeep,
-    mbToHumanReadable,
 } = require('../common.js')
 module.exports = (config) => {
     var currentlyUpdating = false
-    const isValidStreamName = (streamName) => {
-        const pathTraversalPatterns = [/\.\.\//g, /\/\/+/g, /^\/.*/g];
-        let cleanName = streamName;
-        pathTraversalPatterns.forEach(pattern => {
-            cleanName = cleanName.replace(pattern, '');
-        });
-        return cleanName === streamName;
-    };
     return {
-        isValidStreamName,
         getSystemInfo: (s) => {
             const response = {
                 "Time Started": s.timeStarted,
                 "Time Ready": s.timeReady,
-                "Maximum Cameras": s.cameraCount,
                 Versions: {
                     "Shinobi": s.currentVersion,
                     "Node.js": process.version,
@@ -30,7 +19,7 @@ module.exports = (config) => {
                 },
                 Machine: {
                     "CPU Core Count": s.coreCount,
-                    "Total RAM": mbToHumanReadable(s.totalmem / (1024 * 1024)),
+                    "Total RAM": s.totalmem,
                     "Operating System Platform": s.platform,
                 },
 
@@ -40,7 +29,8 @@ module.exports = (config) => {
         },
         getConfiguration: () => {
             return new Promise((resolve,reject) => {
-                const configPath = s.location.config;
+                const configPath = config.thisIsDocker ? "/config/conf.json" : s.location.config;
+
                 fs.readFile(configPath, 'utf8', (err, data) => {
                     resolve(JSON.parse(data))
                 });
@@ -48,6 +38,7 @@ module.exports = (config) => {
         },
         modifyConfiguration: (postBody, useBase) => {
             return new Promise((resolve, reject) => {
+                console.log(config)
                 const configPath = config.thisIsDocker ? "/config/conf.json" : s.location.config;
                 let configToPost = postBody;
                 if(useBase){
@@ -59,7 +50,6 @@ module.exports = (config) => {
                     }
                 }
                 const configData = JSON.stringify(configToPost, null, 3);
-                s.debugLog(configData)
                 fs.writeFile(configPath, configData, resolve);
             });
         },

@@ -15,9 +15,6 @@ var fileupload = require("express-fileupload");
 var fieldBuild = require('./fieldBuild');
 module.exports = function(s,config,lang,app,io){
     const {
-        applyPermissionsToUser,
-    } = require('./user/permissionSets.js')(s,config,lang)
-    const {
         ptzControl,
         setPresetForCurrentPosition
     } = require('./control/ptz.js')(s,config,lang,app,io)
@@ -32,7 +29,6 @@ module.exports = function(s,config,lang,app,io){
         ldapLogin,
     } = require('./auth/utils.js')(s,config,lang)
     const {
-        getMonitors,
         spawnSubstreamProcess,
         destroySubstreamProcess,
         removeSenstiveInfoFromMonitorConfig,
@@ -91,11 +87,6 @@ module.exports = function(s,config,lang,app,io){
     s.getClientIp = function(req){
         return req.headers['cf-connecting-ip']||req.headers["CF-Connecting-IP"]||req.headers["'x-forwarded-for"]||req.connection.remoteAddress;
     }
-    proxy.on('error', function(err, req, res) {
-        try {
-            res.status(502).end('Bad Gateway')
-        } catch(e) {}
-    })
     ////Pages
     app.enable('trust proxy');
     if(config.webPaths.home !== '/'){
@@ -154,14 +145,14 @@ module.exports = function(s,config,lang,app,io){
     * Page : Login Screen
     */
     app.get(config.webPaths.home, function (req,res){
-        s.renderPage(req,res,config.renderPaths.index,{lang,config: s.getConfigWithBranding(req.hostname),screen:'dashboard'})
+        s.renderPage(req,res,config.renderPaths.index,{lang:lang,config: s.getConfigWithBranding(req.hostname),screen:'dashboard'})
     });
     /**
     * Page : Superuser Login Screen
     */
     app.get(config.webPaths.super, function (req,res){
         s.renderPage(req,res,config.renderPaths.index,{
-            lang,
+            lang: lang,
             config: s.getConfigWithBranding(req.hostname),
             screen: 'super'
         })
@@ -185,7 +176,6 @@ module.exports = function(s,config,lang,app,io){
             });
             const userInfo =  rows[0];
             userInfo.details = JSON.parse(userInfo.details)
-            await applyPermissionsToUser(userInfo)
             response.user = userInfo;
             res.end(s.prettyPrint(response));
         },res,req);
@@ -234,14 +224,14 @@ module.exports = function(s,config,lang,app,io){
             }
         }
         // brute check
-        if(s.failedLoginAttempts[req.ip] && s.failedLoginAttempts[req.ip].failCount >= 5){
+        if(s.failedLoginAttempts[req.body.mail] && s.failedLoginAttempts[req.body.mail].failCount >= 5){
             if(req.query.json=='true'){
                 res.end(s.prettyPrint({ok:false}))
             }else{
                 s.renderPage(req,res,config.renderPaths.index,{
                     failedLogin: true,
                     message: lang.failedLoginText1,
-                    lang,
+                    lang: s.copySystemDefaultLanguage(),
                     config: s.getConfigWithBranding(req.hostname),
                     screen: screenChooser(req.params.screen)
                 })
@@ -250,16 +240,9 @@ module.exports = function(s,config,lang,app,io){
         }
         //
         const renderPage = function(focus,data){
-            if(s.failedLoginAttempts[req.ip]){
-                clearTimeout(s.failedLoginAttempts[req.ip].timeout)
-                delete(s.failedLoginAttempts[req.ip])
-            }
-            if(
-                focus !== config.renderPaths.index
-            ){
-                const isSuperUser = focus === config.renderPaths.super
-                const user = data.$user;
-                s.runExtensionsForArray('onUserLogin', null, isSuperUser ? [user, '$', user.mail, req.ip] : [user, user.ke, user.uid, req.ip])
+            if(s.failedLoginAttempts[req.body.mail]){
+                clearTimeout(s.failedLoginAttempts[req.body.mail].timeout)
+                delete(s.failedLoginAttempts[req.body.mail])
             }
             if(req.query.json=='true'){
                 delete(data.config);
@@ -275,13 +258,13 @@ module.exports = function(s,config,lang,app,io){
                 s.renderPage(req,res,focus,data)
             }
         }
-        const failedAuthentication = function(board,failIdentifier,failMessage,emailAddress){
+        const failedAuthentication = function(board,failIdentifier,failMessage){
             // brute protector
             if(!failIdentifier){
                 s.renderPage(req,res,config.renderPaths.index,{
                     failedLogin: true,
                     message: failMessage || lang.failedLoginText2,
-                    lang,
+                    lang: s.copySystemDefaultLanguage(),
                     config: s.getConfigWithBranding(req.hostname),
                     screen: screenChooser(req.params.screen)
                 })
@@ -289,10 +272,15 @@ module.exports = function(s,config,lang,app,io){
             }
             if(!s.failedLoginAttempts[failIdentifier]){
                 s.failedLoginAttempts[failIdentifier] = {
-                    failCount : 0
+                    failCount : 0,
+                    ips : {}
                 }
             }
             ++s.failedLoginAttempts[failIdentifier].failCount
+            if(!s.failedLoginAttempts[failIdentifier].ips[req.ip]){
+                s.failedLoginAttempts[failIdentifier].ips[req.ip] = 0
+            }
+            ++s.failedLoginAttempts[failIdentifier].ips[req.ip]
             clearTimeout(s.failedLoginAttempts[failIdentifier].timeout)
             s.failedLoginAttempts[failIdentifier].timeout = setTimeout(function(){
                 delete(s.failedLoginAttempts[failIdentifier])
@@ -305,7 +293,7 @@ module.exports = function(s,config,lang,app,io){
                 s.renderPage(req,res,config.renderPaths.index,{
                     failedLogin: true,
                     message: failMessage || lang.failedLoginText2,
-                    lang,
+                    lang: s.copySystemDefaultLanguage(),
                     config: s.getConfigWithBranding(req.hostname),
                     screen: screenChooser(req.params.screen)
                 })
@@ -318,39 +306,43 @@ module.exports = function(s,config,lang,app,io){
                 type: lang['Authentication Failed'],
                 msg: {
                     for: board,
-                    mail: emailAddress,
+                    mail: failIdentifier,
                     ip: req.ip
                 }
             }
             if(board === 'super'){
                 s.userLog(logTo,logData)
             }else{
-                s.userLog(logTo,logData)
                 s.knexQuery({
                     action: "select",
                     columns: "ke,uid,details",
                     table: "Users",
                     where: [
-                        ['mail','=',emailAddress],
+                        ['mail','=',failIdentifier],
                     ]
                 },(err,r) => {
                     if(r && r[0]){
                         r = r[0]
                         r.details = JSON.parse(r.details)
+                        r.lang = s.getLanguageFile(r.details.lang)
                         logData.id = r.uid
-                        logData.type = lang['Authentication Failed']
+                        logData.type = r.lang['Authentication Failed']
+                        logTo.ke = r.ke
                     }
                     s.userLog(logTo,logData)
                 })
             }
         }
         function checkRoute(pageTarget,userInfo){
+            if(!userInfo.lang){
+                userInfo.lang = s.getLanguageFile(userInfo.details.lang)
+            }
             switch(pageTarget){
                 case'cam':
                     renderPage(config.renderPaths.dashcam,{
                         // config: s.getConfigWithBranding(req.hostname),
                         $user: userInfo,
-                        lang,
+                        lang: userInfo.lang,
                         define: s.getDefinitonFile(userInfo.details.lang),
                         __dirname: s.mainDirectory,
                         customAutoLoad: s.customAutoLoadTree
@@ -360,7 +352,7 @@ module.exports = function(s,config,lang,app,io){
                     renderPage(config.renderPaths.streamer,{
                         // config: s.getConfigWithBranding(req.hostname),
                         $user: userInfo,
-                        lang,
+                        lang: userInfo.lang,
                         define: s.getDefinitonFile(userInfo.details.lang),
                         __dirname: s.mainDirectory,
                         customAutoLoad: s.customAutoLoadTree
@@ -370,10 +362,13 @@ module.exports = function(s,config,lang,app,io){
                 // dash
                 default:
                     var chosenRender = 'home'
+                    if(userInfo.details.sub && userInfo.details.landing_page && userInfo.details.landing_page !== '' && config.renderPaths[userInfo.details.landing_page]){
+                        chosenRender = userInfo.details.landing_page
+                    }
                     renderPage(config.renderPaths[chosenRender],{
                         $user: userInfo,
                         config: s.getConfigWithBranding(req.hostname),
-                        lang,
+                        lang: userInfo.lang,
                         define: s.getDefinitonFile(userInfo.details.lang),
                         addStorage: s.dir.addStorage,
                         fs: fs,
@@ -386,7 +381,7 @@ module.exports = function(s,config,lang,app,io){
                 ke: userInfo.ke,
                 mid: '$USER'
             },{
-                type: lang['New Authentication Token'],
+                type: userInfo.lang['New Authentication Token'],
                 msg: {
                     for: pageTarget,
                     mail: userInfo.mail,
@@ -422,7 +417,7 @@ module.exports = function(s,config,lang,app,io){
                     details: user.details
                 })
             }else{
-                return failedAuthentication(req.body.function,req.ip,alternateLoginResponse.msg,req.body.mail)
+                return failedAuthentication(req.body.function,req.body.mail,alternateLoginResponse.msg)
             }
         }else if(req.body.mail && req.body.pass){
             async function regularLogin(){
@@ -431,6 +426,7 @@ module.exports = function(s,config,lang,app,io){
                     const user = basicAuthResponse.user;
                     const sessionKey = s.md5(s.gid())
                     user.auth = sessionKey
+                    user.lang = s.getLanguageFile(user.details.lang)
                     s.knexQuery({
                         action: "update",
                         table: "Users",
@@ -458,7 +454,7 @@ module.exports = function(s,config,lang,app,io){
                                         sub: user.details.sub
                                     }
                                 },
-                                lang,
+                                lang: user.lang,
                             })
                             return;
                         }
@@ -473,7 +469,7 @@ module.exports = function(s,config,lang,app,io){
                         details: user.details
                     })
                 }else{
-                    failedAuthentication(req.body.function,req.ip,null,req.body.mail)
+                    failedAuthentication(req.body.function,req.body.mail)
                 }
             }
             if(req.body.function === 'super' && !config.superUserLoginDisabled){
@@ -481,14 +477,14 @@ module.exports = function(s,config,lang,app,io){
                 if(superLoginResponse.ok){
                     renderPage(config.renderPaths.super,{
                         config: config,
-                        lang,
+                        lang: lang,
                         define: s.getDefinitonFile(config.language),
                         $user: superLoginResponse.user,
                         customAutoLoad: s.customAutoLoadTree,
                         currentVersion: s.currentVersion,
                     })
                 }else{
-                    failedAuthentication(req.body.function,req.ip,null,req.body.mail)
+                    failedAuthentication(req.body.function,req.body.mail)
                 }
             }else{
                 regularLogin()
@@ -509,24 +505,24 @@ module.exports = function(s,config,lang,app,io){
             if(twoFactorVerificationResponse.ok){
                 checkRoute(twoFactorVerificationResponse.pageTarget,twoFactorVerificationResponse.info)
             }else{
-                failedAuthentication(lang['2-Factor Authentication'],req.ip,null,factorAuthObject.info.mail)
+                failedAuthentication(lang['2-Factor Authentication'],factorAuthObject.info.mail)
             }
         }else{
-            failedAuthentication(lang['2-Factor Authentication'],req.ip,null,req.body.mail)
+            failedAuthentication(lang['2-Factor Authentication'],req.body.mail)
         }
     })
-    // /**
-    // * API : Brute Protection Lock Reset by API
-    // */
-    // app.get([config.webPaths.apiPrefix+':auth/resetBruteProtection/:ke'], function (req,res){
-    //     s.auth(req.params,function(user){
-    //         if(s.failedLoginAttempts[user.mail]){
-    //             clearTimeout(s.failedLoginAttempts[user.mail].timeout)
-    //             delete(s.failedLoginAttempts[user.mail])
-    //         }
-    //         res.end(s.prettyPrint({ok:true}))
-    //     })
-    // })
+    /**
+    * API : Brute Protection Lock Reset by API
+    */
+    app.get([config.webPaths.apiPrefix+':auth/resetBruteProtection/:ke'], function (req,res){
+        s.auth(req.params,function(user){
+            if(s.failedLoginAttempts[user.mail]){
+                clearTimeout(s.failedLoginAttempts[user.mail].timeout)
+                delete(s.failedLoginAttempts[user.mail])
+            }
+            res.end(s.prettyPrint({ok:true}))
+        })
+    })
     /**
     * API : Get TV Channels (Monitor Streams) json
      */
@@ -633,13 +629,13 @@ module.exports = function(s,config,lang,app,io){
                     channelRow.streams=[]
                     channelRow.streamsSortedByType={}
                     buildStreamURL(channelRow,details.stream_type)
-                    const streamChannels = s.parseJSON(details.stream_channels)
-                    if(streamChannels){
-                        streamChannels.forEach(function(b,m){
+                    if(details.stream_channels&&details.stream_channels!==''){
+                        details.stream_channels=JSON.parse(details.stream_channels)
+                        details.stream_channels.forEach(function(b,m){
                             buildStreamURL(channelRow,b.stream_type,m.toString())
                         })
                     }
-                    if(details.tv_channel === '1'){
+                    if(details.tv_channel==='1'){
                         tvChannelMonitors.push(channelRow)
                     }
                 })
@@ -671,11 +667,9 @@ module.exports = function(s,config,lang,app,io){
     app.get([config.webPaths.apiPrefix+':auth/monitor/:ke',config.webPaths.apiPrefix+':auth/monitor/:ke/:id'], function (req,res){
         var response = {ok:false};
         res.setHeader('Content-Type', 'application/json');
-        s.auth(req.params, async (user) => {
-            const authKey = req.params.auth
+        s.auth(req.params,(user) => {
             const groupKey = req.params.ke
             const monitorId = req.params.id
-            let monitors = []
             const {
                 monitorPermissions,
                 monitorRestrictions,
@@ -693,12 +687,109 @@ module.exports = function(s,config,lang,app,io){
                     monitorRestrictions.length === 0
                 )
             ){
-                // response.monitors = [];
-            }else{
-                const cannotSeeImportantSettings = (isRestrictedApiKey && apiKeyPermissions.edit_monitors_disallowed) || userPermissions.monitor_create_disallowed;
-                monitors = await getMonitors(groupKey, monitorId, authKey, isRestricted, monitorPermissions, monitorRestrictions, cannotSeeImportantSettings, req.query.search)
+                s.closeJsonResponse(res,[]);
+                return
             }
-            s.closeJsonResponse(res,monitors);
+            const cannotSeeImportantSettings = (isRestrictedApiKey && apiKeyPermissions.edit_monitors_disallowed) || userPermissions.monitor_create_disallowed;
+            const whereQuery = [
+                ['ke','=',groupKey],
+                monitorRestrictions
+            ];
+            if(!!req.query.search){
+                const searchQuery = req.query.search.split(',');
+                const whereQuerySearch = []
+                for(item of searchQuery){
+                    if(item){
+                        whereQuerySearch.push(
+                            whereQuerySearch.length === 0 ? ['name','LIKE',`%${item.trim()}%`] : ['or', 'name','LIKE',`%${item}%`],
+                            ['or','mid','LIKE',`%${item.trim()}%`]
+                        );
+                    }
+                }
+                whereQuery.push(whereQuerySearch)
+            }
+            s.knexQuery({
+                action: "select",
+                columns: "*",
+                table: "Monitors",
+                where: whereQuery
+            },(err,r) => {
+                r.forEach(function(v,n){
+                    const monitorId = v.mid;
+                    v.details = JSON.parse(v.details)
+                    var details = v.details;
+                    if(isRestricted && !monitorPermissions[`${monitorId}_monitor_edit`] || cannotSeeImportantSettings){
+                        r[n] = removeSenstiveInfoFromMonitorConfig(v);
+                    }
+                    if(s.group[v.ke] && s.group[v.ke].activeMonitors[v.mid]){
+                        const activeMonitor = s.group[v.ke].activeMonitors[v.mid]
+                        r[n].currentlyWatching = Object.keys(activeMonitor.watch).length
+                        r[n].currentCpuUsage = activeMonitor.currentCpuUsage
+                        r[n].status = activeMonitor.monitorStatus
+                        r[n].code = activeMonitor.monitorStatusCode
+                        r[n].subStreamChannel = activeMonitor.subStreamChannel
+                        r[n].subStreamActive = !!activeMonitor.subStreamProcess
+                    }
+                    function getStreamUrl(type,channelNumber){
+                        var streamURL
+                        if(channelNumber){channelNumber = '/'+channelNumber}else{channelNumber=''}
+                        switch(type){
+                            case'mjpeg':
+                                streamURL='/'+req.params.auth+'/mjpeg/'+v.ke+'/'+v.mid+channelNumber
+                            break;
+                            case'hls':
+                                streamURL='/'+req.params.auth+'/hls/'+v.ke+'/'+v.mid+channelNumber+'/s.m3u8'
+                            break;
+                            case'h264':
+                                streamURL='/'+req.params.auth+'/h264/'+v.ke+'/'+v.mid+channelNumber
+                            break;
+                            case'flv':
+                                streamURL='/'+req.params.auth+'/flv/'+v.ke+'/'+v.mid+channelNumber+'/s.flv'
+                            break;
+                            case'mp4':
+                                streamURL='/'+req.params.auth+'/mp4/'+v.ke+'/'+v.mid+channelNumber+'/s.mp4'
+                            break;
+                            case'useSubstream':
+                                try{
+                                    const monitorConfig = s.group[v.ke].rawMonitorConfigurations[v.mid]
+                                    const monitorDetails = monitorConfig.details
+                                    const subStreamChannelNumber = 1 + (monitorDetails.stream_channels || []).length
+                                    const subStreamType = monitorConfig.details.substream.output.stream_type
+                                    streamURL = getStreamUrl(subStreamType,subStreamChannelNumber)
+                                }catch(err){
+                                    s.debugLog(err)
+                                }
+                            break;
+                        }
+                        return streamURL
+                    }
+                    var buildStreamURL = function(type,channelNumber){
+                        var streamURL = getStreamUrl(type,channelNumber)
+                        if(streamURL){
+                            if(!r[n].streamsSortedByType[type]){
+                                r[n].streamsSortedByType[type]=[]
+                            }
+                            r[n].streamsSortedByType[type].push(streamURL)
+                            r[n].streams.push(streamURL)
+                        }
+                        return streamURL
+                    }
+                    if(!details.tv_channel_id||details.tv_channel_id==='')details.tv_channel_id = 'temp_'+s.gid(5)
+                    if(details.snap==='1'){
+                        r[n].snapshot = '/'+req.params.auth+'/jpeg/'+v.ke+'/'+v.mid+'/s.jpg'
+                    }
+                    r[n].streams=[]
+                    r[n].streamsSortedByType={}
+                    buildStreamURL(details.stream_type)
+                    if(details.stream_channels&&details.stream_channels!==''){
+                        details.stream_channels=s.parseJSON(details.stream_channels)
+                        details.stream_channels.forEach(function(b,m){
+                            buildStreamURL(b.stream_type,m.toString())
+                        })
+                    }
+                })
+                s.closeJsonResponse(res,r);
+            })
         },res,req);
     });
     /**
@@ -709,11 +800,6 @@ module.exports = function(s,config,lang,app,io){
         s.auth(req.params,async (user) => {
             const groupKey = req.params.ke
             const monitorId = req.params.id
-            if(!s.group[groupKey] || !s.group[groupKey].rawMonitorConfigurations[monitorId]){
-                response.msg = 'Not Ready'
-                s.closeJsonResponse(res,response);
-                return
-            }
             const {
                 monitorPermissions,
                 monitorRestrictions,
@@ -728,7 +814,7 @@ module.exports = function(s,config,lang,app,io){
                 isRestrictedApiKey && apiKeyPermissions.control_monitors_disallowed ||
                 isRestricted && !monitorPermissions[`${monitorId}_monitors`]
             ){
-                response.msg = lang['Not Permitted']
+                response.msg = user.lang['Not Permitted']
             }else{
                 const monitorConfig = s.group[groupKey].rawMonitorConfigurations[monitorId]
                 const activeMonitor = s.group[groupKey].activeMonitors[monitorId]
@@ -744,7 +830,6 @@ module.exports = function(s,config,lang,app,io){
                             response.channel = activeMonitor.subStreamChannel;
                         break;
                         case'stop':
-                            response.ok = true
                             activeMonitor.allowDestroySubstream = true
                             await destroySubstreamProcess(activeMonitor)
                         break;
@@ -796,7 +881,7 @@ module.exports = function(s,config,lang,app,io){
                 isRestrictedApiKey && apiKeyPermissions.control_monitors_disallowed ||
                 isRestricted && !monitorPermissions[`${monitorId}_monitors`]
             ){
-                response.msg = lang['Not Permitted']
+                response.msg = user.lang['Not Permitted']
             }else{
                 const monitorConfig = s.group[groupKey].rawMonitorConfigurations[monitorId]
                 const activeMonitor = s.group[groupKey].activeMonitors[monitorId]
@@ -1002,7 +1087,7 @@ module.exports = function(s,config,lang,app,io){
                 user.permissions.watch_videos === "0"
                 && user.details.allmonitors !== '1'
             ){
-                res.end(lang['Not Permitted'])
+                res.end(user.lang['Not Permitted'])
                 return
             }
             s.renderPage(req,res,config.renderPaths.wallvideoview,{
@@ -1012,7 +1097,7 @@ module.exports = function(s,config,lang,app,io){
                 baseUrl: req.protocol + '://' + req.hostname,
                 config: s.getConfigWithBranding(req.hostname),
                 define: s.getDefinitonFile(user.details ? user.details.lang : config.lang),
-                lang,
+                lang: lang,
                 $user: user,
                 authKey: authKey,
                 groupKey: groupKey,
@@ -1170,13 +1255,8 @@ module.exports = function(s,config,lang,app,io){
                 s.closeJsonResponse(res,{ok: false, msg: lang['Not Authorized']});
                 return
             }
-            if(req.params.f===''){response.msg = lang.monitorGetText1;res.end(s.prettyPrint(response));return}
-            if(
-                req.params.f!=='stop' &&
-                req.params.f!=='start' &&
-                req.params.f!=='record' &&
-                req.params.f!=='idle'
-            ){
+            if(req.params.f===''){response.msg = user.lang.monitorGetText1;res.end(s.prettyPrint(response));return}
+            if(req.params.f!=='stop'&&req.params.f!=='start'&&req.params.f!=='record'){
                 response.msg = 'Mode not recognized.';
                 res.end(s.prettyPrint(response));
                 return;
@@ -1197,6 +1277,7 @@ module.exports = function(s,config,lang,app,io){
                         if(req.query.reset!=='1'||!s.group[r.ke].activeMonitors[r.mid].trigger_timer){
                             if(!s.group[r.ke].activeMonitors[r.mid].currentState)s.group[r.ke].activeMonitors[r.mid].currentState={}
                             s.group[r.ke].activeMonitors[r.mid].currentState.mode=r.mode.toString()
+                            s.group[r.ke].activeMonitors[r.mid].currentState.fps=r.fps.toString()
                             if(!s.group[r.ke].activeMonitors[r.mid].currentState.trigger_on){
                                s.group[r.ke].activeMonitors[r.mid].currentState.trigger_on=true
                             }else{
@@ -1223,9 +1304,9 @@ module.exports = function(s,config,lang,app,io){
                             }
                             s.tx({f:'monitor_edit',mid:r.mid,ke:r.ke,mon:r},'GRP_'+r.ke);
                             s.tx({f:'monitor_edit',mid:r.mid,ke:r.ke,mon:r},'STR_'+r.ke);
-                            response.msg = lang['Monitor mode changed']+' : '+req.params.f;
+                            response.msg = user.lang['Monitor mode changed']+' : '+req.params.f;
                         }else{
-                            response.msg = lang['Reset Timer'];
+                            response.msg = user.lang['Reset Timer'];
                         }
                         response.cmd_at=s.formattedTime(new Date,'YYYY-MM-DD HH:mm:ss');
                         response.ok = true;
@@ -1246,36 +1327,37 @@ module.exports = function(s,config,lang,app,io){
                                     req.timeout=req.params.ff*1000
                                 break;
                             }
-                            const timerKe = r.ke
-                            const timerMid = r.mid
-                            s.group[timerKe].activeMonitors[timerMid].trigger_timer = setTimeout(async function(){
-                                const liveMonitor = s.group[timerKe] && s.group[timerKe].activeMonitors[timerMid]
-                                if(!liveMonitor) return
-                                delete(liveMonitor.trigger_timer)
-                                const liveConfig = s.group[timerKe].rawMonitorConfigurations[timerMid]
-                                const restoreMode = liveMonitor.currentState && liveMonitor.currentState.mode
-                                if(!restoreMode) return
+                            s.group[r.ke].activeMonitors[r.mid].trigger_timer=setTimeout(async function(){
+                                delete(s.group[r.ke].activeMonitors[r.mid].trigger_timer)
                                 s.knexQuery({
                                     action: "update",
                                     table: "Monitors",
-                                    update: { mode: restoreMode },
-                                    where: [['ke','=',timerKe],['mid','=',timerMid]]
+                                    update: {
+                                        mode: s.group[r.ke].activeMonitors[r.mid].currentState.mode
+                                    },
+                                    where: [
+                                        ['ke','=',r.ke],
+                                        ['mid','=',r.mid],
+                                    ]
                                 })
-                                const monObj = s.cleanMonitorObject(Object.assign({}, liveConfig, { mode: restoreMode, id: timerMid }))
-                                await s.camera('stop', monObj)
-                                if(restoreMode !== 'stop'){
-                                    await s.camera(restoreMode, monObj)
+                                r.neglectTriggerTimer=1;
+                                r.mode=s.group[r.ke].activeMonitors[r.mid].currentState.mode;
+                                r.fps=s.group[r.ke].activeMonitors[r.mid].currentState.fps;
+                                await s.camera('stop',s.cleanMonitorObject(r));
+                                if(s.group[r.ke].activeMonitors[r.mid].currentState.mode!=='stop'){
+                                    await s.camera(s.group[r.ke].activeMonitors[r.mid].currentState.mode,s.cleanMonitorObject(r));
                                 }
-                                s.tx({f:'monitor_edit',mid:timerMid,ke:timerKe,mon:liveConfig},'GRP_'+timerKe)
-                                s.tx({f:'monitor_edit',mid:timerMid,ke:timerKe,mon:liveConfig},'STR_'+timerKe)
-                            }, req.timeout)
+                                s.group[r.ke].rawMonitorConfigurations[r.mid]=r;
+                                s.tx({f:'monitor_edit',mid:r.mid,ke:r.ke,mon:r},'GRP_'+r.ke);
+                                s.tx({f:'monitor_edit',mid:r.mid,ke:r.ke,mon:r},'STR_'+r.ke);
+                            },req.timeout);
     //                        response.end_at=s.formattedTime(new Date,'YYYY-MM-DD HH:mm:ss').add(req.timeout,'milliseconds');
                         }
                      }else{
-                        response.msg = lang['Monitor mode is already']+' : '+req.params.f;
+                        response.msg = user.lang['Monitor mode is already']+' : '+req.params.f;
                     }
                 }else{
-                    response.msg = lang['Monitor or Key does not exist.'];
+                    response.msg = user.lang['Monitor or Key does not exist.'];
                 }
                 res.end(s.prettyPrint(response));
             })
@@ -1332,23 +1414,17 @@ module.exports = function(s,config,lang,app,io){
                         }).catch((err) => {
                             console.error('onGetVideoData ERROR',err,videoDetails)
                             res.status(404)
-                            res.end(lang['File Not Found in Database'])
+                            res.end(user.lang['File Not Found in Database'])
                         })
                     }else{
                         fetch(r.href).then(actual => {
                             actual.headers.forEach((v, n) => res.setHeader(n, v));
                             actual.body.pipe(res);
-                            res.on('close', () => {
-                                try{ actual.body.destroy() }catch(e){}
-                            })
-                        }).catch(err => {
-                            console.error('Cloud video fetch error', err)
-                            res.status(502).end('Bad Gateway')
                         })
                     }
                 }else{
                     res.status(404)
-                    res.end(lang['File Not Found in Database'])
+                    res.end(user.lang['File Not Found in Database'])
                 }
             })
         },res,req);
@@ -1389,7 +1465,6 @@ module.exports = function(s,config,lang,app,io){
                 clearTimeout(videoRowCacheTimeouts[cacheName])
                 videoRowCacheTimeouts[cacheName] = setTimeout(() => {
                     delete(videoRowCaches[cacheName])
-                    delete(videoRowCacheTimeouts[cacheName])  // <-- add this
                 },60000)
             }
             const sendVideo = (videoRow) => {
@@ -1434,7 +1509,7 @@ module.exports = function(s,config,lang,app,io){
                         sendVideo(videoRow)
                     }else{
                         res.status(404)
-                        res.end(lang['File Not Found in Database'])
+                        res.end(user.lang['File Not Found in Database'])
                     }
                 })
             }
@@ -1463,7 +1538,7 @@ module.exports = function(s,config,lang,app,io){
             ){
                 s.closeJsonResponse(res,{
                     ok: false,
-                    msg: !monitorConfig ? lang['Monitor or Key does not exist.'] : lang['Not Authorized']
+                    msg: !monitorConfig ? user.lang['Monitor or Key does not exist.'] : lang['Not Authorized']
                 });
                 return
             }
@@ -1477,7 +1552,7 @@ module.exports = function(s,config,lang,app,io){
                  }catch(err){
                      s.closeJsonResponse(res,{
                          ok: false,
-                         msg: lang['Data Broken']
+                         msg: user.lang['Data Broken']
                      })
                      return
                  }
@@ -1502,7 +1577,7 @@ module.exports = function(s,config,lang,app,io){
              else{
                  s.closeJsonResponse(res,{
                      ok: false,
-                     msg: lang['No Data']
+                     msg: user.lang['No Data']
                  })
                  return
              }
@@ -1516,14 +1591,14 @@ module.exports = function(s,config,lang,app,io){
              ){
                  s.closeJsonResponse(res,{
                      ok: false,
-                     msg: lang['Trigger Blocked']
+                     msg: user.lang['Trigger Blocked']
                  })
                  return;
              }
              triggerEvent(simulatedEvent)
              s.closeJsonResponse(res,{
                  ok: true,
-                 msg: lang['Trigger Successful']
+                 msg: user.lang['Trigger Successful']
              })
          },res,req)
      })
@@ -1570,6 +1645,57 @@ module.exports = function(s,config,lang,app,io){
                 counted: Object.keys(selectedObject).length,
                 tags: selectedObject,
             }))
+        },res,req)
+    })
+    /**
+    * API : Object Detection Counter Status
+     */
+    app.get([
+        config.webPaths.apiPrefix+':auth/eventCounts/:ke',
+        config.webPaths.apiPrefix+':auth/eventCounts/:ke/:id'
+    ], function (req,res){
+        res.setHeader('Content-Type', 'application/json')
+        s.auth(req.params,function(user){
+            const monitorId = req.params.id
+            const groupKey = req.params.ke
+            const {
+                monitorPermissions,
+                monitorRestrictions,
+            } = s.getMonitorsPermitted(user.details,monitorId)
+            const {
+                isRestricted,
+                isRestrictedApiKey,
+                apiKeyPermissions,
+            } = s.checkPermission(user);
+            if(
+                isRestrictedApiKey && apiKeyPermissions.watch_videos_disallowed ||
+                isRestricted && (
+                    monitorId && !monitorPermissions[`${monitorId}_video_view`] ||
+                    monitorRestrictions.length === 0
+                )
+            ){
+                s.closeJsonResponse(res,{ok: false, msg: lang['Not Authorized'], videos: []});
+                return
+            }
+            s.sqlQueryBetweenTimesWithPermissions({
+                table: 'Events Counts',
+                user: user,
+                noCount: true,
+                groupKey: req.params.ke,
+                monitorId: req.params.id,
+                startTime: req.query.start,
+                endTime: req.query.end,
+                startTimeOperator: req.query.startOperator,
+                endTimeOperator: req.query.endOperator,
+                limit: req.query.limit,
+                archived: req.query.archived,
+                endIsStartTo: !!req.query.endIsStartTo,
+                parseRowDetails: true,
+                rowName: 'counts',
+                preliminaryValidationFailed: false
+            },(response) => {
+                res.end(s.prettyPrint(response))
+            })
         },res,req)
     })
     /**
@@ -1786,24 +1912,21 @@ module.exports = function(s,config,lang,app,io){
                         break;
                         case'delete':
                             response.ok = true;
-                            const clientIp = s.getClientIp(req)
                             switch(videoParam){
                                 case'cloudVideos':
-                                    s.runExtensionsForArray('onCloudVideoDeleteByUser', null, [r, user, groupKey, monitorId, clientIp])
                                     s.deleteVideoFromCloud(r,details.type || r.type || 's3')
                                 break;
                                 default:
-                                    s.runExtensionsForArray('onVideoDeleteByUser', null, [r, user, groupKey, monitorId, clientIp])
                                     s.deleteVideo(r)
                                 break;
                             }
                         break;
                         default:
-                            response.msg = lang.modifyVideoText1;
+                            response.msg = user.lang.modifyVideoText1;
                         break;
                     }
                 }else{
-                    response.msg = lang['No such file'];
+                    response.msg = user.lang['No such file'];
                 }
                 res.end(s.prettyPrint(response));
             })
@@ -1837,6 +1960,7 @@ module.exports = function(s,config,lang,app,io){
             }
             const response = { ok: false }
             const selectedVideos = s.getPostData(req,'videos');
+            console.log('selected',selectedVideos)
             if(selectedVideos && selectedVideos.length > 1){
                 const mergedFilePath = await mergeVideosAndBin(selectedVideos);
                 response.ok = !!mergedFilePath;
@@ -1959,9 +2083,8 @@ module.exports = function(s,config,lang,app,io){
                 }
             })
             res.connection.setTimeout(0);
-            const activeMonitor = s.group[groupKey] && s.group[groupKey].activeMonitors[monitorId]
             req.on('data', function(buffer){
-                try{ activeMonitor.spawn.stdin.write(buffer) }catch(e){}
+                s.group[groupKey].activeMonitors[monitorId].spawn.stdin.write(buffer)
             });
             req.on('end',function(){
                 s.userLog({
@@ -1982,33 +2105,20 @@ module.exports = function(s,config,lang,app,io){
      */
     app.all(config.webPaths.apiPrefix+':auth/accounts/:ke/edit',function (req,res){
         s.auth(req.params,function(user){
-            const {
-                isSubAccount,
-                isRestrictedApiKey,
-                apiKeyPermissions,
-                userPermissions,
-            } = s.checkPermission(user)
-            const endData = {
+            var endData = {
                 ok : false
             }
-            if(
-                userPermissions.user_change_disallowed ||
-                isRestrictedApiKey && apiKeyPermissions.edit_user_disallowed
-            ){
-                endData.msg = lang['Not Authorized']
+            var form = s.getPostData(req)
+            if(form){
+                endData.ok = true
+                s.accountSettingsEdit({
+                    ke: req.params.ke,
+                    uid: user.uid,
+                    form: form,
+                    cnid: user.cnid
+                })
             }else{
-                var form = s.getPostData(req)
-                if(form){
-                    endData.ok = true
-                    s.accountSettingsEdit({
-                        ke: req.params.ke,
-                        uid: user.uid,
-                        form: form,
-                        cnid: user.cnid
-                    })
-                }else{
-                    endData.msg = lang.postDataBroken
-                }
+                endData.msg = lang.postDataBroken
             }
             s.closeJsonResponse(res,endData)
         },res,req)
@@ -2118,6 +2228,9 @@ module.exports = function(s,config,lang,app,io){
     * Robots.txt
     */
     app.get('/robots.txt', function (req,res){
+        res.on('finish',function(){
+            res.end()
+        })
         fs.createReadStream(s.mainDirectory + '/web/pages/robots.txt').pipe(res)
     })
 }

@@ -676,7 +676,7 @@ module.exports = (s,config,lang) => {
                     audioCodec !== 'auto' &&
                     audioCodec !== 'aac'
                 ){
-                    outputMap += `-map 0:1 `
+                    outputMap += `-map 0:1? `
                 }
                 if(config.noEventBasedRecordingMaps)outputMap = '';
                 const secondsBefore = parseInt(monitorDetails.detector_buffer_seconds_before) || 5
