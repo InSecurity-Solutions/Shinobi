@@ -81,7 +81,9 @@ module.exports = (s,config,lang) => {
                     treekill(processPID)
                 });
                 if(proc && proc.stdin) {
-                    proc.stdin.write("q\r\n");
+                    try{
+                        proc.stdin.write("q\r\n");
+                    }catch(err){}
                 }
                 let killTimer = setTimeout(() => {
                     if(proc && proc.kill){
@@ -677,10 +679,9 @@ module.exports = (s,config,lang) => {
                 type: lang.monitorDeleted,
                 msg: `${lang.byUser} : ${userId}`
             });
-            s.camera('stop', {
+            await s.camera('stop', {
                 ke: groupKey,
                 mid: monitorId,
-                delete: 1,
             });
             s.tx({
                 f: 'monitor_delete',
