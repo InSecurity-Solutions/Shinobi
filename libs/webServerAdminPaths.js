@@ -9,6 +9,7 @@ module.exports = function(s,config,lang,app){
         deleteMonitor,
     } = require('./monitor/utils.js')(s,config,lang);
     require('./webPaths/permissionSets.js')(s,config,lang,app)
+    require('./webPaths/customSettings.js')(s,config,lang,app)
     const { createApiKey } = require('./user/apiKeys.js')(s,config,lang)
     /**
     * API : Administrator : Edit Sub-Account (Account to share cameras with)
