@@ -1,12 +1,42 @@
 module.exports = function(s,config,lang,io){
+    const { getMonitors } = require('./utils.js')(s,config,lang)
     s.onOtherWebSocketMessages(async (d,cn,tx) => {
+        const authKey = cn.auth
+        const groupKey = cn.ke
+        const user = s.group[groupKey].users[authKey];
+        const monitorId = d.mid || d.id;
+        const callbackId = d.callbackId;
+        const response = { f: 'callback', callbackId, args: [true] }
         switch(d.f){
+            case'getMonitors':
+                response.ff = 'getMonitors'
+                var {
+                    monitorPermissions,
+                    monitorRestrictions,
+                } = s.getMonitorsPermitted(user.details,monitorId)
+                var {
+                    isRestricted,
+                    userPermissions,
+                    isRestrictedApiKey,
+                    apiKeyPermissions,
+                } = s.checkPermission(user)
+                if(
+                    isRestrictedApiKey && apiKeyPermissions.get_monitors_disallowed ||
+                    isRestricted && (
+                        monitorId && !monitorPermissions[`${monitorId}_monitors`] ||
+                        monitorRestrictions.length === 0
+                    )
+                ){
+                    //not authorized
+                }else{
+                    const cannotSeeImportantSettings = (isRestrictedApiKey && apiKeyPermissions.edit_monitors_disallowed) || userPermissions.monitor_create_disallowed;
+                    const monitors = await getMonitors(groupKey, monitorId, authKey, isRestricted, monitorPermissions, monitorRestrictions, cannotSeeImportantSettings, d.search)
+                    response.args = [false, monitors]
+                }
+                tx(response);
+            break;
             case'addOrEditMonitor':
-                var user = s.group[cn.ke].users[cn.auth];
-                var groupKey = cn.ke
-                var monitorId = d.mid || d.id;
-                var callbackId = d.callbackId;
-                var response = { f: 'callback', ff:'addOrEditMonitor', callbackId, ok: false }
+                response.ff = 'addOrEditMonitor'
                 var {
                     monitorPermissions,
                     monitorRestrictions,
@@ -33,9 +63,9 @@ module.exports = function(s,config,lang,io){
                            s.checkDetails(form)
                            form.ke = groupKey
                            const editResponse = await s.addOrEditMonitor(form,null,user);
-                           response.ok = editResponse.ok;
+                           response.args = [!editResponse.ok, editResponse];
                        }else{
-                           response.msg = user.lang.monitorEditText1;
+                           response.args = [lang.monitorEditText1];
                        }
                    }
                 }

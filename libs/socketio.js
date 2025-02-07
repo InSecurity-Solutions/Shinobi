@@ -374,7 +374,6 @@ module.exports = function(s,config,lang,io){
             }
             if((d.id||d.uid||d.mid)&&cn.ke){
             try{
-                d.callbackResponse = {ok: true}
                 switch(d.f){
                     case'monitorOrder':
                         if(d.monitorOrder && d.monitorOrder instanceof Object){
@@ -714,13 +713,6 @@ module.exports = function(s,config,lang,io){
                             extender(d,cn,tx)
                         })
                     break;
-                }
-                if(d.callbackId && !d.hasResponded){
-                    tx({
-                        f:'callback',
-                        callbackId: d.callbackId,
-                        args: [d.callbackResponse]
-                    })
                 }
             }catch(er){
                 s.systemLog('ERROR CATCH 1',er)

@@ -32,6 +32,7 @@ module.exports = function(s,config,lang,app,io){
         ldapLogin,
     } = require('./auth/utils.js')(s,config,lang)
     const {
+        getMonitors,
         spawnSubstreamProcess,
         destroySubstreamProcess,
         removeSenstiveInfoFromMonitorConfig,
@@ -671,9 +672,11 @@ module.exports = function(s,config,lang,app,io){
     app.get([config.webPaths.apiPrefix+':auth/monitor/:ke',config.webPaths.apiPrefix+':auth/monitor/:ke/:id'], function (req,res){
         var response = {ok:false};
         res.setHeader('Content-Type', 'application/json');
-        s.auth(req.params,(user) => {
+        s.auth(req.params, async (user) => {
+            const authKey = req.params.auth
             const groupKey = req.params.ke
             const monitorId = req.params.id
+            let monitors = []
             const {
                 monitorPermissions,
                 monitorRestrictions,
@@ -691,109 +694,12 @@ module.exports = function(s,config,lang,app,io){
                     monitorRestrictions.length === 0
                 )
             ){
-                s.closeJsonResponse(res,[]);
-                return
+                // response.monitors = [];
+            }else{
+                const cannotSeeImportantSettings = (isRestrictedApiKey && apiKeyPermissions.edit_monitors_disallowed) || userPermissions.monitor_create_disallowed;
+                monitors = await getMonitors(groupKey, monitorId, authKey, isRestricted, monitorPermissions, monitorRestrictions, cannotSeeImportantSettings, req.query.search)
             }
-            const cannotSeeImportantSettings = (isRestrictedApiKey && apiKeyPermissions.edit_monitors_disallowed) || userPermissions.monitor_create_disallowed;
-            const whereQuery = [
-                ['ke','=',groupKey],
-                monitorRestrictions
-            ];
-            if(!!req.query.search){
-                const searchQuery = req.query.search.split(',');
-                const whereQuerySearch = []
-                for(item of searchQuery){
-                    if(item){
-                        whereQuerySearch.push(
-                            whereQuerySearch.length === 0 ? ['name','LIKE',`%${item.trim()}%`] : ['or', 'name','LIKE',`%${item}%`],
-                            ['or','mid','LIKE',`%${item.trim()}%`]
-                        );
-                    }
-                }
-                whereQuery.push(whereQuerySearch)
-            }
-            s.knexQuery({
-                action: "select",
-                columns: "*",
-                table: "Monitors",
-                where: whereQuery
-            },(err,r) => {
-                r.forEach(function(v,n){
-                    const monitorId = v.mid;
-                    v.details = JSON.parse(v.details)
-                    var details = v.details;
-                    if(isRestricted && !monitorPermissions[`${monitorId}_monitor_edit`] || cannotSeeImportantSettings){
-                        r[n] = removeSenstiveInfoFromMonitorConfig(v);
-                    }
-                    if(s.group[v.ke] && s.group[v.ke].activeMonitors[v.mid]){
-                        const activeMonitor = s.group[v.ke].activeMonitors[v.mid]
-                        r[n].currentlyWatching = Object.keys(activeMonitor.watch).length
-                        r[n].currentCpuUsage = activeMonitor.currentCpuUsage
-                        r[n].status = activeMonitor.monitorStatus
-                        r[n].code = activeMonitor.monitorStatusCode
-                        r[n].subStreamChannel = activeMonitor.subStreamChannel
-                        r[n].subStreamActive = !!activeMonitor.subStreamProcess
-                    }
-                    function getStreamUrl(type,channelNumber){
-                        var streamURL
-                        if(channelNumber){channelNumber = '/'+channelNumber}else{channelNumber=''}
-                        switch(type){
-                            case'mjpeg':
-                                streamURL='/'+req.params.auth+'/mjpeg/'+v.ke+'/'+v.mid+channelNumber
-                            break;
-                            case'hls':
-                                streamURL='/'+req.params.auth+'/hls/'+v.ke+'/'+v.mid+channelNumber+'/s.m3u8'
-                            break;
-                            case'h264':
-                                streamURL='/'+req.params.auth+'/h264/'+v.ke+'/'+v.mid+channelNumber
-                            break;
-                            case'flv':
-                                streamURL='/'+req.params.auth+'/flv/'+v.ke+'/'+v.mid+channelNumber+'/s.flv'
-                            break;
-                            case'mp4':
-                                streamURL='/'+req.params.auth+'/mp4/'+v.ke+'/'+v.mid+channelNumber+'/s.mp4'
-                            break;
-                            case'useSubstream':
-                                try{
-                                    const monitorConfig = s.group[v.ke].rawMonitorConfigurations[v.mid]
-                                    const monitorDetails = monitorConfig.details
-                                    const subStreamChannelNumber = 1 + (monitorDetails.stream_channels || []).length
-                                    const subStreamType = monitorConfig.details.substream.output.stream_type
-                                    streamURL = getStreamUrl(subStreamType,subStreamChannelNumber)
-                                }catch(err){
-                                    s.debugLog(err)
-                                }
-                            break;
-                        }
-                        return streamURL
-                    }
-                    var buildStreamURL = function(type,channelNumber){
-                        var streamURL = getStreamUrl(type,channelNumber)
-                        if(streamURL){
-                            if(!r[n].streamsSortedByType[type]){
-                                r[n].streamsSortedByType[type]=[]
-                            }
-                            r[n].streamsSortedByType[type].push(streamURL)
-                            r[n].streams.push(streamURL)
-                        }
-                        return streamURL
-                    }
-                    if(!details.tv_channel_id||details.tv_channel_id==='')details.tv_channel_id = 'temp_'+s.gid(5)
-                    if(details.snap==='1'){
-                        r[n].snapshot = '/'+req.params.auth+'/jpeg/'+v.ke+'/'+v.mid+'/s.jpg'
-                    }
-                    r[n].streams=[]
-                    r[n].streamsSortedByType={}
-                    buildStreamURL(details.stream_type)
-                    if(details.stream_channels&&details.stream_channels!==''){
-                        details.stream_channels=s.parseJSON(details.stream_channels)
-                        details.stream_channels.forEach(function(b,m){
-                            buildStreamURL(b.stream_type,m.toString())
-                        })
-                    }
-                })
-                s.closeJsonResponse(res,r);
-            })
+            s.closeJsonResponse(res,monitors);
         },res,req);
     });
     /**
