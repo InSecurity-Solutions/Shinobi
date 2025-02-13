@@ -20,7 +20,6 @@ module.exports = function(s,config,lang){
     async function getApiKeys({ ke, uid }){
         const whereQuery = {
             ke,
-            code
         };
         if(uid)whereQuery.uid = uid;
         const { rows } = await s.knexQueryPromise({
@@ -29,7 +28,10 @@ module.exports = function(s,config,lang){
             table: "API",
             where: whereQuery
         });
-        return rows[0]
+        for(row of rows){
+            row.details = JSON.parse(row.details);
+        }
+        return rows
     }
     async function getApiKey({ ke, code, uid }){
         const whereQuery = {
@@ -43,6 +45,7 @@ module.exports = function(s,config,lang){
             table: "API",
             where: whereQuery
         });
+        if(rows[0])rows[0].details = JSON.parse(rows[0].details);
         return rows[0]
     }
     async function getNewApiKey(ke){
@@ -70,6 +73,45 @@ module.exports = function(s,config,lang){
         })
         return insertQuery;
     }
+    async function updateApiKey({ ke, code, ip, details }){
+        const whereQuery = {
+            ke,
+            code,
+        };
+        const updateQuery = {};
+        if(ip)updateQuery.ip = ip;
+        if(details)updateQuery.details = details;
+        if(ip || details){
+            await s.knexQueryPromise({
+                action: "update",
+                table: "API",
+                where: whereQuery,
+                update: updateQuery
+            })
+        }
+        return { ke, code };
+    }
+    async function editApiKey({ ke, code, uid, ip, details }){
+        const response = { ok: true }
+        try{
+            let exists = false;
+            if(code){
+                const row = await getApiKey({ ke, code, uid, ip, details });
+                exists = !!row;
+            }
+            if(!exists){
+                response.editResponse = await createApiKey({ ke, uid, ip, details })
+            }else{
+                response.editResponse = await updateApiKey({ ke, code, uid, ip, details })
+                delete(s.api[response.editResponse.code])
+            }
+            response.api = await getApiKey({ ke, code: response.editResponse.code });
+        }catch(err){
+            response.ok = false;
+            response.err = err.toString();
+        }
+        return response;
+    }
     async function deleteApiKey({ ke, code, uid }){
         const whereQuery = {
             ke,
@@ -89,6 +131,8 @@ module.exports = function(s,config,lang){
         getApiKeys,
         getNewApiKey,
         createApiKey,
+        updateApiKey,
+        editApiKey,
         deleteApiKey,
     }
 }
