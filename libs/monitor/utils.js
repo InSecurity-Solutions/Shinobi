@@ -1888,7 +1888,7 @@ module.exports = (s,config,lang) => {
         monitorConfig.details.stream_channels = ''
         monitorConfig.details.input_maps = ''
         delete(monitorConfig.details.input_map_choices)
-        delete(monitorConfig.details.substream)
+        if(monitorConfig.details.substream && monitorConfig.details.substream.fulladdress)delete(monitorConfig.details.substream.fulladdress);
         return monitorConfig
     }
     function getMonitors(groupKey, monitorId, authKey, isRestricted, monitorPermissions, monitorRestrictions, cannotSeeImportantSettings, search){
