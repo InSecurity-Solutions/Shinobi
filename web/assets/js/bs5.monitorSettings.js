@@ -422,12 +422,9 @@ var copyMonitorSettingsToSelected = function(monitorConfig){
         $.each(chosenSections,function(n,section){
             monitor = alterSettings(section,monitor)
         })
-        $.post(getApiPrefix()+'/configureMonitor/'+$user.ke+'/'+monitor.mid,{data:JSON.stringify(monitor)},function(d){
-            debugLog(d)
-        }).fail(function(xhr, status, error) {
-            console.error(error)
-        });
-        chosenMonitors[monitor.mid] = monitor;
+        configureMonitor(monitor).then(() => {
+            chosenMonitors[monitor.mid] = monitor;
+        })
     })
 }
 window.getMonitorEditFormFields = function(){
@@ -822,7 +819,7 @@ editorForm.submit(function(e){
     }
     var monitorConfig = validation.monitorConfig
     setSubmitButton(editorForm, lang[`Please Wait...`], `spinner fa-pulse`, true)
-    $.post(getApiPrefix()+'/configureMonitor/'+$user.ke+'/'+monitorConfig.mid,{data:JSON.stringify(monitorConfig)},function(d){
+    configureMonitor(monitorConfig).then((d) => {
         if(d.ok === false){
             new PNotify({
                 title: lang['Action Failed'],
@@ -832,19 +829,11 @@ editorForm.submit(function(e){
         }
         debugLog(d)
         setSubmitButton(editorForm, lang.Save, `check`, false)
-    }).fail((err) => {
-        new PNotify({
-            title: lang['Action Failed'],
-            text: JSON.stringify(err, null, 3),
-            type: 'danger'
-        })
-        setSubmitButton(editorForm, lang.Save, `check`, false)
     })
     //
     if(copySettingsSelector.val() === '1'){
         copyMonitorSettingsToSelected(monitorConfig)
     }
-    monitorEditorWindow.modal('hide')
     return false;
 });
 //////////////////

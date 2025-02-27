@@ -1156,6 +1156,19 @@ function getRunningMonitors(asArray){
 function buildFileBinUrl(data){
     return apiBaseUrl + '/fileBin/' + data.ke + '/' + data.mid + '/' + data.name
 }
+async function configureMonitor(monitorConfig){
+    const _this = this;
+    return new Promise((resolve) => {
+        const monitorId = monitorConfig.mid;
+        mainSocket.f({
+            f: 'addOrEditMonitor',
+            mid: monitorId,
+            form: monitorConfig,
+        },function(response){
+            resolve(response)
+        });
+    })
+}
 $(document).ready(function(){
     $('body')
     .on('click','[system]',function(){
