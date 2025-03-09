@@ -10,6 +10,7 @@ const { queryStringToObject, createQueryStringFromObject } = require('./common.j
 module.exports = function(s,config,lang){
     const {
         asyncSetTimeout,
+        cleanStringsInObject,
     } = require('./basic/utils.js')(process.cwd(),config)
     const {
         splitForFFMPEG,
@@ -562,6 +563,7 @@ module.exports = function(s,config,lang){
             if(callback)callback(endData);
             return
         }
+        cleanStringsInObject(form)
         form.mid = form.mid.replace(/[^\w\s]/gi,'').replace(/ /g,'')
         const selectResponse = await s.knexQueryPromise({
             action: "select",
