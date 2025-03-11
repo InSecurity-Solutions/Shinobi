@@ -726,7 +726,7 @@ module.exports = (s,config,lang) => {
             }catch(err){
 
             }
-            const filePaths = videos.map(video => {
+            const filePaths = videos.reverse().map(video => {
                 const monitorConfig = s.group[video.ke].rawMonitorConfigurations[video.mid];
                 const filePath = path.join(s.getVideoDirectory(video), `${s.formattedTime(video.time)}.mp4`);
                 return filePath
