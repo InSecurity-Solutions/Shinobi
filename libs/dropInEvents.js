@@ -56,7 +56,7 @@ module.exports = function(s,config,lang,app,io){
                 var snapPath = s.dir.streams + ke + '/' + mid + '/s.jpg'
                 fs.rm(snapPath,async function(err){
                     await copyFileAsync(filePath, snapPath)
-                    triggerEvent({
+                    const eventData = {
                         id: mid,
                         ke: ke,
                         details: {
@@ -64,8 +64,14 @@ module.exports = function(s,config,lang,app,io){
                             name: filename,
                             plug: "dropInEvent",
                             reason: "ftpServer"
-                        },
-                    },config.dropInEventForceSaveEvent)
+                        }
+                    }
+                    try{
+                        eventData.frame = await fs.promises.readFile(filePath);
+                    }catch(err){
+
+                    }
+                    triggerEvent(eventData,config.dropInEventForceSaveEvent)
                 })
             }else{
                 var reason = "ftpServer"
