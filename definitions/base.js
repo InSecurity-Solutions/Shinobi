@@ -4926,15 +4926,6 @@ module.exports = function(s,config,lang){
                       "notForSubAccount": true,
                       "evaluation": "details.edit_log_days !== '0'"
                   },
-                  {
-                     "name": "detail=lang",
-                     "field": lang["Dashboard Language"],
-                     "description": lang["fieldTextLang"],
-                     "default": "en_CA",
-                     "example": "",
-                     "fieldType": "select",
-                     "possible": s.listOfPossibleLanguages
-                 },
                  {
                      "name": "detail=audio_note",
                      "field": lang["Notification Sound"],

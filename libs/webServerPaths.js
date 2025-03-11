@@ -156,7 +156,7 @@ module.exports = function(s,config,lang,app,io){
     */
     app.get(config.webPaths.super, function (req,res){
         s.renderPage(req,res,config.renderPaths.index,{
-            lang: lang,
+            lang,
             config: s.getConfigWithBranding(req.hostname),
             screen: 'super'
         })
@@ -339,15 +339,15 @@ module.exports = function(s,config,lang,app,io){
             }
         }
         function checkRoute(pageTarget,userInfo){
-            if(!userInfo.lang){
-                userInfo.lang = s.getLanguageFile(userInfo.details.lang)
+            if(!lang){
+                lang = s.getLanguageFile(userInfo.details.lang)
             }
             switch(pageTarget){
                 case'cam':
                     renderPage(config.renderPaths.dashcam,{
                         // config: s.getConfigWithBranding(req.hostname),
                         $user: userInfo,
-                        lang: userInfo.lang,
+                        lang,
                         define: s.getDefinitonFile(userInfo.details.lang),
                         __dirname: s.mainDirectory,
                         customAutoLoad: s.customAutoLoadTree
@@ -357,7 +357,7 @@ module.exports = function(s,config,lang,app,io){
                     renderPage(config.renderPaths.streamer,{
                         // config: s.getConfigWithBranding(req.hostname),
                         $user: userInfo,
-                        lang: userInfo.lang,
+                        lang,
                         define: s.getDefinitonFile(userInfo.details.lang),
                         __dirname: s.mainDirectory,
                         customAutoLoad: s.customAutoLoadTree
@@ -373,7 +373,7 @@ module.exports = function(s,config,lang,app,io){
                     renderPage(config.renderPaths[chosenRender],{
                         $user: userInfo,
                         config: s.getConfigWithBranding(req.hostname),
-                        lang: userInfo.lang,
+                        lang,
                         define: s.getDefinitonFile(userInfo.details.lang),
                         addStorage: s.dir.addStorage,
                         fs: fs,
@@ -386,7 +386,7 @@ module.exports = function(s,config,lang,app,io){
                 ke: userInfo.ke,
                 mid: '$USER'
             },{
-                type: userInfo.lang['New Authentication Token'],
+                type: lang['New Authentication Token'],
                 msg: {
                     for: pageTarget,
                     mail: userInfo.mail,
@@ -431,7 +431,6 @@ module.exports = function(s,config,lang,app,io){
                     const user = basicAuthResponse.user;
                     const sessionKey = s.md5(s.gid())
                     user.auth = sessionKey
-                    user.lang = s.getLanguageFile(user.details.lang)
                     s.knexQuery({
                         action: "update",
                         table: "Users",
@@ -459,7 +458,7 @@ module.exports = function(s,config,lang,app,io){
                                         sub: user.details.sub
                                     }
                                 },
-                                lang: user.lang,
+                                lang: lang,
                             })
                             return;
                         }
@@ -482,7 +481,7 @@ module.exports = function(s,config,lang,app,io){
                 if(superLoginResponse.ok){
                     renderPage(config.renderPaths.super,{
                         config: config,
-                        lang: lang,
+                        lang,
                         define: s.getDefinitonFile(config.language),
                         $user: superLoginResponse.user,
                         customAutoLoad: s.customAutoLoadTree,
@@ -724,7 +723,7 @@ module.exports = function(s,config,lang,app,io){
                 isRestrictedApiKey && apiKeyPermissions.control_monitors_disallowed ||
                 isRestricted && !monitorPermissions[`${monitorId}_monitors`]
             ){
-                response.msg = user.lang['Not Permitted']
+                response.msg = lang['Not Permitted']
             }else{
                 const monitorConfig = s.group[groupKey].rawMonitorConfigurations[monitorId]
                 const activeMonitor = s.group[groupKey].activeMonitors[monitorId]
@@ -791,7 +790,7 @@ module.exports = function(s,config,lang,app,io){
                 isRestrictedApiKey && apiKeyPermissions.control_monitors_disallowed ||
                 isRestricted && !monitorPermissions[`${monitorId}_monitors`]
             ){
-                response.msg = user.lang['Not Permitted']
+                response.msg = lang['Not Permitted']
             }else{
                 const monitorConfig = s.group[groupKey].rawMonitorConfigurations[monitorId]
                 const activeMonitor = s.group[groupKey].activeMonitors[monitorId]
@@ -997,7 +996,7 @@ module.exports = function(s,config,lang,app,io){
                 user.permissions.watch_videos === "0"
                 && user.details.allmonitors !== '1'
             ){
-                res.end(user.lang['Not Permitted'])
+                res.end(lang['Not Permitted'])
                 return
             }
             s.renderPage(req,res,config.renderPaths.wallvideoview,{
@@ -1007,7 +1006,7 @@ module.exports = function(s,config,lang,app,io){
                 baseUrl: req.protocol + '://' + req.hostname,
                 config: s.getConfigWithBranding(req.hostname),
                 define: s.getDefinitonFile(user.details ? user.details.lang : config.lang),
-                lang: lang,
+                lang,
                 $user: user,
                 authKey: authKey,
                 groupKey: groupKey,
@@ -1165,7 +1164,7 @@ module.exports = function(s,config,lang,app,io){
                 s.closeJsonResponse(res,{ok: false, msg: lang['Not Authorized']});
                 return
             }
-            if(req.params.f===''){response.msg = user.lang.monitorGetText1;res.end(s.prettyPrint(response));return}
+            if(req.params.f===''){response.msg = lang.monitorGetText1;res.end(s.prettyPrint(response));return}
             if(req.params.f!=='stop'&&req.params.f!=='start'&&req.params.f!=='record'){
                 response.msg = 'Mode not recognized.';
                 res.end(s.prettyPrint(response));
@@ -1214,9 +1213,9 @@ module.exports = function(s,config,lang,app,io){
                             }
                             s.tx({f:'monitor_edit',mid:r.mid,ke:r.ke,mon:r},'GRP_'+r.ke);
                             s.tx({f:'monitor_edit',mid:r.mid,ke:r.ke,mon:r},'STR_'+r.ke);
-                            response.msg = user.lang['Monitor mode changed']+' : '+req.params.f;
+                            response.msg = lang['Monitor mode changed']+' : '+req.params.f;
                         }else{
-                            response.msg = user.lang['Reset Timer'];
+                            response.msg = lang['Reset Timer'];
                         }
                         response.cmd_at=s.formattedTime(new Date,'YYYY-MM-DD HH:mm:ss');
                         response.ok = true;
@@ -1264,10 +1263,10 @@ module.exports = function(s,config,lang,app,io){
     //                        response.end_at=s.formattedTime(new Date,'YYYY-MM-DD HH:mm:ss').add(req.timeout,'milliseconds');
                         }
                      }else{
-                        response.msg = user.lang['Monitor mode is already']+' : '+req.params.f;
+                        response.msg = lang['Monitor mode is already']+' : '+req.params.f;
                     }
                 }else{
-                    response.msg = user.lang['Monitor or Key does not exist.'];
+                    response.msg = lang['Monitor or Key does not exist.'];
                 }
                 res.end(s.prettyPrint(response));
             })
@@ -1324,7 +1323,7 @@ module.exports = function(s,config,lang,app,io){
                         }).catch((err) => {
                             console.error('onGetVideoData ERROR',err,videoDetails)
                             res.status(404)
-                            res.end(user.lang['File Not Found in Database'])
+                            res.end(lang['File Not Found in Database'])
                         })
                     }else{
                         fetch(r.href).then(actual => {
@@ -1334,7 +1333,7 @@ module.exports = function(s,config,lang,app,io){
                     }
                 }else{
                     res.status(404)
-                    res.end(user.lang['File Not Found in Database'])
+                    res.end(lang['File Not Found in Database'])
                 }
             })
         },res,req);
@@ -1419,7 +1418,7 @@ module.exports = function(s,config,lang,app,io){
                         sendVideo(videoRow)
                     }else{
                         res.status(404)
-                        res.end(user.lang['File Not Found in Database'])
+                        res.end(lang['File Not Found in Database'])
                     }
                 })
             }
@@ -1448,7 +1447,7 @@ module.exports = function(s,config,lang,app,io){
             ){
                 s.closeJsonResponse(res,{
                     ok: false,
-                    msg: !monitorConfig ? user.lang['Monitor or Key does not exist.'] : lang['Not Authorized']
+                    msg: !monitorConfig ? lang['Monitor or Key does not exist.'] : lang['Not Authorized']
                 });
                 return
             }
@@ -1462,7 +1461,7 @@ module.exports = function(s,config,lang,app,io){
                  }catch(err){
                      s.closeJsonResponse(res,{
                          ok: false,
-                         msg: user.lang['Data Broken']
+                         msg: lang['Data Broken']
                      })
                      return
                  }
@@ -1487,7 +1486,7 @@ module.exports = function(s,config,lang,app,io){
              else{
                  s.closeJsonResponse(res,{
                      ok: false,
-                     msg: user.lang['No Data']
+                     msg: lang['No Data']
                  })
                  return
              }
@@ -1501,14 +1500,14 @@ module.exports = function(s,config,lang,app,io){
              ){
                  s.closeJsonResponse(res,{
                      ok: false,
-                     msg: user.lang['Trigger Blocked']
+                     msg: lang['Trigger Blocked']
                  })
                  return;
              }
              triggerEvent(simulatedEvent)
              s.closeJsonResponse(res,{
                  ok: true,
-                 msg: user.lang['Trigger Successful']
+                 msg: lang['Trigger Successful']
              })
          },res,req)
      })
@@ -1832,11 +1831,11 @@ module.exports = function(s,config,lang,app,io){
                             }
                         break;
                         default:
-                            response.msg = user.lang.modifyVideoText1;
+                            response.msg = lang.modifyVideoText1;
                         break;
                     }
                 }else{
-                    response.msg = user.lang['No such file'];
+                    response.msg = lang['No such file'];
                 }
                 res.end(s.prettyPrint(response));
             })
