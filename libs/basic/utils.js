@@ -292,7 +292,7 @@ module.exports = (processCwd,config) => {
               obj[key] = JSON.stringify(cleanStringsInObject(parsed));
             } catch (e) {
               // If parsing fails, it's not a JSON string, so apply the replace function
-              obj[key] = obj[key].replace(/[^\w\s.\-=+()\[\]*$@!`^%#:/]/gi, '');
+              obj[key] = obj[key].replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/]/gi, '');
             }
           }
           // If the value is an object, recursively call the function
@@ -310,7 +310,7 @@ module.exports = (processCwd,config) => {
                   obj[key][index] = JSON.stringify(cleanStringsInObject(parsed));
                 } catch (e) {
                   // If parsing fails, it's not a JSON string, so apply the replace function
-                  obj[key][index] = item.replace(/[^\w\s.\-=+()\[\]*$@!`^%#:/]/gi, '');
+                  obj[key][index] = item.replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/]/gi, '');
                 }
               } else if (typeof item === 'object' && item !== null) {
                 cleanStringsInObject(item);
