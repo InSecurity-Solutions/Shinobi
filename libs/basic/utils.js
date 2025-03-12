@@ -283,34 +283,25 @@ module.exports = (processCwd,config) => {
     function cleanStringsInObject(obj) {
       for (let key in obj) {
         if (obj.hasOwnProperty(key)) {
-          // If the value is a string
           if (typeof obj[key] === 'string') {
             try {
-              // Attempt to parse the string as JSON
               const parsed = JSON.parse(obj[key]);
-              // If parsing succeeds, recursively clean the parsed object
               obj[key] = JSON.stringify(cleanStringsInObject(parsed));
             } catch (e) {
-              // If parsing fails, it's not a JSON string, so apply the replace function
-              obj[key] = obj[key].replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/]/gi, '');
+              obj[key] = obj[key].replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&]/gi, '');
             }
           }
-          // If the value is an object, recursively call the function
           else if (typeof obj[key] === 'object' && obj[key] !== null) {
             cleanStringsInObject(obj[key]);
           }
-          // If the value is an array, iterate through its elements
           else if (Array.isArray(obj[key])) {
             obj[key].forEach((item, index) => {
               if (typeof item === 'string') {
                 try {
-                  // Attempt to parse the string as JSON
                   const parsed = JSON.parse(item);
-                  // If parsing succeeds, recursively clean the parsed object
                   obj[key][index] = JSON.stringify(cleanStringsInObject(parsed));
                 } catch (e) {
-                  // If parsing fails, it's not a JSON string, so apply the replace function
-                  obj[key][index] = item.replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/]/gi, '');
+                  obj[key][index] = item.replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&]/gi, '');
                 }
               } else if (typeof item === 'object' && item !== null) {
                 cleanStringsInObject(item);
@@ -319,7 +310,7 @@ module.exports = (processCwd,config) => {
           }
         }
       }
-      return obj; // Return the modified object
+      return obj;
     }
     return {
         parseJSON: parseJSON,
