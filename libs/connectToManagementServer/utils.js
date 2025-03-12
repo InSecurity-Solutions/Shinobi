@@ -3,6 +3,12 @@ module.exports = (s,config,lang) => {
     const { getConnectionDetails } = require('./libs/connectDetails.js')(s,config,lang)
     const { modifyConfiguration, getConfiguration } = require('../system/utils.js')(config)
     if(!s.connectedMgmtServers)s.connectedMgmtServers = {}
+    function parseNewConnectionAddress(serverIp){
+        let parsedIp = `${serverIp}`
+        if(parsedIp.indexOf('://') === -1)parsedIp = `ws://${parsedIp}`
+        if(parsedIp.split(':').length === 2)parsedIp = `ws://${parsedIp}:8663`
+        return parsedIp;
+    }
     function getManagementServers(){
         const response = { ok: true }
         response.mgmtServers = config.mgmtServers || {};
@@ -23,6 +29,7 @@ module.exports = (s,config,lang) => {
     }
     async function addManagementServer(serverIp, p2pKey){
         const response = { ok: true }
+        const parsedIp = parseNewConnectionAddress(serverIp)
         const currentConfig = await getConfiguration();
         if(!currentConfig.mgmtServers)currentConfig.mgmtServers = {};
         currentConfig.mgmtServers[serverIp] = p2pKey;
