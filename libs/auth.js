@@ -181,10 +181,6 @@ module.exports = function(s,config,lang){
                     params.ip && (params.ip.indexOf(activeSession.ip) > -1)
                 )
             ){
-                if(!user.lang){
-                    var details = s.parseJSON(user.details).lang
-                    user.lang = s.getLanguageFile(user.details.lang) || s.copySystemDefaultLanguage()
-                }
                 onSuccessComplete(user)
             }else{
                 onFail()
@@ -193,9 +189,6 @@ module.exports = function(s,config,lang){
         if(s.group[params.ke] && s.group[params.ke].users && s.group[params.ke].users[params.auth] && s.group[params.ke].users[params.auth].details){
             var activeSession = s.group[params.ke].users[params.auth]
             activeSession.permissions = {}
-            if(!activeSession.lang){
-                activeSession.lang = s.copySystemDefaultLanguage()
-            }
             onSuccessComplete(activeSession)
         }else if(s.api[params.auth] && s.api[params.auth].details){
             var activeSession = s.api[params.auth]
@@ -262,7 +255,7 @@ module.exports = function(s,config,lang){
                     ip : ip,
                     $user: userSelected,
                     config: chosenConfig,
-                    lang: lang
+                    lang
                 })
             }
             if(params.auth && Object.keys(s.superUsersApi).indexOf(params.auth) > -1){

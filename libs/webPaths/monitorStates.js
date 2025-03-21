@@ -77,7 +77,7 @@ module.exports = function(s,config,lang,app){
                     var form = s.getPostData(req)
                     s.checkDetails(form)
                     if(!form || !form.monitors){
-                        endData.msg = user.lang['Form Data Not Found']
+                        endData.msg = lang['Form Data Not Found']
                         s.closeJsonResponse(res,endData)
                         return
                     }
@@ -134,7 +134,7 @@ module.exports = function(s,config,lang,app){
                 case'delete':
                     s.findPreset(presetQueryVals,function(notFound,preset){
                         if(notFound === true){
-                            endData.msg = user.lang['State Configuration Not Found']
+                            endData.msg = lang['State Configuration Not Found']
                             s.closeJsonResponse(res,endData)
                         }else{
                             s.knexQuery({

@@ -53,7 +53,7 @@ module.exports = function(s,config,lang,app){
                 default:
                     var form = s.getPostData(req)
                     if(!form){
-                       endData.msg = user.lang.monitorEditText1;
+                       endData.msg = lang.monitorEditText1;
                        s.closeJsonResponse(res,endData)
                        return
                     }
@@ -63,7 +63,7 @@ module.exports = function(s,config,lang,app){
                         form.ke = req.params.ke
                         endData = await s.addOrEditMonitor(form,null,user)
                     }else{
-                        endData.msg = user.lang.monitorEditText1;
+                        endData.msg = lang.monitorEditText1;
                     }
                 break;
             }

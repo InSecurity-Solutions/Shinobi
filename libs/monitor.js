@@ -614,7 +614,7 @@ module.exports = function(s,config,lang){
                 }
             })
             s.userLog(form,{type:'Monitor Updated',msg:'by user : '+user.uid})
-            endData.msg = user.lang['Monitor Updated by user']+' : '+user.uid
+            endData.msg = lang['Monitor Updated by user']+' : '+user.uid
             s.knexQuery({
                 action: "update",
                 table: "Monitors",
@@ -636,7 +636,7 @@ module.exports = function(s,config,lang){
                 }
             })
             s.userLog(form,{type:'Monitor Added',msg:'by user : '+user.uid})
-            endData.msg = user.lang['Monitor Added by user']+' : '+user.uid
+            endData.msg = lang['Monitor Added by user']+' : '+user.uid
             s.knexQuery({
                 action: "insert",
                 table: "Monitors",
@@ -646,7 +646,7 @@ module.exports = function(s,config,lang){
         }else{
             txData.f = 'monitor_edit_failed'
             txData.ff = 'max_reached'
-            endData.msg = !systemMax ? user.lang.monitorEditFailedMaxReachedUnactivated : user.lang.monitorEditFailedMaxReached
+            endData.msg = !systemMax ? lang.monitorEditFailedMaxReachedUnactivated : lang.monitorEditFailedMaxReached
         }
         if(affectMonitor === true){
             form.details = JSON.parse(form.details)
@@ -796,12 +796,12 @@ module.exports = function(s,config,lang){
                         s.tx({f:'change_group_state',ke:groupKey,name:stateName},'GRP_'+groupKey)
                         callback(endData)
                     }else{
-                        endData.msg = user.lang['State Configuration has no monitors associated']
+                        endData.msg = lang['State Configuration has no monitors associated']
                         callback(endData)
                     }
                 })
             }else{
-                endData.msg = user.lang['State Configuration Not Found']
+                endData.msg = lang['State Configuration Not Found']
                 callback(endData)
             }
         })

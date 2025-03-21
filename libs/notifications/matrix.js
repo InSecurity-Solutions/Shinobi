@@ -141,7 +141,7 @@ module.exports = async function(s,config,lang,getSnapshot){
             const onTwoFactorAuthCodeNotificationForMatrixBot = function(user){
                 // r = user
                 if(r.details.factor_matrixbot === '1'){
-                    const eventText = `${user.lang['2-Factor Authentication']} : ${user.lang['Enter this code to proceed']} **${factorAuthKey}** ${user.lang.FactorAuthText1}`
+                    const eventText = `${lang['2-Factor Authentication']} : ${lang['Enter this code to proceed']} **${factorAuthKey}** ${lang.FactorAuthText1}`
                     sendMessage({
                         text: eventText,
                     },[],d.ke)

@@ -149,7 +149,7 @@ module.exports = function(s,config,lang,app,io){
     * Page : Login Screen
     */
     app.get(config.webPaths.home, function (req,res){
-        s.renderPage(req,res,config.renderPaths.index,{lang:lang,config: s.getConfigWithBranding(req.hostname),screen:'dashboard'})
+        s.renderPage(req,res,config.renderPaths.index,{lang,config: s.getConfigWithBranding(req.hostname),screen:'dashboard'})
     });
     /**
     * Page : Superuser Login Screen
@@ -236,7 +236,7 @@ module.exports = function(s,config,lang,app,io){
                 s.renderPage(req,res,config.renderPaths.index,{
                     failedLogin: true,
                     message: lang.failedLoginText1,
-                    lang: s.copySystemDefaultLanguage(),
+                    lang,
                     config: s.getConfigWithBranding(req.hostname),
                     screen: screenChooser(req.params.screen)
                 })
@@ -269,7 +269,7 @@ module.exports = function(s,config,lang,app,io){
                 s.renderPage(req,res,config.renderPaths.index,{
                     failedLogin: true,
                     message: failMessage || lang.failedLoginText2,
-                    lang: s.copySystemDefaultLanguage(),
+                    lang,
                     config: s.getConfigWithBranding(req.hostname),
                     screen: screenChooser(req.params.screen)
                 })
@@ -298,7 +298,7 @@ module.exports = function(s,config,lang,app,io){
                 s.renderPage(req,res,config.renderPaths.index,{
                     failedLogin: true,
                     message: failMessage || lang.failedLoginText2,
-                    lang: s.copySystemDefaultLanguage(),
+                    lang,
                     config: s.getConfigWithBranding(req.hostname),
                     screen: screenChooser(req.params.screen)
                 })
@@ -329,9 +329,8 @@ module.exports = function(s,config,lang,app,io){
                     if(r && r[0]){
                         r = r[0]
                         r.details = JSON.parse(r.details)
-                        r.lang = s.getLanguageFile(r.details.lang)
                         logData.id = r.uid
-                        logData.type = r.lang['Authentication Failed']
+                        logData.type = lang['Authentication Failed']
                         logTo.ke = r.ke
                     }
                     s.userLog(logTo,logData)
@@ -339,9 +338,6 @@ module.exports = function(s,config,lang,app,io){
             }
         }
         function checkRoute(pageTarget,userInfo){
-            if(!lang){
-                lang = s.getLanguageFile(userInfo.details.lang)
-            }
             switch(pageTarget){
                 case'cam':
                     renderPage(config.renderPaths.dashcam,{
@@ -458,7 +454,7 @@ module.exports = function(s,config,lang,app,io){
                                         sub: user.details.sub
                                     }
                                 },
-                                lang: lang,
+                                lang,
                             })
                             return;
                         }
