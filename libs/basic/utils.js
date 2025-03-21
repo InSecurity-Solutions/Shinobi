@@ -146,6 +146,7 @@ module.exports = (processCwd,config) => {
             console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
             console.log('https://licenses.shinobi.video/subscribe')
         }
+        s.cameraCount = 15;
         if(subscriptionId && subscriptionId !== 'sub_XXXXXXXXXXXX' && !config.disableOnlineSubscriptionCheck){
             var url = 'https://licenses.shinobi.video/subscribe/check?subscriptionId=' + subscriptionId
             var hasSubcribed = false
@@ -154,8 +155,9 @@ module.exports = (processCwd,config) => {
             })
             .then(response => response.text())
             .then(function(body){
-                var json = s.parseJSON(body)
-                hasSubcribed = json && !!json.ok
+                var json = s.parseJSON(body);
+                hasSubcribed = json && !!json.ok;
+                s.cameraCount = json.cameraCount || 15;
                 var i;
                 for (i = 0; i < s.onSubscriptionCheckExtensions.length; i++) {
                     const extender = s.onSubscriptionCheckExtensions[i]

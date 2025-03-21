@@ -69,7 +69,7 @@ module.exports = function(s,config,lang,io){
                     var loadMonitor = function(monitor){
                         const checkAnother = function(){
                             ++loadCompleted
-                            if(monitors[loadCompleted]){
+                            if(loadCompleted <= s.cameraCount && monitors[loadCompleted]){
                                 loadMonitor(monitors[loadCompleted])
                             }else{
                                 if(didNotLoad > 0)console.log(`${didNotLoad} Monitor${didNotLoad === 1 ? '' : 's'} not loaded because Admin user does not exist for them. It may have been deleted.`);
