@@ -10,6 +10,7 @@ module.exports = (config) => {
             const response = {
                 "Time Started": s.timeStarted,
                 "Time Ready": s.timeReady,
+                "Maximum Cameras": s.cameraCount,
                 Versions: {
                     "Shinobi": s.currentVersion,
                     "Node.js": process.version,

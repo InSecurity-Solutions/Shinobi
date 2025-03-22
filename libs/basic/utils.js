@@ -136,73 +136,6 @@ module.exports = (processCwd,config) => {
         }
         return theRequester(requestUrl,requestOptions)
     }
-    const checkSubscription = (subscriptionId,callback,suppressCheckNotice = false) => {
-        function subscriptionFailed(){
-            console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-            console.error('This Install of Shinobi is NOT Activated')
-            console.error('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-            console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-            s.systemLog('This Install of Shinobi is NOT Activated')
-            console.log('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
-            console.log('https://licenses.shinobi.video/subscribe')
-        }
-        s.cameraCount = 15;
-        if(subscriptionId && subscriptionId !== 'sub_XXXXXXXXXXXX' && !config.disableOnlineSubscriptionCheck){
-            var url = 'https://licenses.shinobi.video/subscribe/check?subscriptionId=' + subscriptionId
-            var hasSubcribed = false
-            fetchTimeout(url,30000,{
-                method: 'GET',
-            })
-            .then(response => response.text())
-            .then(function(body){
-                var json = s.parseJSON(body);
-                hasSubcribed = json && !!json.ok;
-                s.cameraCount = json.cameraCount || 15;
-                var i;
-                for (i = 0; i < s.onSubscriptionCheckExtensions.length; i++) {
-                    const extender = s.onSubscriptionCheckExtensions[i]
-                    hasSubcribed = extender(hasSubcribed,json,subscriptionId)
-                }
-                callback(hasSubcribed)
-                if(hasSubcribed){
-                    if(!suppressCheckNotice){
-                        s.systemLog('This Install of Shinobi is Activated')
-                        if(!json.expired && json.timeExpires){
-                            s.systemLog(`This License expires on ${json.timeExpires}`)
-                        }
-                    }
-                }else{
-                    subscriptionFailed()
-                }
-            }).catch((err) => {
-                if(err)console.log(err)
-                subscriptionFailed()
-                callback(false)
-            })
-        }else{
-            var i;
-            for (i = 0; i < s.onSubscriptionCheckExtensions.length; i++) {
-                const extender = s.onSubscriptionCheckExtensions[i]
-                hasSubcribed = extender(false,{},subscriptionId)
-            }
-            if(hasSubcribed === false){
-                subscriptionFailed()
-            }
-            callback(hasSubcribed)
-        }
-    }
-    function checkAgainSubscription(){
-        let checkCount = 1
-        return setInterval(function(){
-            if(checkCount === 28){
-                checkSubscription(config.subscriptionId || config.peerConnectKey || config.p2pApiKey, function(hasSubcribed){
-                    config.userHasSubscribed = hasSubcribed
-                }, true);
-                checkCount = 1;
-            }
-            ++checkCount;
-        }, 1000 * 60 * 60 * 24);
-    }
     function isEven(value) {
         if (value%2 == 0)
             return true;
@@ -326,8 +259,6 @@ module.exports = (processCwd,config) => {
         utcToLocal: utcToLocal,
         localToUtc: localToUtc,
         formattedTime: formattedTime,
-        checkSubscription: checkSubscription,
-        checkAgainSubscription,
         isEven: isEven,
         fetchTimeout: fetchTimeout,
         fetchDownloadAndWrite: fetchDownloadAndWrite,

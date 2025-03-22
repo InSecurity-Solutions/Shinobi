@@ -11,7 +11,7 @@ module.exports = function(s,config,lang,io){
     const {
         checkSubscription,
         checkAgainSubscription,
-    } = require('./basic/utils.js')(process.cwd(),config)
+    } = require('./checker/actCheck.js')(s,config)
     const {
         checkForStaticUsers
     } = require('./user/startup.js')(s,config,lang,io)
@@ -402,7 +402,6 @@ module.exports = function(s,config,lang,io){
                 }
             })
         }
-        config.userHasSubscribed = false
         //check disk space every 20 minutes
         if(config.autoDropCache===true){
             setInterval(function(){
@@ -422,8 +421,7 @@ module.exports = function(s,config,lang,io){
                 setTimeout(async () => {
                     await checkForStaticUsers()
                     //check for subscription
-                    checkSubscription(config.subscriptionId || config.peerConnectKey || config.p2pApiKey, function(hasSubcribed){
-                        config.userHasSubscribed = hasSubcribed
+                    checkSubscription(config.subscriptionId || config.peerConnectKey || config.p2pApiKey, function(){
                         //check terminal commander
                         checkForTerminalCommands(function(){
                             //load administrators (groups)
