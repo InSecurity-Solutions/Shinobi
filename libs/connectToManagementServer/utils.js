@@ -118,10 +118,14 @@ module.exports = (s,config,lang) => {
         s.connectedMgmtServers[serverIp] = { worker, wantTerminate: false };
     }
     function disconnectFromManagmentServer(serverIp){
-        const mgmtConnection = s.connectedMgmtServers[serverIp];
-        if(!mgmtConnection)return;
-        mgmtConnection.wantTerminate = true;
-        mgmtConnection.worker.terminate();
+        try{
+            const mgmtConnection = s.connectedMgmtServers[serverIp];
+            if(!mgmtConnection)return;
+            mgmtConnection.wantTerminate = true;
+            mgmtConnection.worker.terminate();
+        }catch(err){
+            s.debugLog('disconnectFromManagmentServer ERR',err)
+        }
     }
     function resetConnectionToManagementServer(serverIp){
         const mgmtConnection = s.connectedMgmtServers[serverIp];
@@ -154,6 +158,11 @@ module.exports = (s,config,lang) => {
         delete(configFromFile.managementServer)
         delete(configFromFile.peerConnectKey)
         modifyConfiguration(configFromFile)
+    }
+    if(config.autoRestartManagementConnectionInterval){
+        setInterval(() => {
+            resetAllManagementServers()
+        }, 1000 * 60 * 15)
     }
     return {
         getManagementServers,
