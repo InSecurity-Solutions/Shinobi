@@ -256,10 +256,12 @@ function startConnection(){
         requestConnections[requestId].pause()
     })
     onIncomingMessage('pong',function(data,requestId){
-        refreshHeartBeatCheck()
+        // refreshHeartBeatCheck()
+        // console.log('ponged', new Date())
     })
     onIncomingMessage('init',function(data,requestId){
         console.log(`Central : Authenticated!`)
+        parentPort.postMessage({ f: 'authenticated' })
     })
     onIncomingMessage('modifyConfiguration',function(data,requestId){
         parentPort.postMessage({

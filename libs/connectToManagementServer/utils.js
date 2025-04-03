@@ -64,6 +64,40 @@ module.exports = (s,config,lang) => {
         }
         return response
     }
+    async function provideSshToManagement(serverIp, p2pKey){
+        const configFromFile = await getConfiguration()
+        const wsServerParts = serverIp.split(':')
+        wsServerParts[serverIp.includes('://') ? 2 : 1] = configFromFile.sshSocketPort || 9021
+        const wsServer = wsServerParts.join(':')
+        console.log('Central SSH Connector Starting...', wsServer)
+        const worker = new Worker(`${__dirname}/libs/centralConnect/ssh.js`, {
+            workerData: {
+                config: configFromFile,
+                wsServer: wsServer,
+                peerConnectKey: p2pKey,
+            }
+        });
+        worker.on('message', async (data) => {
+            switch(data.f){
+                case'restart':
+                    s.systemLog('Restarting SSH Connection...', serverIp)
+                    worker.terminate()
+                break;
+            }
+        });
+        worker.on('error', (err) => {
+            console.error('cameraPeer SSH Error', serverIp, err)
+        });
+        worker.on('exit', (code) => {
+            if(!s.connectedMgmtServers[serverIp].wantTerminate){
+                console.log('cameraPeer SSH Exited, Restarting...', serverIp, code)
+                provideSshToManagement(serverIp, p2pKey)
+            }else{
+                console.log('cameraPeer SSH Exited, NOT Restarting...', serverIp, code)
+            }
+        });
+        return worker
+    }
     async function connectToManagementServer(serverIp, p2pKey){
         if(!config.userHasSubscribed){
             return console.log(lang.centralManagementNotEnabled)
@@ -71,6 +105,7 @@ module.exports = (s,config,lang) => {
         if(s.connectedMgmtServers[serverIp]){
             disconnectFromManagmentServer(serverIp)
         }
+        s.connectedMgmtServers[serverIp] = {}
         const configFromFile = await getConfiguration()
         configFromFile.timezone = config.timezone;
         console.log('Central Worker Starting...', serverIp)
@@ -83,6 +118,10 @@ module.exports = (s,config,lang) => {
         });
         worker.on('message', async (data) => {
             switch(data.f){
+                case'authenticated':
+                    const sshWorker = await provideSshToManagement(serverIp, p2pKey)
+                    s.connectedMgmtServers[serverIp].sshWorker = sshWorker;
+                break;
                 case'connectDetailsRequest':
                     getConnectionDetails().then((connectDetails) => {
                         worker.postMessage({ f: 'connectDetails', connectDetails })
@@ -115,16 +154,22 @@ module.exports = (s,config,lang) => {
             console.log('cameraPeer Exited, Restarting...', serverIp, code)
             if(!s.connectedMgmtServers[serverIp].wantTerminate)connectToManagementServer(serverIp, p2pKey)
         });
-        s.connectedMgmtServers[serverIp] = { worker, wantTerminate: false };
+        s.connectedMgmtServers[serverIp].worker = worker;
+        s.connectedMgmtServers[serverIp].wantTerminate = false;
     }
     function disconnectFromManagmentServer(serverIp){
+        const mgmtConnection = s.connectedMgmtServers[serverIp];
         try{
-            const mgmtConnection = s.connectedMgmtServers[serverIp];
             if(!mgmtConnection)return;
             mgmtConnection.wantTerminate = true;
             mgmtConnection.worker.terminate();
         }catch(err){
             s.debugLog('disconnectFromManagmentServer ERR',err)
+        }
+        try{
+            mgmtConnection.sshWorker.terminate();
+        }catch(err){
+            s.debugLog('disconnectFromManagmentSshServer ERR',err)
         }
     }
     function resetConnectionToManagementServer(serverIp){
@@ -132,6 +177,11 @@ module.exports = (s,config,lang) => {
         if(!mgmtConnection)return;
         mgmtConnection.wantTerminate = false;
         mgmtConnection.worker.terminate();
+        try{
+            mgmtConnection.sshWorker.terminate();
+        }catch(err){
+            s.debugLog('resetConnectionToManagementSshServer ERR',err)
+        }
     }
     function resetAllManagementServers(){
         for(serverIp in s.connectedMgmtServers){
