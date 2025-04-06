@@ -18,8 +18,7 @@ let reconnectTimer = null;
 
 function connectWebSocket() {
   if (ws) {
-    ws.removeAllListeners();
-    if (ws.readyState === ws.OPEN) ws.close();
+    if (ws.readyState === ws.OPEN) return;
   }
 
   console.log(`Connecting SSH to ${WS_SERVER}...`);

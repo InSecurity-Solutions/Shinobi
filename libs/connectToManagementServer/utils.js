@@ -2,6 +2,7 @@ const { Worker } = require('worker_threads')
 module.exports = (s,config,lang) => {
     const { getConnectionDetails } = require('./libs/connectDetails.js')(s,config,lang)
     const { modifyConfiguration, getConfiguration } = require('../system/utils.js')(config)
+    const queuedSshRestart = {}
     if(!s.connectedMgmtServers)s.connectedMgmtServers = {}
     function parseNewConnectionAddress(serverIp){
         let parsedIp = `${serverIp}`
@@ -64,7 +65,22 @@ module.exports = (s,config,lang) => {
         }
         return response
     }
+    async function queueToggleSshToManagement(serverIp, p2pKey, onlyClose){
+        clearTimeout(queuedSshRestart[serverIp])
+        queuedSshRestart[serverIp] = setTimeout(() => {
+            delete(queuedSshRestart[serverIp])
+            if(onlyClose){
+                if(s.connectedMgmtServers[serverIp])s.connectedMgmtServers[serverIp].sshWorker.terminate()
+            }else{
+                provideSshToManagement(serverIp, p2pKey)
+            }
+        },1000 * 60)
+    }
     async function provideSshToManagement(serverIp, p2pKey){
+        if(queuedSshRestart[serverIp]){
+            clearTimeout(queuedSshRestart[serverIp]);
+            return s.connectedMgmtServers[serverIp].sshWorker
+        }
         const configFromFile = await getConfiguration()
         const wsServerParts = serverIp.split(':')
         wsServerParts[serverIp.includes('://') ? 2 : 1] = configFromFile.sshSocketPort || 9021
@@ -91,7 +107,7 @@ module.exports = (s,config,lang) => {
         worker.on('exit', (code) => {
             if(!s.connectedMgmtServers[serverIp].wantTerminate){
                 console.log('cameraPeer SSH Exited, Restarting...', serverIp, code)
-                provideSshToManagement(serverIp, p2pKey)
+                queueToggleSshToManagement(serverIp, p2pKey, true)
             }else{
                 console.log('cameraPeer SSH Exited, NOT Restarting...', serverIp, code)
             }
@@ -167,7 +183,7 @@ module.exports = (s,config,lang) => {
             s.debugLog('disconnectFromManagmentServer ERR',err)
         }
         try{
-            mgmtConnection.sshWorker.terminate();
+            queueToggleSshToManagement(serverIp, null, true);
         }catch(err){
             s.debugLog('disconnectFromManagmentSshServer ERR',err)
         }
@@ -178,7 +194,7 @@ module.exports = (s,config,lang) => {
         mgmtConnection.wantTerminate = false;
         mgmtConnection.worker.terminate();
         try{
-            mgmtConnection.sshWorker.terminate();
+            queueToggleSshToManagement(serverIp, null, true);
         }catch(err){
             s.debugLog('resetConnectionToManagementSshServer ERR',err)
         }
