@@ -64,6 +64,7 @@ module.exports = function(s,config,lang){
             const theRequest = fetchWithAuthentication(requestUrl,fetchWithAuthData);
             theRequest.then(res => res.text())
             .then((data) => {
+                response.msg = data;
                 if(doStart){
                     const stopCommandEnabled = monitorConfig.details.control_stop === '1' || monitorConfig.details.control_stop === '2';
                     if(stopCommandEnabled && options.direction !== 'center'){
