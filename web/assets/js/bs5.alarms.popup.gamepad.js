@@ -33,7 +33,7 @@ $(document).ready(function() {
     var stickMax = 4096
     var deadZoneThreshold = 0.35
     var outerDeadZone = 1.01
-    var selectedMonitor = dashboardOptions().gamepadMonitorSelection;
+    var selectedMonitor = null;
     var monitorKeys = {};
     var sequenceButtonPressList = []
     var sequenceButtonPressTimeout = null
@@ -67,7 +67,6 @@ $(document).ready(function() {
     }
 
     window.setGamepadMonitorSelection = (monitorId) => {
-        dashboardOptions('gamepadMonitorSelection', monitorId);
         selectedMonitor = `${monitorId}`;
     }
 
@@ -132,46 +131,6 @@ $(document).ready(function() {
         } else if (target.webkitRequestFullscreen) {
           target.webkitRequestFullscreen(Element.ALLOW_KEYBOARD_INPUT);
         }
-    }
-
-    function getMonitorFromButtonCode(buttonCode = 0, preAdded){
-        const addedOneToButtonCode = preAdded ? buttonCode : parseInt(buttonCode) + 1
-        const monitor = loadedMonitors[monitorKeys[addedOneToButtonCode]];
-        const monitorId = monitor.mid;
-        return { monitor, monitorId }
-    }
-
-    function setCameraFromButtonCode(buttonCode = 0, preAdded){
-        try{
-            const { monitor, monitorId } = getMonitorFromButtonCode(buttonCode, preAdded)
-            const isFullscreened = !!document.fullscreenElement;
-            if(isFullscreened) {
-                document.exitFullscreen()
-            }
-            closeAllMonitors()
-            openMonitorInLiveGrid(monitorId)
-            if(isFullscreened) {
-                const streamElement = $(`[live-stream="${monitorId}"]`)[0];
-                fullScreenInit(streamElement)
-            }
-        }catch(err){
-            console.log(err)
-            new PNotify({
-                title: lang['Invalid Action'],
-                text: `${lang.ptzControlIdNotFound}<br><br>${lang['Button Code']} : ${addedOneToButtonCode}`,
-                type: 'warning'
-            });
-            console.log('No Monitor Associated :', buttonCode)
-        }
-    }
-
-    function openMonitorInLiveGrid(monitorId, callback){
-        lastPtzDirection = {};
-        setGamepadMonitorSelection(monitorId)
-        selectMonitor(monitorId)
-        displayInfoScreen()
-        autoPlaceCurrentMonitorItems()
-        saveLayout()
     }
 
     function sendPtzCommand(direction, doMove){
@@ -263,14 +222,6 @@ $(document).ready(function() {
                     }else{
                         document.exitFullscreen()
                     }
-                }else if(buttonCode == 12){
-                    toggleCycleLiveState(!!wallViewCycleTimer)
-                }else if(buttonCode == 14){
-                    cycleLiveMovePrev();
-                }else if(buttonCode == 15){
-                    cycleLiveMoveNext();
-                }else{
-                    buttonPressAction(buttonCode)
                 }
             }, function(buttonCode){
                 if(buttonCode == 6){
@@ -317,48 +268,21 @@ $(document).ready(function() {
         }
     }
 
-    function openSnapshot(){
-        if(!$.confirm.e.is(':visible')){
-            getSnapshot(loadedMonitors[selectedMonitor],function(url){
-                $.confirm.create({
-                    title: lang.Snapshot,
-                    body: `<img src="${url}">`,
-                    clickOptions: {
-                        class: 'btn-primary',
-                        title: lang.Close,
-                    },
-                    clickCallback: async function(){}
-                })
-            })
-        }
-    }
-    function closeSnapshot(){
-        $.confirm.e.modal('hide')
-    }
-
-
     function startReporting(){
+        if(!selectedMonitor)return console.log('No PTZ Monitor')
         if(hasGP){
             console.log('Reading Gamepad')
+            window.clearInterval(repGP)
             repGP = window.setInterval(reportOnGamepad, reportInterval);
+            delete(repGP)
         }
     }
 
     function stopReporting(){
-        console.log('Stopping Gamepad')
-        window.clearInterval(repGP)
-    }
-
-    function generateMonitorKeysFromPtzIds(){
-        monitorKeys = []
-        Object.values(loadedMonitors)
-            .filter(item => !!parseInt(item.details.ptz_id))
-            .sort((a, b) => parseInt(b.details.ptz_id) - parseInt(a.details.ptz_id))
-            .forEach((item) => {
-                console.log(item.details.ptz_id)
-                monitorKeys[item.details.ptz_id] = item.mid;
-            });
-            console.log(monitorKeys)
+        if(repGP){
+            console.log('Stopping Gamepad')
+            window.clearInterval(repGP)
+        }
     }
 
     function setControllerType(gamepadId){
@@ -366,35 +290,23 @@ $(document).ready(function() {
             case gamepadId.includes('Xbox'):
                 reportInterval = 200;
                 reportOnGamepad = reportOnXboxGamepad
-                buttonPressAction = setCameraFromButtonCode
                 console.log('Xbox Controller found!')
             break;
             default:
                 reportInterval = 50;
                 reportOnGamepad = reportOnGenericGamepad
-                buttonPressAction = sequenceButtonPress
             break;
         }
     }
     var reportOnGamepad = reportOnXboxGamepad;
 
-    function sequenceButtonPress(buttonCode){
-        sequenceButtonPressList.push(buttonCode)
-        clearTimeout(sequenceButtonPressTimeout)
-        sequenceButtonPressTimeout = setTimeout(() => {
-            const newButtonCode = parseInt(sequenceButtonPressList.map(item => `${parseInt(item) + 1}`).join(''))
-            setCameraFromButtonCode(newButtonCode, true)
-            sequenceButtonPressList = []
-        },300)
-    }
-
     if(canGame()) {
         $(window).on("gamepadconnected", function(e) {
+            console.error('Gamepad Connected!')
             hasGP = true;
             startReporting()
             const gamepadName = e.originalEvent.gamepad.id;
             setControllerType(gamepadName)
-            console.log('Gamepad Connected!', gamepadName)
         })
         .on("gamepaddisconnected", function() {
             if(!navigator.getGamepads()[0]){
@@ -402,16 +314,13 @@ $(document).ready(function() {
                 console.log('Gamepad Disconnected!')
             }
         })
+    }else{
+        console.error('No Gamepad detected!')
     }
-    addActionToExtender('onDashboardReady',function(){
-        generateMonitorKeysFromPtzIds();
+    addActionToExtender('windowFocus', function () {
         startReporting()
     })
-    // onWebSocketEvent(function(d){
-    //     switch(d.f){
-    //         case'monitor_edit':
-    //             generateMonitorKeysFromPtzIds();
-    //         break;
-    //     }
-    // })
+    addActionToExtender('windowBlur', function () {
+        stopReporting()
+    })
 });

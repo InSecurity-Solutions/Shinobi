@@ -426,7 +426,7 @@ module.exports = function(s,config,lang){
             })
         })
     }
-    const moveToHomePositionTimeout = (event) => {
+    const moveToHomePositionTimeout = (event, returnTime = 7000) => {
         const groupKey = event.ke
         const monitorId = event.id
         const monitorConfig = s.group[groupKey].rawMonitorConfigurations[monitorId]
@@ -440,7 +440,7 @@ module.exports = function(s,config,lang){
             },(endData) => {
                 s.debugLog(endData)
             })
-        },7000)
+        },returnTime)
     }
     const getLargestMatrix = (matrices,imgWidth,imgHeight) => {
         var largestMatrix = {width: 0, height: 0}
@@ -541,5 +541,6 @@ module.exports = function(s,config,lang){
         moveCameraPtzToMatrix,
         setHomePositionPreset,
         moveToHomePosition,
+        moveToHomePositionTimeout,
     }
 }
