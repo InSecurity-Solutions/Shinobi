@@ -223,7 +223,7 @@ module.exports = (processCwd,config) => {
               const parsed = JSON.parse(obj[key]);
               obj[key] = JSON.stringify(cleanStringsInObject(parsed));
             } catch (e) {
-              obj[key] = obj[key].replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&]/gi, '');
+              obj[key] = obj[key].replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&,]/gi, '');
             }
           }
           else if (typeof obj[key] === 'object' && obj[key] !== null) {
@@ -236,7 +236,7 @@ module.exports = (processCwd,config) => {
                   const parsed = JSON.parse(item);
                   obj[key][index] = JSON.stringify(cleanStringsInObject(parsed));
                 } catch (e) {
-                  obj[key][index] = item.replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&]/gi, '');
+                  obj[key][index] = item.replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&,]/gi, '');
                 }
               } else if (typeof item === 'object' && item !== null) {
                 cleanStringsInObject(item);
