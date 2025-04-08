@@ -1207,6 +1207,7 @@ async function configureMonitor(monitorConfig){
             resolve(response)
         });
     })
+}
 function incrementString(strNum) {
     const originalLength = strNum.length;
     let numericValue = parseInt(strNum, 10);
