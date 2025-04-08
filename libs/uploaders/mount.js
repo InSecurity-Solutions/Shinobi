@@ -304,14 +304,17 @@ module.exports = function(s,config,lang){
          },
          {
              "hidden": true,
-            "name": "detail=mnt_size_limit",
-            "field": lang['Max Storage Amount'],
+            "attribute": `size-adjust='[detail=mnt_size_limit]'`,
             "form-group-class":"autosave_mnt_input autosave_mnt_1",
             "form-group-class-pre-layer":"h_mntsld_input h_mntsld_1",
-            "description": "",
+            "field": lang["Max Storage Amount"],
+            "default": "10 GB",
+         },
+         {
+             "hidden": true,
+            "name": "detail=mnt_size_limit",
+            "field": lang['Max Storage Amount'],
             "default": "10000",
-            "example": "",
-            "possible": ""
          },
          {
              "hidden": true,
