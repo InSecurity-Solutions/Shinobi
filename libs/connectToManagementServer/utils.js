@@ -2,6 +2,7 @@ const { Worker } = require('worker_threads')
 module.exports = (s,config,lang) => {
     const { getConnectionDetails } = require('./libs/connectDetails.js')(s,config,lang)
     const { modifyConfiguration, getConfiguration } = require('../system/utils.js')(config)
+    const sshDisabled = config.noCentralSsh === true;
     const queuedSshRestart = {}
     if(!s.connectedMgmtServers)s.connectedMgmtServers = {}
     function parseNewConnectionAddress(serverIp){
@@ -66,6 +67,7 @@ module.exports = (s,config,lang) => {
         return response
     }
     async function queueToggleSshToManagement(serverIp, p2pKey, onlyClose){
+        if(sshDisabled)return;
         clearTimeout(queuedSshRestart[serverIp])
         queuedSshRestart[serverIp] = setTimeout(() => {
             delete(queuedSshRestart[serverIp])
@@ -77,6 +79,7 @@ module.exports = (s,config,lang) => {
         },1000 * 60)
     }
     async function provideSshToManagement(serverIp, p2pKey){
+        if(sshDisabled)return;
         if(queuedSshRestart[serverIp]){
             clearTimeout(queuedSshRestart[serverIp]);
             return s.connectedMgmtServers[serverIp].sshWorker
