@@ -30,7 +30,7 @@ module.exports = (s,config,lang) => {
         // ws://127.0.0.1:8663
         let response = {ok: true};
         const managementServer = req.body.managementServer;
-        if(!config.mgmtServers[serverIp]){
+        if(!config.mgmtServers[managementServer]){
             const peerConnectKey = req.body.peerConnectKey;
             if(peerConnectKey){
                 response = await addManagementServer(managementServer, peerConnectKey)
