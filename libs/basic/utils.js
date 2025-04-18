@@ -215,31 +215,57 @@ module.exports = (processCwd,config) => {
             },theTime)
         })
     }
-    function cleanStringsInObject(obj) {
+    function cleanStringsInObject(obj, isWithinDetectorFilters = false) {
       for (let key in obj) {
         if (obj.hasOwnProperty(key)) {
+          // Check if we're entering the detector_filters structure
+          const enteringDetectorFilters = !isWithinDetectorFilters &&
+                                        (key === 'detector_filters' ||
+                                        (key === 'details' &&
+                                         typeof obj[key] === 'object' &&
+                                         obj[key].hasOwnProperty('detector_filters')));
+
+          // Determine if we're currently within detector_filters
+          const currentIsWithinDetectorFilters = isWithinDetectorFilters || enteringDetectorFilters;
+
           if (typeof obj[key] === 'string') {
             try {
               const parsed = JSON.parse(obj[key]);
-              obj[key] = JSON.stringify(cleanStringsInObject(parsed));
+              obj[key] = JSON.stringify(cleanStringsInObject(parsed, currentIsWithinDetectorFilters));
             } catch (e) {
-              obj[key] = obj[key].replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&,]/gi, '');
+              if (currentIsWithinDetectorFilters) {
+                // Special handling for detector_filters - allow comparison operators
+                obj[key] = obj[key].replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&,><=!]/gi, '');
+              } else {
+                // Normal string cleaning
+                obj[key] = obj[key].replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&,]/gi, '');
+              }
             }
           }
           else if (typeof obj[key] === 'object' && obj[key] !== null) {
-            cleanStringsInObject(obj[key]);
+            // Handle the case where we're entering detector_filters through the details object
+            if (enteringDetectorFilters && key === 'details') {
+              cleanStringsInObject(obj[key].detector_filters, true);
+              cleanStringsInObject(obj[key], false); // Clean rest of details normally
+            } else {
+              cleanStringsInObject(obj[key], currentIsWithinDetectorFilters);
+            }
           }
           else if (Array.isArray(obj[key])) {
             obj[key].forEach((item, index) => {
               if (typeof item === 'string') {
                 try {
                   const parsed = JSON.parse(item);
-                  obj[key][index] = JSON.stringify(cleanStringsInObject(parsed));
+                  obj[key][index] = JSON.stringify(cleanStringsInObject(parsed, currentIsWithinDetectorFilters));
                 } catch (e) {
-                  obj[key][index] = item.replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&,]/gi, '');
+                  if (currentIsWithinDetectorFilters) {
+                    obj[key][index] = item.replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&,><=!]/gi, '');
+                  } else {
+                    obj[key][index] = item.replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&,]/gi, '');
+                  }
                 }
               } else if (typeof item === 'object' && item !== null) {
-                cleanStringsInObject(item);
+                cleanStringsInObject(item, currentIsWithinDetectorFilters);
               }
             });
           }
