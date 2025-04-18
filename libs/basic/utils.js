@@ -220,18 +220,34 @@ module.exports = (processCwd,config) => {
         if (obj.hasOwnProperty(key)) {
           // Check if we're entering the detector_filters structure
           const enteringDetectorFilters = !isWithinDetectorFilters &&
-                                        (key === 'detector_filters' ||
-                                        (key === 'details' &&
-                                         typeof obj[key] === 'object' &&
-                                         obj[key].hasOwnProperty('detector_filters')));
+                                       (key === 'detector_filters' ||
+                                       (key === 'details' &&
+                                        typeof obj[key] === 'object' &&
+                                        obj[key].hasOwnProperty('detector_filters')));
 
           // Determine if we're currently within detector_filters
-          const currentIsWithinDetectorFilters = isWithinDetectorFilters || enteringDetectorFilters;
+          let currentIsWithinDetectorFilters = isWithinDetectorFilters || enteringDetectorFilters;
+
+          // Special handling for stringified detector_filters
+          if ((key === 'detector_filters' || (key === 'details' && obj[key].hasOwnProperty('detector_filters')))) {
+            const detectorFiltersTarget = key === 'details' ? obj[key] : obj;
+            const detectorFiltersKey = key === 'details' ? 'detector_filters' : key;
+
+            if (typeof detectorFiltersTarget[detectorFiltersKey] === 'string') {
+              try {
+                const parsed = JSON.parse(detectorFiltersTarget[detectorFiltersKey]);
+                detectorFiltersTarget[detectorFiltersKey] = cleanStringsInObject(parsed, true);
+                continue; // Skip further processing as we've replaced and cleaned it
+              } catch (e) {
+                currentIsWithinDetectorFilters = true;
+              }
+            }
+          }
 
           if (typeof obj[key] === 'string') {
             try {
               const parsed = JSON.parse(obj[key]);
-              obj[key] = JSON.stringify(cleanStringsInObject(parsed, currentIsWithinDetectorFilters));
+              obj[key] = cleanStringsInObject(parsed, currentIsWithinDetectorFilters);
             } catch (e) {
               if (currentIsWithinDetectorFilters) {
                 // Special handling for detector_filters - allow comparison operators
@@ -243,10 +259,9 @@ module.exports = (processCwd,config) => {
             }
           }
           else if (typeof obj[key] === 'object' && obj[key] !== null) {
-            // Handle the case where we're entering detector_filters through the details object
             if (enteringDetectorFilters && key === 'details') {
               cleanStringsInObject(obj[key].detector_filters, true);
-              cleanStringsInObject(obj[key], false); // Clean rest of details normally
+              cleanStringsInObject(obj[key], false);
             } else {
               cleanStringsInObject(obj[key], currentIsWithinDetectorFilters);
             }
@@ -256,7 +271,7 @@ module.exports = (processCwd,config) => {
               if (typeof item === 'string') {
                 try {
                   const parsed = JSON.parse(item);
-                  obj[key][index] = JSON.stringify(cleanStringsInObject(parsed, currentIsWithinDetectorFilters));
+                  obj[key][index] = cleanStringsInObject(parsed, currentIsWithinDetectorFilters);
                 } catch (e) {
                   if (currentIsWithinDetectorFilters) {
                     obj[key][index] = item.replace(/[^\w\s.\-=+()\[\]*$@!`^%#:?\/&,><=!]/gi, '');

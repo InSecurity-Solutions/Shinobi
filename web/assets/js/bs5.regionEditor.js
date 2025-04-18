@@ -114,9 +114,7 @@ $(document).ready(function(e){
         monitorConfig.details.cords = JSON.stringify(regionCoordinates)
         monitorConfig.details = JSON.stringify(monitorConfig.details)
         setSubmitButton(regionEditorForm, lang[`Please Wait...`], `spinner fa-pulse`, true)
-        $.post(getApiPrefix(`configureMonitor`)+ '/' + monitorId,{
-            data: JSON.stringify(monitorConfig)
-        },function(d){
+        configureMonitor(monitorConfig).then((d) => {
             if(d.ok === false){
                 new PNotify({
                     title: lang['Action Failed'],
