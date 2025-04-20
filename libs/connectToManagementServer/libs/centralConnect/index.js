@@ -134,13 +134,18 @@ class CentralConnection {
 
     try {
       this.clearAllTimers();
-      this.stayDisconnected = true;
-      if (this.tunnelToP2P) this.tunnelToP2P.close();
+      // this.stayDisconnected = true;
+      if (this.tunnelToP2P){
+          this.tunnelToP2P.removeAllListeners('open');
+          this.tunnelToP2P.removeAllListeners('error');
+          this.tunnelToP2P.removeAllListeners('close');
+          this.tunnelToP2P.close();
+      }
     } catch (err) {
       console.log('Error closing previous connection:', err);
     }
 
-    this.stayDisconnected = false;
+    // this.stayDisconnected = false;
     this.tunnelToP2P = new WebSocket(this.hostPeerServer);
 
     this.tunnelToP2P.on('open', () => this.onWebsocketOpen());
