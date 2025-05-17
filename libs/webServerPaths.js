@@ -1182,7 +1182,6 @@ module.exports = function(s,config,lang,app,io){
                         if(req.query.reset!=='1'||!s.group[r.ke].activeMonitors[r.mid].trigger_timer){
                             if(!s.group[r.ke].activeMonitors[r.mid].currentState)s.group[r.ke].activeMonitors[r.mid].currentState={}
                             s.group[r.ke].activeMonitors[r.mid].currentState.mode=r.mode.toString()
-                            s.group[r.ke].activeMonitors[r.mid].currentState.fps=r.fps.toString()
                             if(!s.group[r.ke].activeMonitors[r.mid].currentState.trigger_on){
                                s.group[r.ke].activeMonitors[r.mid].currentState.trigger_on=true
                             }else{
