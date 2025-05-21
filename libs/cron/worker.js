@@ -460,7 +460,7 @@ function beginProcessing(){
                     const dir = getTimelapseFrameDirectory(row)
                     const filename = row.filename
                     const theDate = filename.split('T')[0]
-                    const enclosingFolder = `${dir}/${theDate}/`
+                    const enclosingFolder = `${dir}${theDate}/`
                     try{
                         const fileSizeMB = row.size / 1048576;
                         setDiskUsedForGroup(groupKey,-fileSizeMB,null,row)
