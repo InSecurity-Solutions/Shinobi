@@ -547,6 +547,7 @@
    "SFTP (SSH File Transfer)": "SFTP (SSH File Transfer)",
    "SFTP Error": "SFTP Error",
    "SFTP": "SFTP",
+   "FTPMonitorIdNotFound": "Monitor ID Not Found or Not Active. Check the Monitor ID configured in the FTP settings.",
    "accountSettingsError": "Account Settings Error",
    "Could not create Bucket.": "Could not create Bucket.",
    "Amazon S3": "Amazon S3",

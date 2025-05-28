@@ -302,7 +302,7 @@ module.exports = function(s,config,lang){
     }
     s.basicOrApiAuthentication = function(username,password,callback){
         var splitUsername = username.split('@')
-        if(splitUsername[1] && splitUsername[1].toLowerCase().indexOf('shinobi') > -1){
+        if(username.endsWith('@') || (splitUsername[1] && splitUsername[1].toLowerCase().indexOf('shinobi') > -1)){
             getApiKey({
                 auth: splitUsername[0],
                 ke: password
