@@ -13,11 +13,6 @@ module.exports = function(s,config,lang,app){
      const {
          checkSubscription
      } = require('./checker/actCheck.js')(s,config)
-     const {
-         legacyCreateAdminUser,
-         legacyEditAdminUser,
-         legacyDeleteUser,
-     } = require('./user/utils.js')(s,config,lang)
     /**
     * API : Superuser : Get Logs
     */
@@ -273,15 +268,68 @@ module.exports = function(s,config,lang,app){
     * API : Superuser : Create Admin account (Account to manage cameras)
     */
     app.all(config.webPaths.superApiPrefix+':auth/accounts/registerAdmin', function (req,res){
-        s.superAuth(req.params,async function(resp){
-            const endData = { ok: false }
+        s.superAuth(req.params,function(resp){
+            var endData = {
+                ok : false
+            }
+            var close = function(){
+                s.closeJsonResponse(res,endData)
+            }
+            var isCallbacking = false
             var form = s.getPostData(req)
             if(form){
                 if(form.mail !== '' && form.pass !== ''){
                     if(form.pass === form.password_again || form.pass === form.pass_again){
-                        const createResponse = await legacyCreateAdminUser(form, 'mail', true)
-                        endData.ok = createResponse.ok
-                        endData.msg = createResponse.msg
+                        isCallbacking = true
+                        s.knexQuery({
+                            action: "select",
+                            columns: "*",
+                            table: "Users",
+                            where: [
+                                ['mail','=',form.mail]
+                            ]
+                        },(err,r) => {
+                            if(r&&r[0]){
+                                //found address already exists
+                                endData.msg = lang['Email address is in use.'];
+                            }else{
+                                //create new
+                                //user id
+                                form.uid = s.gid()
+                                //check to see if custom key set
+                                if(!form.ke){
+                                    form.ke = s.gid()
+                                }else{
+                                    form.ke = form.ke.replace(/[`~!@#$%^&*()_|+\-=?;:'",.<>\{\}\[\]\\\/]/gi, '').trim()
+                                }
+                                if(!s.group[form.ke]){
+                                    endData.ok = true
+                                    //check if "details" is object
+                                    if(form.details instanceof Object){
+                                        form.details = JSON.stringify(form.details)
+                                    }
+                                    //write user to db
+                                    s.knexQuery({
+                                        action: "insert",
+                                        table: "Users",
+                                        insert: {
+                                            ke: form.ke,
+                                            uid: form.uid,
+                                            mail: form.mail,
+                                            pass: s.createHash(form.pass),
+                                            details: form.details
+                                        }
+                                    });
+                                    s.tx({f:'add_account',details:form.details,ke:form.ke,uid:form.uid,mail:form.mail},'$')
+                                    endData.user = Object.assign(form,{})
+                                    //init user
+                                    s.loadGroup(form)
+                                }else{
+                                    endData.msg = lang["Group with this key exists already"]
+                                }
+                            }
+                            close()
+                        })
                     }else{
                         endData.msg = lang["Passwords Don't Match"]
                     }
@@ -291,41 +339,164 @@ module.exports = function(s,config,lang,app){
             }else{
                 endData.msg = lang.postDataBroken
             }
-            s.closeJsonResponse(res,endData)
+            if(isCallbacking === false)close()
         },res,req)
     })
     /**
     * API : Superuser : Edit Admin account (Account to manage cameras)
     */
     app.all(config.webPaths.superApiPrefix+':auth/accounts/editAdmin', function (req,res){
-        s.superAuth(req.params, async function(resp){
-            var response = {
+        s.superAuth(req.params,function(resp){
+            var endData = {
                 ok : false
+            }
+            var close = function(){
+                s.closeJsonResponse(res,endData)
             }
             var form = s.getPostData(req)
             if(form){
                 var account = s.getPostData(req,'account')
-                response = await legacyEditAdminUser(account, form, 'mail', true)
+                s.knexQuery({
+                    action: "select",
+                    columns: "*",
+                    table: "Users",
+                    where: [
+                        ['mail','=',account.mail]
+                    ]
+                },(err,r) => {
+                    if(r && r[0]){
+                        r = r[0]
+                        var details = JSON.parse(r.details)
+                        if(form.pass && form.pass !== ''){
+                           if(form.pass === form.password_again || form.pass_again){
+                               form.pass = s.createHash(form.pass);
+                           }else{
+                               endData.msg = lang["Passwords Don't Match"]
+                               close()
+                               return
+                           }
+                        }else{
+                            delete(form.pass);
+                        }
+                        delete(form.password_again);
+                        delete(form.pass_again);
+                        delete(form.ke);
+                        form.details = s.stringJSON(Object.assign(details,s.parseJSON(form.details)))
+                        s.knexQuery({
+                            action: "update",
+                            table: "Users",
+                            update: form,
+                            where: [
+                                ['mail','=',account.mail],
+                            ]
+                        },(err,r) => {
+                            if(err){
+                                console.log(err)
+                                endData.error = err
+                                endData.msg = lang.AccountEditText1
+                            }else{
+                                endData.ok = true
+                                s.tx({f:'edit_account',form:form,ke:account.ke,uid:account.uid},'$')
+                                delete(s.group[account.ke].init);
+                                s.loadGroupApps(account)
+                            }
+                            close()
+                        })
+                    }else{
+                        endData.msg = lang['User Not Found']
+                        close()
+                    }
+                })
             }else{
-                response.msg = lang.postDataBroken
+                endData.msg = lang.postDataBroken
+                close()
             }
-            s.closeJsonResponse(res,response)
         },res,req)
     })
     /**
     * API : Superuser : Delete Admin account (Account to manage cameras)
     */
     app.all(config.webPaths.superApiPrefix+':auth/accounts/deleteAdmin', function (req,res){
-        s.superAuth(req.params, async function(resp){
+        s.superAuth(req.params,function(resp){
+            var endData = {
+                ok : true
+            }
+            var close = function(){
+                s.closeJsonResponse(res,endData)
+            }
             var account = s.getPostData(req,'account')
-            const response = await legacyDeleteUser({
-                account,
-                deleteSubAccounts: s.getPostData(req,'deleteSubAccounts',false) === '1',
-                deleteMonitors: s.getPostData(req,'deleteMonitors',false) === '1',
-                deleteVideos: s.getPostData(req,'deleteVideos',false) === '1',
-                deleteEvents: s.getPostData(req,'deleteEvents',false) === '1',
-            });
-            s.closeJsonResponse(res,response)
+            s.knexQuery({
+                action: "delete",
+                table: "Users",
+                where: {
+                    ke: account.ke,
+                    uid: account.uid,
+                    mail: account.mail,
+                }
+            })
+            s.knexQuery({
+                action: "delete",
+                table: "API",
+                where:  {
+                    ke: account.ke,
+                    uid: account.uid,
+                }
+            })
+            if(s.getPostData(req,'deleteSubAccounts',false) === '1'){
+                s.knexQuery({
+                    action: "delete",
+                    table: "Users",
+                    where:  {
+                        ke: account.ke,
+                    }
+                })
+            }
+            if(s.getPostData(req,'deleteMonitors',false) == '1'){
+                s.knexQuery({
+                    action: "select",
+                    columns: "*",
+                    table: "Monitors",
+                    where:  {
+                        ke: account.ke,
+                    }
+                },(err,monitors) => {
+                    if(monitors && monitors[0]){
+                        monitors.forEach(function(monitor){
+                            s.camera('stop',monitor)
+                        })
+                        s.knexQuery({
+                            action: "delete",
+                            table: "Monitors",
+                            where:  {
+                                ke: account.ke,
+                            }
+                        })
+                    }
+                })
+            }
+            if(s.getPostData(req,'deleteVideos',false) == '1'){
+                s.knexQuery({
+                    action: "delete",
+                    table: "Videos",
+                    where:  {
+                        ke: account.ke,
+                    }
+                })
+                fs.rm(s.dir.videos+account.ke,function(err){
+                    s.debugLog(err)
+                })
+            }
+            if(s.getPostData(req,'deleteEvents',false) == '1'){
+                s.knexQuery({
+                    action: "delete",
+                    table: "Events",
+                    where:  {
+                        ke: account.ke,
+                    }
+                })
+            }
+            s.tx({f:'delete_account',ke:account.ke,uid:account.uid,mail:account.mail},'$')
+            close()
         },res,req)
     })
     /**

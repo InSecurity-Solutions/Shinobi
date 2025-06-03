@@ -297,11 +297,15 @@ module.exports = (s,config,lang) => {
                      ]
                  },
                  {
+                     hidden:true,
                     "name": "detail=rtsp_transport",
                     "field": lang["RTSP Transport"],
                     "description": lang["fieldTextRtspTransport"],
+                    "default": "",
+                    "example": "",
                     "form-group-class": "h_t_input h_t_h264 h_t_hls h_t_mp4 h_t_jpeg h_t_mjpeg",
                     "form-group-class-pre-layer":"h_p_input h_p_rtsp",
+                    "form-group-class-pre-pre-layer":"h_auto_host_input h_auto_host_0 auto_host_fill",
                     "fieldType": "select",
                     "possible": [
                         {
@@ -318,11 +322,6 @@ module.exports = (s,config,lang) => {
                            "name": "UDP",
                            "value": "udp",
                            "info": lang["fieldTextRtspTransportUDP"]
-                        },
-                        {
-                           "name": lang['UDP Multicast'],
-                           "value": "udp_multicast",
-                           "info": lang["fieldTextRtspTransportUDPMulticast"]
                         },
                         {
                            "name": "HTTP",
@@ -2963,72 +2962,6 @@ module.exports = (s,config,lang) => {
                    ]
                },
                 {
-                   hidden: true,
-                  "name": lang['Line Counter'],
-                  "color": "orange",
-                  id: "monSectionLineCounter",
-                  isSection: true,
-                  isFormGroupGroup: true,
-                  "section-class": "h_det_input h_det_1",
-                  "info": [
-                        {
-                            "name": "detail=detectorLineCounter",
-                            "field": lang.Enabled,
-                            "description": lang["fieldTextDetectorLineCounter"],
-                            "default": "0",
-                            "fieldType": "select",
-                            "selector": "h_det_line",
-                            "possible": yesNoPossibility
-                        },
-                        {
-                            "id": "monitorSettings-lineCounter-canvas-container",
-                            "form-group-class": "h_det_line_input h_det_line_1",
-                            "fieldType": "div",
-                            "style": "overflow-x: auto; width: 100%; text-align: center",
-                        },
-                        {
-                            "id": "detector-line-counter-spacing",
-                            "form-group-class": "h_det_line_input h_det_line_1",
-                            "field": lang['Line Spacing'],
-                            "fieldType": "number",
-                            "numberMin": "10",
-                            "placeholder": "40"
-                        },
-                        {
-                            "name": "detail=detectorLineCounterTags",
-                            "form-group-class": "h_det_line_input h_det_line_1",
-                            "field": lang['Objects to Count'],
-                            "placeholder": "person"
-                        },
-                        {
-                            "id": "monitorSettings-lineCounter-canvas-container",
-                            "class": "row",
-                            "fieldType": "div",
-                            "info": [
-                                {
-                                    "id": "detector-line-counter-name-down",
-                                    "form-group-class": "h_det_line_input h_det_line_1 col-md-6",
-                                    "field": lang['Down Label'],
-                                    "placeholder": "Down"
-                                },
-                                {
-                                    "id": "detector-line-counter-name-up",
-                                    "form-group-class": "h_det_line_input h_det_line_1 col-md-6",
-                                    "field": lang['Up Label'],
-                                    "placeholder": "Up"
-                                }
-                            ],
-                        },
-                        {
-                            "id": "detector-line-counter-reset-daily",
-                            "form-group-class": "h_det_line_input h_det_line_1",
-                            "field": lang['Reset Daily'],
-                            "fieldType": "select",
-                            "possible": yesNoPossibility
-                        }
-                    ]
-                },
-                {
                     hidden: true,
                    "name": lang['Event-Based Recording'],
                    "input-mapping": "detector_sip_buffer",
@@ -3464,6 +3397,7 @@ module.exports = (s,config,lang) => {
                     "possible": yesNoPossibility
                  },
                  {
+                     isAdvanced: true,
                     "name": "detail=control_base_url",
                     "field": lang['Custom Base URL'],
                     "description": "",
@@ -3808,17 +3742,6 @@ module.exports = (s,config,lang) => {
                    "example": "",
                    "fieldType": "select",
                    "attribute": `copy="field=mode"`,
-                   "form-group-class": "h_copy_settings_input h_copy_settings_1",
-                   "form-group-class-pre-layer": "col-md-6",
-                   "possible": yesNoPossibility
-                },
-                {
-                   "field": lang['Copy Tags'],
-                   "description": "",
-                   "default": "0",
-                   "example": "",
-                   "fieldType": "select",
-                   "attribute": `copy="field=tags"`,
                    "form-group-class": "h_copy_settings_input h_copy_settings_1",
                    "form-group-class-pre-layer": "col-md-6",
                    "possible": yesNoPossibility

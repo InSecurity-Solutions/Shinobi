@@ -66,20 +66,13 @@ module.exports = (s,config,lang) => {
         }
         return response
     }
-    function terminateSshToManagement(serverIp){
-        clearTimeout(queuedSshRestart[serverIp])
-        if(s.connectedMgmtServers[serverIp] && s.connectedMgmtServers[serverIp].sshWorker){
-            try{ s.connectedMgmtServers[serverIp].sshWorker.terminate() }catch(err){}
-            delete(s.connectedMgmtServers[serverIp].sshWorker)
-        }
-    }
     async function queueToggleSshToManagement(serverIp, p2pKey, onlyClose){
         if(sshDisabled)return;
         clearTimeout(queuedSshRestart[serverIp])
         queuedSshRestart[serverIp] = setTimeout(() => {
             delete(queuedSshRestart[serverIp])
             if(onlyClose){
-                terminateSshToManagement(serverIp)
+                if(s.connectedMgmtServers[serverIp])s.connectedMgmtServers[serverIp].sshWorker.terminate()
             }else{
                 provideSshToManagement(serverIp, p2pKey)
             }
@@ -87,7 +80,10 @@ module.exports = (s,config,lang) => {
     }
     async function provideSshToManagement(serverIp, p2pKey){
         if(sshDisabled)return;
-        terminateSshToManagement(serverIp)
+        if(queuedSshRestart[serverIp]){
+            clearTimeout(queuedSshRestart[serverIp]);
+            return s.connectedMgmtServers[serverIp].sshWorker
+        }
         const configFromFile = await getConfiguration()
         const wsServerParts = serverIp.split(':')
         wsServerParts[serverIp.includes('://') ? 2 : 1] = configFromFile.sshSocketPort || 9021
@@ -114,7 +110,7 @@ module.exports = (s,config,lang) => {
         worker.on('exit', (code) => {
             if(!s.connectedMgmtServers[serverIp].wantTerminate){
                 console.log('cameraPeer SSH Exited, Restarting...', serverIp, code)
-                // s.connectedMgmtServers[serverIp].sshWorker = provideSshToManagement(serverIp, p2pKey)
+                queueToggleSshToManagement(serverIp, p2pKey, true)
             }else{
                 console.log('cameraPeer SSH Exited, NOT Restarting...', serverIp, code)
             }
@@ -146,8 +142,7 @@ module.exports = (s,config,lang) => {
                     s.connectedMgmtServers[serverIp].sshWorker = sshWorker;
                 break;
                 case'connectDetailsRequest':
-                    var mail = data.mail
-                    getConnectionDetails(mail).then((connectDetails) => {
+                    getConnectionDetails().then((connectDetails) => {
                         worker.postMessage({ f: 'connectDetails', connectDetails })
                     }).catch((error) => {
                         console.error('FAILED TO GET connectDetails', serverIp, error)
@@ -191,7 +186,7 @@ module.exports = (s,config,lang) => {
             s.debugLog('disconnectFromManagmentServer ERR',err)
         }
         try{
-            terminateSshToManagement(serverIp);
+            queueToggleSshToManagement(serverIp, null, true);
         }catch(err){
             s.debugLog('disconnectFromManagmentSshServer ERR',err)
         }
@@ -202,7 +197,7 @@ module.exports = (s,config,lang) => {
         mgmtConnection.wantTerminate = false;
         mgmtConnection.worker.terminate();
         try{
-            terminateSshToManagement(serverIp);
+            queueToggleSshToManagement(serverIp, null, true);
         }catch(err){
             s.debugLog('resetConnectionToManagementSshServer ERR',err)
         }
@@ -233,15 +228,6 @@ module.exports = (s,config,lang) => {
         delete(configFromFile.peerConnectKey)
         modifyConfiguration(configFromFile)
     }
-    async function sendMessageToAllConnectedServers(data){
-        for(let serverIp in s.connectedMgmtServers){
-            try{
-                s.connectedMgmtServers[serverIp].worker.postMessage(data)
-            }catch(err){
-                s.debugLog(err.toString())
-            }
-        }
-    }
     if(config.autoRestartManagementConnectionInterval){
         setInterval(() => {
             resetAllManagementServers()
@@ -257,6 +243,5 @@ module.exports = (s,config,lang) => {
         resetAllManagementServers,
         connectAllManagementServers,
         migrateOldConfiguration,
-        sendMessageToAllConnectedServers,
     }
 }

@@ -67,8 +67,12 @@ module.exports = async (s,config,lang,onFinish) => {
                         activeMonitor.ffmpeg = sanitizedFfmpegCommand(e,ffmpegCommandString)
                         //clean the string of spatial impurities and split for spawn()
                         const ffmpegCommandParsed = splitForFFMPEG(ffmpegCommandString)
-                        const cmdFilePath = e.sdir + `cmd_${dataPortToken}.txt`
-                        fs.writeFileSync(cmdFilePath,JSON.stringify({
+                        try{
+                            fs.rmSync(e.sdir + 'cmd.txt')
+                        }catch(err){
+
+                        }
+                        fs.writeFileSync(e.sdir + 'cmd.txt',JSON.stringify({
                             dataPortToken: dataPortToken,
                             cmd: ffmpegCommandParsed,
                             pipes: stdioPipes.length,
@@ -81,40 +85,34 @@ module.exports = async (s,config,lang,onFinish) => {
                         var cameraCommandParams = [
                           config.monitorDaemonPath ? config.monitorDaemonPath : __dirname + '/cameraThread/singleCamera.js',
                           config.ffmpegDir,
-                          cmdFilePath
+                          e.sdir + 'cmd.txt'
                         ]
                         const cameraProcess = spawn('node',cameraCommandParams,{detached: true,stdio: stdioPipes})
-                        cameraProcess.stderr.on('close',(data) => {
-                            delete(s.dataPortTokens[dataPortToken])
-                            try{ fs.rmSync(cmdFilePath) }catch(e){}
-                        })
                         if(config.debugLog === true && config.debugLogMonitors === true){
-                            if(!config.debugLogMonitorsVerbose){
-                                const checkLog = function(string,x){return string.indexOf(x)>-1}
-                                cameraProcess.stderr.on('data',(data) => {
-                                    const string = data.toString()
-                                    switch(true){
-                                        case string.startsWith('DTS'):
-                                        case checkLog(string,'Queue input is backward'):
-                                        case checkLog(string,'pkt->duration = 0'):
-                                        case checkLog(string,'bad cseq'):
-                                        case checkLog(string,'[hls @'):
-                                        case checkLog(string,'Past duration'):
-                                        case checkLog(string,'Last message repeated'):
-                                        case checkLog(string,'Non-monotonous DTS'):
-                                        case checkLog(string,'Non-monotonic DTS'):
-                                        case checkLog(string,'invalid dropping'):
-                                        case checkLog(string,'NULL @'):
-                                        case checkLog(string,'RTP: missed'):
-                                        case checkLog(string,'Application provided'):
-                                        case checkLog(string,'deprecated pixel format used'):
-                                                return;
-                                        break;
-                                    }
-                                    console.log(`${e.ke} ${e.name} (${e.mid})`)
-                                    console.log(data.toString())
-                                })
-                            }
+                            cameraProcess.stderr.on('close',(data) => {
+                                delete(s.dataPortTokens[dataPortToken])
+                            })
+                            cameraProcess.stderr.on('data',(data) => {
+                                const string = data.toString()
+                                var checkLog = function(x){return string.indexOf(x)>-1}
+                                switch(true){
+                                    case checkLog('pkt->duration = 0'):
+                                    case checkLog('bad cseq'):
+                                    case checkLog('[hls @'):
+                                    case checkLog('Past duration'):
+                                    case checkLog('Last message repeated'):
+                                    case checkLog('Non-monotonous DTS'):
+                                    case checkLog('NULL @'):
+                                    case checkLog('RTP: missed'):
+                                    case checkLog('deprecated pixel format used'):
+                                        if(!config.debugLogMonitorsVerbose){
+                                            return;
+                                        }
+                                    break;
+                                }
+                                console.log(`${e.ke} ${e.name} (${e.mid})`)
+                                console.log(data.toString())
+                            })
                         }
                         completeResolve(cameraProcess)
                     }catch(err){

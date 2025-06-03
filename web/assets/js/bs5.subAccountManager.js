@@ -75,7 +75,6 @@ $(document).ready(function(){
                 notifyColor = 'success'
                 if(data.user){
                     var account = data.user
-                    account.details = safeJsonParse(account.details)
                     loadedSubAccounts[account.uid] = account;
                     drawSubAccountRow(account)
                     theWindowForm.find('[name="uid"]').val(account.uid)
@@ -106,7 +105,6 @@ $(document).ready(function(){
                 $.each(form,function(n,v){
                     account[n] = v
                 });
-                account.details = safeJsonParse(account.details);
                 accountTable.find(`[uid="${uid}"] .mail`).text(form.mail)
                 new PNotify({
                     title : lang['Account Edited'],
@@ -154,12 +152,7 @@ $(document).ready(function(){
             label: lang['Can Delete Videos and Events'],
         },
     ];
-    var drawSelectableForPermissionForm = async function(account){
-        var details = account ? safeJsonParse(account.details) : {}
-        if(account){
-            await loadPermissions()
-            details = Object.assign({}, details, loadedPermissions[details.permissionSet] || {})
-        }
+    var drawSelectableForPermissionForm = function(account){
         var html = `
         <thead class="text-center">
             <tr>
@@ -174,7 +167,7 @@ $(document).ready(function(){
                 html += `<td class="text-start">${monitor.name} (${monitor.mid})</td>`
                 html += `<td>${(monitor.tags || '').split(',').map(item => `<span class="label label-primary">${item}</span>`)}</td>`
                 $.each(permissionTypeNames,function(n,permissionType){
-                    const isChecked = account && (details[permissionType.name] || []).indexOf(monitor.mid) > -1;
+                    const isChecked = account && (account.details[permissionType.name] || []).indexOf(monitor.mid) > -1;
                     html += `<td><input class="form-check-input" type="checkbox" data-monitor="${monitor.mid}" value="${permissionType.name}" ${isChecked ? 'checked' : ''}></td>`
                 })
             html += `</tr>`
@@ -198,9 +191,8 @@ $(document).ready(function(){
     }
     var setPermissionSelectionsToFields = async function(uid){
         var account = loadedSubAccounts[uid]
-        var details = safeJsonParse(account.details)
+        var details = account.details
         await loadPermissions()
-        details = Object.assign({}, details, loadedPermissions[details.permissionSet] || {})
         // load values to Account Information : email, password, etc.
         $.each(account,function(n,v){
             theWindowForm.find('[name="'+n+'"]').val(v)
@@ -215,7 +207,7 @@ $(document).ready(function(){
     }
     var openSubAccountEditor = async function(uid){
         var account = loadedSubAccounts[uid]
-        await drawSelectableForPermissionForm(account)
+        drawSelectableForPermissionForm(account)
         await setPermissionSelectionsToFields(uid)
         theWindowForm.find('[name="pass"],[name="password_again"]').val('')
         permissionsSection.show()
@@ -281,7 +273,7 @@ $(document).ready(function(){
             var defaultValue = el.attr('data-default')
             el.val(defaultValue)
         })
-        await drawSelectableForPermissionForm()
+        drawSelectableForPermissionForm()
         setSubmitButtonState(lang['Add New'],'plus')
         theWindowForm.find('input').val('')
     }

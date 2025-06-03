@@ -1,9 +1,6 @@
 var fs = require('fs');
 module.exports = function(s,config,lang){
     const {
-        resetSuperSessionTimeout,
-    } = require('./auth/utils.js')(s,config,lang)
-    const {
         applyPermissionsToUser,
     } = require('./user/permissionSets.js')(s,config,lang)
     //Authenticator functions
@@ -236,7 +233,7 @@ module.exports = function(s,config,lang){
         var userSelected = false
         var adminUsersSelected = null
         try{
-            var success = function(sessionKey = s.gid(30)){
+            var success = function(){
                 var chosenConfig = config
                 if(req && res){
                     chosenConfig = s.getConfigWithBranding(req.hostname)
@@ -254,25 +251,17 @@ module.exports = function(s,config,lang){
                         resp.$user = userSelected
                     }
                 }
-                userSelected.sessionKey = sessionKey;
-                const responseData = {
+                callback({
                     ip : ip,
                     $user: userSelected,
                     config: chosenConfig,
                     lang
-                };
-                s.superUsersApi[sessionKey] = {
-                    ip : ip,
-                    $user: userSelected,
-                }
-                resetSuperSessionTimeout(params.auth)
-                callback(responseData)
-                return responseData
+                })
             }
             if(params.auth && Object.keys(s.superUsersApi).indexOf(params.auth) > -1){
                 userFound = true
                 userSelected = s.superUsersApi[params.auth].$user
-                success(params.auth)
+                success()
             }else{
                 var superUserList = JSON.parse(fs.readFileSync(s.location.super))
                 superUserList.forEach(function(superUser,n){
@@ -284,7 +273,7 @@ module.exports = function(s,config,lang){
                             (
                                 params.mail && params.mail.toLowerCase() === superUser.mail.toLowerCase() && //email matches
                                 (
-                                    // params.pass === superUser.pass || //user give it already hashed
+                                    params.pass === superUser.pass || //user give it already hashed
                                     superUser.pass === s.createHash(params.pass) || //hash and check it
                                     superUser.pass.toLowerCase() === s.md5(params.pass).toLowerCase() //check if still using md5
                                 )

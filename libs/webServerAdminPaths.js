@@ -1,9 +1,6 @@
 module.exports = function(s,config,lang,app){
     const {
         deleteMonitor,
-        monitorStart,
-        monitorStop,
-        getMonitorConfiguration,
     } = require('./monitor/utils.js')(s,config,lang);
     require('./webPaths/permissionSets.js')(s,config,lang,app)
     require('./webPaths/customSettings.js')(s,config,lang,app)
@@ -53,15 +50,6 @@ module.exports = function(s,config,lang,app){
                         deleteFiles: req.query.deleteFiles === 'true',
                     });
                 break;
-                case'restart':
-                    let monitorConfig = getMonitorConfiguration(groupKey,monitorId);
-                    if(monitorConfig.mode !== 'stop' && monitorConfig.mode !== 'idle'){
-                        const configCopy = Object.assign({}, monitorConfig);
-                        await monitorStop(configCopy)
-                        await monitorStart(configCopy)
-                        endData.ok = true;
-                    }
-                break;
                 default:
                     var form = s.getPostData(req)
                     if(!form){
@@ -70,7 +58,6 @@ module.exports = function(s,config,lang,app){
                        return
                     }
                     form.mid = req.params.id.replace(/[^\w\s]/gi,'').replace(/ /g,'')
-                    form.ke = req.params.ke.replace(/[^\w\s]/gi,'').replace(/ /g,'')
                     if(form && form.name){
                         s.checkDetails(form)
                         form.ke = req.params.ke

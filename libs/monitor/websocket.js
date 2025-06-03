@@ -3,18 +3,13 @@ module.exports = function(s,config,lang,io){
     s.onOtherWebSocketMessages(async (d,cn,tx) => {
         const authKey = cn.auth
         const groupKey = cn.ke
-        const user = s.group[groupKey] && s.group[groupKey].users && s.group[groupKey].users[authKey];
+        const user = s.group[groupKey].users[authKey];
         const monitorId = d.mid || d.id;
         const callbackId = d.callbackId;
         const response = { f: 'callback', callbackId, args: [true] }
         switch(d.f){
             case'getMonitors':
                 response.ff = 'getMonitors'
-                if(!user || !user.details){
-                    response.msg = lang['Not Authorized'];
-                    tx(response);
-                    break;
-                }
                 var {
                     monitorPermissions,
                     monitorRestrictions,
@@ -36,17 +31,12 @@ module.exports = function(s,config,lang,io){
                 }else{
                     const cannotSeeImportantSettings = (isRestrictedApiKey && apiKeyPermissions.edit_monitors_disallowed) || userPermissions.monitor_create_disallowed;
                     const monitors = await getMonitors(groupKey, monitorId, authKey, isRestricted, monitorPermissions, monitorRestrictions, cannotSeeImportantSettings, d.search)
-                    response.args = [monitors]
+                    response.args = [false, monitors]
                 }
                 tx(response);
             break;
             case'addOrEditMonitor':
                 response.ff = 'addOrEditMonitor'
-                if(!user || !user.details){
-                    response.msg = lang['Not Authorized'];
-                    tx(response);
-                    break;
-                }
                 var {
                     monitorPermissions,
                     monitorRestrictions,
@@ -68,7 +58,7 @@ module.exports = function(s,config,lang,io){
                     if(!form){
                        response.msg = lang.monitorEditText1;
                    }else{
-                       form.mid = `${monitorId || form.mid}`.replace(/[^\w\s]/gi,'').replace(/ /g,'')
+                       form.mid = monitorId.replace(/[^\w\s]/gi,'').replace(/ /g,'')
                        if(form && form.name){
                            s.checkDetails(form)
                            form.ke = groupKey

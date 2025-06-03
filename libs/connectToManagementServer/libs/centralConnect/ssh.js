@@ -46,14 +46,12 @@ function connectWebSocket() {
   ws.on('close', () => {
     console.log('Disconnected SSH from server');
     if (sshSocket) sshSocket.end();
-    // scheduleReconnect();
-    process.exit(0);
+    scheduleReconnect();
   });
 
   ws.on('error', (err) => {
     console.error('SSH Socket error:', err);
-    // scheduleReconnect();
-    process.exit(0);
+    scheduleReconnect();
   });
 }
 
