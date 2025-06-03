@@ -89,6 +89,9 @@ module.exports = async (s,config,lang,onFinish) => {
                         ]
                         const cameraProcess = spawn('node',cameraCommandParams,{detached: true,stdio: stdioPipes})
                         if(config.debugLog === true && config.debugLogMonitors === true){
+                            cameraProcess.stderr.on('close',(data) => {
+                                delete(s.dataPortTokens[dataPortToken])
+                            })
                             cameraProcess.stderr.on('data',(data) => {
                                 const string = data.toString()
                                 var checkLog = function(x){return string.indexOf(x)>-1}
