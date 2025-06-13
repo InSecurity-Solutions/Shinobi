@@ -480,7 +480,10 @@ module.exports = (s,config,lang) => {
             var detector_command = addEventDetailsToString(d,monitorDetails.detector_command)
             if(detector_command === '')return
             exec(detector_command,{detached: true},function(err){
-                if(err)s.debugLog(err)
+                if(err){
+                    s.userLog(d, {type:lang["Event Command Error"],msg:{error:err,cmd:detector_command}})
+                    s.debugLog(d.ke, monitorId, detector_command, err)
+                }
             })
         }
 
