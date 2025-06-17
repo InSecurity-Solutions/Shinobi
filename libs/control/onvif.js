@@ -124,7 +124,7 @@ module.exports = function(s,config,lang,app,io){
         if(onvifOptions.mid && onvifOptions.ke){
             const groupKey = onvifOptions.ke
             const monitorId = onvifOptions.mid
-            const theDevice = s.group[groupKey].activeMonitors[monitorId].onvifConnection || (await s.createOnvifDevice({ id: e.mid, ke: e.ke })).device;
+            const theDevice = s.group[groupKey].activeMonitors[monitorId].onvifConnection || (await s.createOnvifDevice({ id: monitorId, ke: groupKey })).device;
             if(theDevice){
                 theUrl = addCredentialsToUrl({
                     username: theDevice.user,
