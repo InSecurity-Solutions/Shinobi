@@ -79,6 +79,7 @@ $(document).ready(function(e){
     pageNumber = pageNumber || 1;
     pageSize = pageSize || 10;
 
+    var use24HourTime = dashboardOptions().use24HourTime == '1';
     var dateRange = getSelectedTime(dateSelector);
     var searchQuery = objectTagSearchField.val() || null;
     var andOnly = objectTagSearchFieldAndOnly.val() || '0';
@@ -179,8 +180,8 @@ $(document).ready(function(e){
                 mid: file.mid,
                 time: `
                        <div>${timeAgo(file.time)}</div>
-                       <div><small><b>${lang.Start} :</b> ${formattedTime(file.time, 'DD-MM-YYYY hh:mm:ss AA')}</small></div>
-                       <div><small><b>${lang.End} :</b> ${formattedTime(file.end, 'DD-MM-YYYY hh:mm:ss AA')}</small></div>`,
+                       <div><small><b>${lang.Start} :</b> ${formattedTime(file.time, !use24HourTime)}</small></div>
+                       <div><small><b>${lang.End} :</b> ${formattedTime(file.end, !use24HourTime)}</small></div>`,
                 objects: `<div style="word-break: break-word;max-width:125px;">${file.objects}</div>`,
                 tags: `
                     ${file.ext ? `<span class="badge badge-${file.ext ==='webm' ? `primary` : 'danger'}">${file.ext}</span>` : ''}

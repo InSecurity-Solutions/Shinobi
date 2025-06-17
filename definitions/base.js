@@ -355,6 +355,24 @@ module.exports = function(s,config,lang){
                       ]
                   },
                   {
+                      "field": lang['Use 24 Hour Time in Videos Table'],
+                      attribute:'localStorage="use24HourTime"',
+                      "description": "",
+                      "default": "0",
+                      "example": "",
+                      "fieldType": "select",
+                      "possible": [
+                          {
+                             "name": lang.No,
+                             "value": "0"
+                          },
+                          {
+                             "name": lang.Yes,
+                             "value": "1"
+                          }
+                      ]
+                  },
+                  {
                       "field": lang.Themes,
                       "name": "detail=theme",
                       "description": "",
