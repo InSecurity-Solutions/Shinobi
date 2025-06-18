@@ -3813,6 +3813,17 @@ module.exports = (s,config,lang) => {
                    "possible": yesNoPossibility
                 },
                 {
+                   "field": lang['Copy Tags'],
+                   "description": "",
+                   "default": "0",
+                   "example": "",
+                   "fieldType": "select",
+                   "attribute": `copy="field=tags"`,
+                   "form-group-class": "h_copy_settings_input h_copy_settings_1",
+                   "form-group-class-pre-layer": "col-md-6",
+                   "possible": yesNoPossibility
+                },
+                {
                    "field": lang['Compress Completed Videos'],
                    "default": "0",
                    "fieldType": "select",
