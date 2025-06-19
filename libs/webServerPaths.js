@@ -735,6 +735,7 @@ module.exports = function(s,config,lang,app,io){
                             response.channel = activeMonitor.subStreamChannel;
                         break;
                         case'stop':
+                            response.ok = true
                             activeMonitor.allowDestroySubstream = true
                             await destroySubstreamProcess(activeMonitor)
                         break;
