@@ -9,6 +9,7 @@ var liveGridOpenCount = 0
 var liveGridPauseScrollTimeout = null;
 var liveGridPlayingNow = {};
 var currentPtzPresetPosition = {};
+var detectionDrawDelays = {};
 //
 var onLiveStreamInitiateExtensions = []
 function onLiveStreamInitiate(callback){
@@ -169,6 +170,7 @@ function buildLiveGridBlock(monitor){
     var streamBlockInfo = definitions['Monitor Stream Window']
     var wasLiveGridLogStreamOpenBefore = isLiveGridLogStreamOpenBefore(monitorId)
     if(!loadedLiveGrids[monitor.mid])loadedLiveGrids[monitor.mid] = {}
+    var detectionDrawDelay = detectionDrawDelays[monitorId];
     var quickLinkHtml = ''
     $.each(streamBlockInfo.quickLinks,function(n,button){
         if(button.eval && !eval(button.eval))return;
@@ -189,6 +191,11 @@ function buildLiveGridBlock(monitor){
                     ${streamBlockInfo.streamBlockHudHtml || ''}
                     <div class="controls">
                         ${streamBlockInfo.streamBlockHudControlsHtml || ''}
+                        <div class="text-start">
+                            <div class="slider-container">
+                                <input type="range" class="slider detection-delay" min="0" max="60" title="${lang['Detection Draw Delay']} : ${detectionDrawDelay}" value="${detectionDrawDelay || 0}">
+                            </div>
+                        </div>
                     </div>
                 </div>
                 ${streamElement}
@@ -1066,11 +1073,28 @@ function showHideSubstreamActiveIcon(monitorId, show){
 
     }
 }
+function setDetectionDrawDelay(monitorId, value){
+    var theValue = parseInt(value) || 0
+    if(theValue == 0){
+        delete(detectionDrawDelays[monitorId])
+    }else{
+        detectionDrawDelays[monitorId] = theValue
+    }
+    dashboardOptions('detectionDrawDelays', detectionDrawDelays)
+}
 $(document).ready(function(e){
     liveGrid
     .on('dblclick','.stream-block',function(){
         var monitorItem = $(this).parents('[data-mid]');
         fullScreenLiveGridStream(monitorItem)
+    })
+    .on('change','.detection-delay',function(){
+        var el = $(this);
+        var monitorId = el.parents('[data-mid]').attr('data-mid');
+        var value = el.val()
+        el.attr('title', `${lang['Detection Draw Delay']} : ${value}`)
+        console.log('setDetectionDrawDelay',monitorId, value)
+        setDetectionDrawDelay(monitorId, value)
     })
     $('body')
     .resize(function(){
@@ -1352,7 +1376,7 @@ $(document).ready(function(e){
     onToggleSideBarMenuHide(function (isHidden){
         setTimeout(updateAllLiveGridElementsHeightWidth,2000)
     })
-    onWebSocketEvent(function (d){
+    onWebSocketEvent(async function (d){
         switch(d.f){
             case'control_ptz_preset_changed':
                 currentPtzPresetPosition[d.mid] = d.profileToken;
@@ -1446,7 +1470,7 @@ $(document).ready(function(e){
                         monitorElement.removeClass('doObjectDetection')
                     }
                     if(matrices && matrices.length > 0){
-                        drawMatrices(d,{
+                        await drawMatrices(d,{
                             theContainer: liveGridElement.eventObjects,
                             height: liveGridElement.height,
                             width: liveGridElement.width,
@@ -1556,4 +1580,5 @@ $(document).ready(function(e){
     window.monitorsWatchOnLiveGrid = monitorsWatchOnLiveGrid;
     window.closeAllLiveGridPlayers = closeAllLiveGridPlayers;
     window.closeLiveGridPlayers = closeLiveGridPlayers;
+    detectionDrawDelays = dashboardOptions().detectionDrawDelays || {}
 })
