@@ -193,7 +193,7 @@ function buildLiveGridBlock(monitor){
                         ${streamBlockInfo.streamBlockHudControlsHtml || ''}
                         <div class="text-start">
                             <div class="slider-container">
-                                <input type="range" class="slider detection-delay" min="0" max="60" title="${lang['Detection Draw Delay']} : ${detectionDrawDelay}" value="${detectionDrawDelay || 0}">
+                                <input type="range" class="slider detection-delay" step="0.1" min="0" max="10" title="${lang['Detection Draw Delay']} : ${detectionDrawDelay}" value="${detectionDrawDelay || 0}">
                             </div>
                         </div>
                     </div>
@@ -1074,7 +1074,7 @@ function showHideSubstreamActiveIcon(monitorId, show){
     }
 }
 function setDetectionDrawDelay(monitorId, value){
-    var theValue = parseInt(value) || 0
+    var theValue = parseFloat(value) || 0
     if(theValue == 0){
         delete(detectionDrawDelays[monitorId])
     }else{
