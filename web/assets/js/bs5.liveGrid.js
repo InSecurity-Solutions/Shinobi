@@ -1093,7 +1093,7 @@ $(document).ready(function(e){
         var monitorId = el.parents('[data-mid]').attr('data-mid');
         var value = el.val()
         el.attr('title', `${lang['Detection Draw Delay']} : ${value}`)
-        console.log('setDetectionDrawDelay',monitorId, value)
+        // console.log('setDetectionDrawDelay',monitorId, value)
         setDetectionDrawDelay(monitorId, value)
     })
     $('body')

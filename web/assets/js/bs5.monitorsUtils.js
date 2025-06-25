@@ -793,7 +793,7 @@ async function drawMatrices(event, options, autoRemoveTimeout, drawTrails){
                 resolve()
             }, detectionDrawDelay * 1000)
         }))
-        console.log(`Delayed Draw by ${detectionDrawDelay} seconds`)
+        // console.log(`Delayed Draw by ${detectionDrawDelay} seconds`)
     }
     var addedEls = theContainer.append(html)
     if(autoRemoveTimeout){
