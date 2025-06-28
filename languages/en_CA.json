@@ -189,6 +189,8 @@
    "Connection": "Connection",
    "Video Set": "Video Set",
    "Video Accessed": "Video Accessed",
+   "Video Deleted": "Video Deleted",
+   "Cloud Video Deleted": "Cloud Video Deleted",
    "notEnoughFramesText1": "Not Enough Frames for compilation.",
    "Allow API Trigger": "Allow API Trigger",
    "When Detector is Off": "When Detector is Off",

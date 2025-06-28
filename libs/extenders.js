@@ -73,12 +73,6 @@ module.exports = function(s,config){
     // [0] groupKey : The ID of the group.
     // [1] usedSpace : Currently used space (mb).
     // [2] sizeLimit : Maximum Usable Space (mb).
-    createExtension(`onVideoAccess`)
-    // [0] videoDatabaseRow : Object of Video database row
-    // [1] userDatabaseRow : Object of User database row. The one accessing the data.
-    // [2] groupKey : The ID of the group.
-    // [3] monitorId : The ID of the Monitor.
-    // [4] clientIp : IP Address of the user accessing the data.
     createExtension(`onLogout`)
     // [0] userDatabaseRow : Object of User database row.
     // [1] groupKey : The ID of the group.
@@ -210,6 +204,24 @@ module.exports = function(s,config){
     createExtension(`onBeforeInsertCompletedVideo`)
     // [0] monitorObject : Active Monitor loaded into memory.
     // [1] rawInfoAboutVideo : Currently processing information about video.
+    createExtension(`onVideoAccess`)
+    // [0] videoDatabaseRow : Object of Video database row
+    // [1] userDatabaseRow : Object of User database row. The one accessing the data.
+    // [2] groupKey : The ID of the group.
+    // [3] monitorId : The ID of the Monitor.
+    // [4] clientIp : IP Address of the user accessing the data.
+    createExtension(`onVideoDeleteByUser`)
+    // [0] videoDatabaseRow : Object of Video database row
+    // [1] userDatabaseRow : Object of User database row. The one accessing the data.
+    // [2] groupKey : The ID of the group.
+    // [3] monitorId : The ID of the Monitor.
+    // [4] clientIp : IP Address of the user deleting the data.
+    createExtension(`onCloudVideoDeleteByUser`)
+    // [0] videoDatabaseRow : Object of Video database row
+    // [1] userDatabaseRow : Object of User database row. The one accessing the data.
+    // [2] groupKey : The ID of the group.
+    // [3] monitorId : The ID of the Monitor.
+    // [4] clientIp : IP Address of the user accessing the data.
     createExtension(`onCloudVideoUploaded`)
     // [0] insertQuery : The insert query used to save the cloud video info into the database.
 
