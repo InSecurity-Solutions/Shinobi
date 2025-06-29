@@ -985,7 +985,8 @@ function pauseMonitorItem(monitorId){
 function resumeMonitorItem(monitorId){
     // needs to know about substream
     liveGridPlayingNow[monitorId] = true
-    resetMonitorCanvas(monitorId,true,null)
+    var monitor = loadedMonitors[monitorId];
+    resetMonitorCanvas(monitorId,true,monitor.subStreamChannel)
 }
 function isScrolledIntoView(elem){
     var el = $(elem)
