@@ -43,6 +43,7 @@ function makeConfig(streamUrl){
     // streamUrl = 'rtsp://1.1.1.1:554/'
     const copyOfBaseConfig = Object.assign({},monitorBase)
     const urlParts = getUrlParts(streamUrl)
+    console.log(streamUrl)
     copyOfBaseConfig.mid = generateId()
     copyOfBaseConfig.name = urlParts.hostname
     copyOfBaseConfig.host = urlParts.hostname
@@ -58,7 +59,7 @@ function run(){
     const newMonitorsList = []
     const fileName = `${importFilePath}.json`
     importList.forEach((streamUrl) => {
-        newMonitorsList.push(makeConfig(streamUrl))
+        if(streamUrl)newMonitorsList.push(makeConfig(streamUrl))
     })
     console.log(`New JSON written to ${fileName}`)
     fs.writeFileSync(fileName,JSON.stringify(newMonitorsList));
