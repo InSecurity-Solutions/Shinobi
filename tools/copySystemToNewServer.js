@@ -137,9 +137,42 @@ async function uploadConf(conn, sftp) {
   console.log('    ✓ conf.json uploaded');
 }
 
-// ── 4. Restore DB on target ──────────────────────────────────────────────────
+// ── 4. Ensure DB / privileges on target ──────────────────────────────────────
+async function ensureDatabase(conn) {
+  console.log('[4/6] Ensuring database & privileges …');
+
+  const pwdClause = sqlPassword
+    ? `IDENTIFIED BY '${sqlPassword.replace(/'/g, `'\\''`)}'`
+    : '';
+
+  const sql = `
+    CREATE DATABASE IF NOT EXISTS \\\`${sqlDatabase}\\\`;
+    GRANT ALL PRIVILEGES ON \\\`${sqlDatabase}\\\`.* TO '${sqlUsername}'@'127.0.0.1' ${pwdClause};
+    FLUSH PRIVILEGES;
+  `;
+
+  const cmd = [
+    'mysql',
+    `-u${sqlUsername}`,
+    sqlPassword ? `-p'${sqlPassword.replace(/'/g, `'\\''`)}'` : '',
+    `-P${sqlPort}`,
+    `-e "${sql.replace(/\n/g, ' ')}"`,
+  ].join(' ');
+
+  await new Promise((resolve, reject) => {
+    conn.exec(cmd, (err, stream) => {
+      if (err) return reject(err);
+      stream.on('close', code => (code === 0 ? resolve() : reject(new Error(`mysql exited ${code}`))))
+            .stderr.pipe(process.stderr);
+      stream.pipe(process.stdout);
+    });
+  });
+  console.log('    ✓ Database ready');
+}
+
+// ── 5. Restore DB on target ───────────────────────────────────────────────────
 async function importOnTarget(conn) {
-  console.log('[4/5] Importing dump on target …');
+  console.log('[5/6] Importing dump on target …');
 
   const restoreCmd = [
     `mysql`,
@@ -160,9 +193,9 @@ async function importOnTarget(conn) {
   console.log('    ✓ Import complete');
 }
 
-// ── 5. Cleanup ────────────────────────────────────────────────────────────────
+// ── 6. Cleanup ────────────────────────────────────────────────────────────────
 async function cleanup(conn) {
-  console.log('[5/5] Cleaning up …');
+  console.log('[6/6] Cleaning up …');
   await fs.unlink(dumpPath).catch(() => {});
   await fs.unlink(localTmpConf).catch(() => {});
   await new Promise(res => {
@@ -182,6 +215,7 @@ async function cleanup(conn) {
 
     await uploadDump(conn, sftp);
     await uploadConf(conn, sftp);
+    await ensureDatabase(conn);
     await importOnTarget(conn);
     await cleanup(conn);
   } catch (err) {
