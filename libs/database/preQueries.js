@@ -111,6 +111,7 @@ module.exports = function(s,config){
             {name: 'mid', length: 100, type: 'string'},
             {name: 'tag', length: 30, type: 'string'},
             {name: 'details', type: 'text'},
+            {name: 'name', length: 255, type: 'string'},
             {name: 'count', type: 'integer', length: 10, defaultTo: 1},
             {name: 'time', type: 'timestamp', defaultTo: currentTimestamp()},
             {name: 'end', type: 'timestamp', defaultTo: currentTimestamp()},
@@ -214,6 +215,7 @@ module.exports = function(s,config){
         await require('./migrate/2022-12-18.js')(s,config)
         await require('./migrate/2023-03-11.js')(s,config)
         await require('./migrate/2025-03-05.js')(s,config)
+        await require('./migrate/2025-04-13.js')(s,config)
         delete(s.preQueries)
     }
 }

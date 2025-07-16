@@ -722,7 +722,7 @@ function buildPosePoints(bodyParts, x, y){
     }
     return theArray;
 }
-function drawMatrices(event, options, autoRemoveTimeout, drawTrails){
+async function drawMatrices(event, options, autoRemoveTimeout, drawTrails){
     var theContainer = options.theContainer
     var height = options.height
     var width = options.width
@@ -786,6 +786,15 @@ function drawMatrices(event, options, autoRemoveTimeout, drawTrails){
     }
     $.each(event.details.matrices, processMatrix);
     $.each(moreMatrices, processMatrix);
+    var detectionDrawDelay = detectionDrawDelays[monitorId];
+    if(detectionDrawDelay){
+        await (new Promise((resolve) => {
+            setTimeout(() => {
+                resolve()
+            }, detectionDrawDelay * 1000)
+        }))
+        // console.log(`Delayed Draw by ${detectionDrawDelay} seconds`)
+    }
     var addedEls = theContainer.append(html)
     if(autoRemoveTimeout){
         addedEls = addedEls.find('.fresh-detected-object').removeClass('fresh-detected-object')

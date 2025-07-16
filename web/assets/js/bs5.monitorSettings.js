@@ -454,6 +454,7 @@ window.getMonitorEditFormFields = function(){
     monitorConfig.details.input_map_choices = getInputMapDesignations()
     monitorConfig.details.stream_channels = getStreamChannelConnectionInfo()
     monitorConfig.details.triggerMonitorsPtzTargets = getSelectedEventBasedPtzPresets()
+    monitorConfig.details.detectorLineCounterSettings = getLineCounterState()
 
 //    if(monitorConfig.protocol=='rtsp'){monitorConfig.ext='mp4',monitorConfig.type='rtsp'}
     if(errorsFound.length > 0){
@@ -724,7 +725,14 @@ async function importIntoMonitorEditor(options){
             }
         }
     });
-
+    //
+    if(monitorDetails.detectorLineCounter == '1'){
+        setTimeout(function(){
+            drawLineCounterCanvas(Object.assign({}, monitorConfig, { details: monitorDetails }))
+        },500)
+    }else{
+        clearLineCounterCanvas()
+    }
     //
     await getPluginsList(monitorConfig)
     //

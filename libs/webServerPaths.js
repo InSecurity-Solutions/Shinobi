@@ -735,6 +735,7 @@ module.exports = function(s,config,lang,app,io){
                             response.channel = activeMonitor.subStreamChannel;
                         break;
                         case'stop':
+                            response.ok = true
                             activeMonitor.allowDestroySubstream = true
                             await destroySubstreamProcess(activeMonitor)
                         break;
@@ -1816,11 +1817,14 @@ module.exports = function(s,config,lang,app,io){
                         break;
                         case'delete':
                             response.ok = true;
+                            const clientIp = s.getClientIp(req)
                             switch(videoParam){
                                 case'cloudVideos':
+                                    s.runExtensionsForArray('onCloudVideoDeleteByUser', null, [r, user, groupKey, monitorId, clientIp])
                                     s.deleteVideoFromCloud(r,details.type || r.type || 's3')
                                 break;
                                 default:
+                                    s.runExtensionsForArray('onVideoDeleteByUser', null, [r, user, groupKey, monitorId, clientIp])
                                     s.deleteVideo(r)
                                 break;
                             }

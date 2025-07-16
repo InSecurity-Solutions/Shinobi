@@ -61,7 +61,7 @@ function createVideoLinks(video,options){
         queryString = ''
     }
     video.ext = video.ext ? video.ext : 'mp4'
-    if(details.type === 'googd' || video.type === 'googd'){
+    if(details.type === 'googd'){
         video.href = undefined
     }else if(!video.ext && video.href){
         video.ext = video.href.split('.')
@@ -712,7 +712,7 @@ async function unarchiveVideos(videos){
 }
 function buildDefaultVideoMenuItems(file,options){
     var isLocalVideo = !file.videoSet || file.videoSet === 'videos'
-    var href = file.href// + `${!isLocalVideo ? `?type=${file.type}` : ''}`
+    var href = file.href + `${!isLocalVideo ? `?type=${file.type}` : ''}`
     options = options ? options : {play: true}
     return `
     <li><a class="dropdown-item" href="${href}" download>${lang.Download}</a></li>
