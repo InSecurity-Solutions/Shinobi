@@ -102,6 +102,9 @@ module.exports = function(s,config){
     createExtension(`onMonitorStop`)
     // [0] monitorConfig : Copy of Monitor Configuration loaded into memory.
     // [1] initiateData : Data that was used to initiate the action.
+    createExtension(`onMonitorDelete`)
+    // [0] monitorConfig : Copy of Monitor Configuration loaded into memory.
+    // [1] initiateData : Data that was used to initiate the action.
     createExtension(`onMonitorSave`)
     // [0] monitorConfig : Copy of Monitor Configuration loaded into memory.
     // [1] formData : Data that was used to update the monitor.

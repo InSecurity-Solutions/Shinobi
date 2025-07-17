@@ -672,6 +672,7 @@ module.exports = (s,config,lang) => {
             const groupKey = options.ke
             const monitorId = options.id || options.mid
             const deleteFiles = options.deleteFiles === undefined ? true : options.deleteFiles
+            const monitorConfig = Object.assign({}, s.group[groupKey].rawMonitorConfigurations[monitorId])
             s.userLog({
                 ke: groupKey,
                 mid: monitorId
@@ -707,6 +708,7 @@ module.exports = (s,config,lang) => {
             delete(s.group[groupKey].activeMonitors[monitorId]);
             delete(s.group[groupKey].rawMonitorConfigurations[monitorId]);
             response.msg = `${lang.monitorDeleted} ${lang.byUser} : ${userId}`
+            s.runExtensionsForArray('onMonitorDelete', null, [monitorConfig, options])
         }catch(err){
             response.ok = false
             response.err = err
