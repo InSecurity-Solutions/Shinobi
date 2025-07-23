@@ -290,7 +290,7 @@ module.exports = function makePluginBase(__dirname, cfg = {}) {
         const separate = det.detector_use_detect_object === "1";
         const width = parseFloat(separate && det.detector_scale_x_object ? det.detector_scale_x_object : det.detector_scale_x);
         const height = parseFloat(separate && det.detector_scale_y_object ? det.detector_scale_y_object : det.detector_scale_y);
-        s.monitorInfo.set(mKey, { separate, width, height });
+        s.monitorInfo.set(mKey, { isObjectDetectionSeparate: separate, separate, width, height });
 
         imageBuffers.delete(mKey);
         runExtenders(s.ext.cameraInit, m, cn, tx);

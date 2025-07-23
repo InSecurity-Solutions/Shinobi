@@ -36,7 +36,7 @@ module.exports = function(__dirname, config){
     s = {
         group: {},
         monitors: {},
-        monitorInfo: {},
+        monitorInfo: new Map(),
         dir: {},
         isWin: (process.platform === 'win32'),
         s: (json) => {
@@ -205,11 +205,12 @@ module.exports = function(__dirname, config){
                 var isObjectDetectionSeparate = monitorDetails.detector_use_detect_object === '1'
                 var width = parseFloat(isObjectDetectionSeparate  && monitorDetails.detector_scale_x_object ? monitorDetails.detector_scale_x_object : monitorDetails.detector_scale_x)
                 var height = parseFloat(isObjectDetectionSeparate  && monitorDetails.detector_scale_y_object ? monitorDetails.detector_scale_y_object : monitorDetails.detector_scale_y)
-                s.monitorInfo[monitorKey] = {
+                s.monitorInfo.set(monitorKey,{
+                    separate: isObjectDetectionSeparate,
                     isObjectDetectionSeparate,
                     width,
                     height,
-                }
+                })
                 delete(imageBuffers[monitorKey])
                 for(extender of s.onCameraInitExtensions){
                     extender(monitorConfig, cn, tx)
