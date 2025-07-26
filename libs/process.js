@@ -1,5 +1,5 @@
 var os = require('os')
-module.exports = function(process,__dirname){
+module.exports = function(process){
     var packageJson = require('../package.json')
     process.send = process.send || function () {};
     process.on('uncaughtException', function (err) {
