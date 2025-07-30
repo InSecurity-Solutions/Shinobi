@@ -116,7 +116,7 @@ $(document).ready(function(){
             }))
             liveElement.attr('src',apiUrl)
         }else{
-            var apiUrl = `${getApiPrefix('embed')}/${monitorId}/fullscreen|jquery|gui|relative?host=${location.pathname}`
+            var apiUrl = `${getApiPrefix('embed')}/${monitorId}/fullscreen|jquery|gui|relative?host=${location.origin + location.pathname}`
             liveElement.attr('src',apiUrl)
             lastEmbedUrl = apiUrl
         }

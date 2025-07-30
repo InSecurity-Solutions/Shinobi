@@ -331,7 +331,7 @@ function buildStreamUrl(monitorId){
 
 function buildEmbedUrl(monitor){
     var monitorId = monitor.mid;
-    var streamURL = `${getApiPrefix(`embed`)}/${monitorId}/fullscreen|jquery|gui|relative?host=${location.pathname}`
+    var streamURL = `${getApiPrefix(`embed`)}/${monitorId}/fullscreen|jquery|gui|relative?host=${location.origin + location.pathname}`
     return streamURL;
 }
 
