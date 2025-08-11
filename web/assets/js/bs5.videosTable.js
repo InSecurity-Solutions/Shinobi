@@ -17,7 +17,8 @@ $(document).ready(function(e){
         if(typeof frameUrlCache[frameUrlCacheId] === 'string'){
             return frameUrlCache[frameUrlCacheId]
         }else{
-            const frame = (await getTimelapseFrames(monitorId,startDate,endDate,1))[0]
+            const apiResponse = await getTimelapseFrames(monitorId,startDate,endDate,1);
+            const frame = apiResponse[0]
             const href = frame && frame.href ? frame.href : ''
             frameUrlCache[frameUrlCacheId] = `${href}`
             frameUrlCacheTimeouts[frameUrlCacheId] = setTimeout(() => {
@@ -32,11 +33,10 @@ $(document).ready(function(e){
         videosTableDrawArea.find('.video-thumbnail').each(async (n, imgEl) => {
             const el = $(imgEl);
             const monitorId = el.attr('data-mid');
-            const startDate = el.attr('data-time');
-            const endDate = el.attr('data-end');
+            const startDate = formattedTimeForFilename(convertTZ(el.attr('data-time'), serverTimezone),false,'YYYY-MM-DDTHH:mm:ss');
+            const endDate = formattedTimeForFilename(convertTZ(el.attr('data-end'), serverTimezone),false,'YYYY-MM-DDTHH:mm:ss');
             const imgBlock = el.find('.video-thumbnail-img-block');
-
-            if (el.is(':visible')) {  // Only load if visible
+            if (el.is(':visible')) {
                 const href = await getSnapshotFromVideoTimeFrame(monitorId, startDate, endDate);
                 imgBlock.find('img').attr('src', href);
             }
