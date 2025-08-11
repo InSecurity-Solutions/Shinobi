@@ -1553,57 +1553,6 @@ module.exports = function(s,config,lang,app,io){
         },res,req)
     })
     /**
-    * API : Object Detection Counter Status
-     */
-    app.get([
-        config.webPaths.apiPrefix+':auth/eventCounts/:ke',
-        config.webPaths.apiPrefix+':auth/eventCounts/:ke/:id'
-    ], function (req,res){
-        res.setHeader('Content-Type', 'application/json')
-        s.auth(req.params,function(user){
-            const monitorId = req.params.id
-            const groupKey = req.params.ke
-            const {
-                monitorPermissions,
-                monitorRestrictions,
-            } = s.getMonitorsPermitted(user.details,monitorId)
-            const {
-                isRestricted,
-                isRestrictedApiKey,
-                apiKeyPermissions,
-            } = s.checkPermission(user);
-            if(
-                isRestrictedApiKey && apiKeyPermissions.watch_videos_disallowed ||
-                isRestricted && (
-                    monitorId && !monitorPermissions[`${monitorId}_video_view`] ||
-                    monitorRestrictions.length === 0
-                )
-            ){
-                s.closeJsonResponse(res,{ok: false, msg: lang['Not Authorized'], videos: []});
-                return
-            }
-            s.sqlQueryBetweenTimesWithPermissions({
-                table: 'Events Counts',
-                user: user,
-                noCount: true,
-                groupKey: req.params.ke,
-                monitorId: req.params.id,
-                startTime: req.query.start,
-                endTime: req.query.end,
-                startTimeOperator: req.query.startOperator,
-                endTimeOperator: req.query.endOperator,
-                limit: req.query.limit,
-                archived: req.query.archived,
-                endIsStartTo: !!req.query.endIsStartTo,
-                parseRowDetails: true,
-                rowName: 'counts',
-                preliminaryValidationFailed: false
-            },(response) => {
-                res.end(s.prettyPrint(response))
-            })
-        },res,req)
-    })
-    /**
     * API : Camera PTZ Controller
      */
     app.get(config.webPaths.apiPrefix+':auth/control/:ke/:id/:direction', function (req,res){
