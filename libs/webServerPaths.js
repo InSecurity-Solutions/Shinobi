@@ -363,9 +363,6 @@ module.exports = function(s,config,lang,app,io){
                 // dash
                 default:
                     var chosenRender = 'home'
-                    if(userInfo.details.sub && userInfo.details.landing_page && userInfo.details.landing_page !== '' && config.renderPaths[userInfo.details.landing_page]){
-                        chosenRender = userInfo.details.landing_page
-                    }
                     renderPage(config.renderPaths[chosenRender],{
                         $user: userInfo,
                         config: s.getConfigWithBranding(req.hostname),

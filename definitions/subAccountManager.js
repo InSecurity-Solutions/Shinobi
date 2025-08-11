@@ -149,23 +149,7 @@ module.exports = (s,config,lang) => {
                      "default": "0",
                      "fieldType": "select",
                      "possible": yesNoPossibility
-                  },
-                  {
-                     "name": "detail=landing_page",
-                     "field": lang['Landing Page'],
-                     "default": "",
-                     "fieldType": "select",
-                     "possible": [
-                         {
-                            "name": lang.Default,
-                            "value": ""
-                         },
-                         {
-                            "name": lang.Timelapse,
-                            "value": "timelapse"
-                         }
-                     ]
-                  },
+                  }
               ]
            },
            "Monitors": {

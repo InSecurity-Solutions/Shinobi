@@ -338,7 +338,6 @@ module.exports = function(s,config,lang){
                     formDetails.edit_days = details.edit_days
                     formDetails.use_admin = details.use_admin
                     formDetails.use_ldap = details.use_ldap
-                    formDetails.landing_page = details.landing_page
                     //check
                     if(details.edit_days == "0"){
                         formDetails.days = details.days;
