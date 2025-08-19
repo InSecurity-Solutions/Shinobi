@@ -1350,7 +1350,7 @@ module.exports = (s,config,lang) => {
                 var filename = d.split('.')[0].split(' [')[0].trim()+'.'+e.ext
                 s.insertCompletedVideo(e,{
                     file: filename,
-                    events: activeMonitor.detector_motion_count
+                    events: activeMonitor ? activeMonitor.detector_motion_count || [] : []
                 },function(err,response){
                     s.userLog(e,{type:lang['Video Finished'],msg:{filename:d}})
                     if(
