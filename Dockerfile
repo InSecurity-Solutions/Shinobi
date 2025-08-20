@@ -1,4 +1,4 @@
-ARG BASE_IMAGE=node:18-buster-slim
+ARG BASE_IMAGE=node:20-bookworm-slim
 FROM ${BASE_IMAGE}
 
 ARG DEBIAN_FRONTEND=noninteractive \
