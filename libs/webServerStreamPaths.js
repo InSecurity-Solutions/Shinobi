@@ -311,6 +311,9 @@ module.exports = function(s,config,lang,app){
     */
     app.get([config.webPaths.apiPrefix+':auth/flv/:ke/:id/s.flv',config.webPaths.apiPrefix+':auth/flv/:ke/:id/:channel/s.flv'], function(req,res) {
         s.auth(req.params,function(user){
+            const authKey = req.params.auth
+            const groupKey = req.params.ke
+            const monitorId = req.params.id
             if(cantLiveStreamPermission(user,monitorId,'watch_stream')){
                 s.closeJsonResponse(res,{ok: false, msg: lang['Not Authorized']});
                 return;
