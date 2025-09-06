@@ -626,13 +626,13 @@ module.exports = function(s,config,lang,app,io){
                     channelRow.streams=[]
                     channelRow.streamsSortedByType={}
                     buildStreamURL(channelRow,details.stream_type)
-                    if(details.stream_channels&&details.stream_channels!==''){
-                        details.stream_channels=JSON.parse(details.stream_channels)
-                        details.stream_channels.forEach(function(b,m){
+                    const streamChannels = s.parseJSON(details.stream_channels)
+                    if(streamChannels){
+                        streamChannels.forEach(function(b,m){
                             buildStreamURL(channelRow,b.stream_type,m.toString())
                         })
                     }
-                    if(details.tv_channel==='1'){
+                    if(details.tv_channel === '1'){
                         tvChannelMonitors.push(channelRow)
                     }
                 })
