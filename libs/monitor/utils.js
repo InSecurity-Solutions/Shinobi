@@ -153,6 +153,7 @@ module.exports = (s,config,lang) => {
             clearTimeout(activeMonitor.timeoutToRestart)
             clearTimeout(activeMonitor.fatalErrorTimeout);
             delete(activeMonitor.onvifConnection)
+            delete(activeMonitor.buildingTimelapseVideo)
             // if(activeMonitor.onChildNodeExit){
             //     activeMonitor.onChildNodeExit()
             // }
