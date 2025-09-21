@@ -232,6 +232,11 @@ module.exports = function(s,config,lang,app,io){
             const ke = frames[0].ke
             const mid = frames[0].mid
             const concatListFile = options.listFile
+            resolved = false
+            function doResolve(){
+                if(!resolved)resolve()
+                resolved = true
+            }
             createTemporaryInputFile(frames,concatListFile).then((framesAccepted) => {
                 var completionTimeout
                 const framesPerSecond = options.fps
@@ -239,7 +244,7 @@ module.exports = function(s,config,lang,app,io){
                 const onPercentChange = options.onPercentChange
                 const numberOfFrames = framesAccepted.length
                 const commandString = `-y -threads 1 -re -f concat -safe 0 -r ${framesPerSecond} -i "${concatListFile}" -q:v 1 -c:v libx264 -preset ultrafast -r ${framesPerSecond} "${finalMp4OutputLocation}"`
-                s.debugLog("ffmpeg",commandString)
+                // console.log("ffmpeg",commandString)
                 const videoBuildProcess = spawn(config.ffmpegDir,splitForFFMPEG(commandString))
                 videoBuildProcess.stdout.on('data',function(data){
                     s.debugLog('stdout',finalMp4OutputLocation,data.toString())
@@ -255,13 +260,18 @@ module.exports = function(s,config,lang,app,io){
                     completionTimeout = setTimeout(function(){
                         s.debugLog('videoBuildProcess completionTimeout',finalMp4OutputLocation)
                         processKill(videoBuildProcess)
+                        doResolve()
                     },20000)
                 })
-                videoBuildProcess.on('exit',async function(data){
+                videoBuildProcess.on('exit',function(data){
                     clearTimeout(completionTimeout)
-                    resolve()
-                    await fs.promises.unlink(concatListFile)
+                    doResolve()
+                    fs.promises.unlink(concatListFile).catch(function(){
+
+                    })
                 })
+            }).catch((err) => {
+                console.error(err)
             })
         })
     }
@@ -283,6 +293,7 @@ module.exports = function(s,config,lang,app,io){
             var numberOfFrames = frameSet.length
             var segmentFileOutput = `${s.dir.streams}${ke}/${mid}/${s.gid(10)}.mp4`
             filePathsList.push(segmentFileOutput)
+            // console.log(`STARTED buildVideoSegmentFromFrames`, `${concatListFile}${i}`)
             await buildVideoSegmentFromFrames({
                 frames: frameSet,
                 listFile: `${concatListFile}${i}`,
@@ -303,6 +314,7 @@ module.exports = function(s,config,lang,app,io){
                     s.debugLog(`Piece ${i}`,`${currentFrame} / ${numberOfFrames}`,`${percent}%`)
                 },
             })
+            // console.log(`ENDED buildVideoSegmentFromFrames`, `${concatListFile}${i}`)
         }
         s.debugLog('videoBuildProcess Stitching...',finalMp4OutputLocation)
         await createTemporaryInputFileForStitched(filePathsList,concatListFile)
@@ -366,6 +378,7 @@ module.exports = function(s,config,lang,app,io){
             const details = {
                 start: frames[0].time,
                 end: frames[frames.length - 1].time,
+                fps: framesPerSecond,
             }
             s.knexQuery({
                 action: "insert",
@@ -377,6 +390,7 @@ module.exports = function(s,config,lang,app,io){
                     name: finalFileName,
                     size: fileStats.size,
                     time: timeNow,
+                    type: 'timelapse',
                 }
             })
             s.setDiskUsedForGroup(ke,fileStats.size / 1048576,'fileBin')
@@ -389,6 +403,7 @@ module.exports = function(s,config,lang,app,io){
                 name: finalFileName,
                 size: fileStats.size,
                 time: timeNow,
+                type: 'timelapse',
                 timelapseVideo: true,
             },'GRP_'+ke);
             delete(activeMonitor.buildingTimelapseVideo)
