@@ -2,6 +2,7 @@ const fs = require('fs');
 const spawn = require('child_process').spawn;
 const {
     mergeDeep,
+    mbToHumanReadable,
 } = require('../common.js')
 module.exports = (config) => {
     var currentlyUpdating = false
@@ -20,7 +21,7 @@ module.exports = (config) => {
                 },
                 Machine: {
                     "CPU Core Count": s.coreCount,
-                    "Total RAM": s.totalmem,
+                    "Total RAM": mbToHumanReadable(s.totalmem / (1024 * 1024)),
                     "Operating System Platform": s.platform,
                 },
 
