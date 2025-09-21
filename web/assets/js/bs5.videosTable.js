@@ -160,7 +160,7 @@ $(document).ready(function(e){
         ],
         data: loadedVideosTable.map((file) => {
             var isLocalVideo = !wantCloudVideo;
-            var href = file.href + `${!isLocalVideo ? `?type=${file.type}` : ''}`;
+            var href = file.href// + `${!isLocalVideo ? `?type=${file.type}` : ''}`;
             var loadedMonitor = loadedMonitors[file.mid];
             return {
                 image: `<div class="video-thumbnail" data-mid="${file.mid}" data-ke="${file.ke}" data-time="${file.time}" data-end="${file.end}" data-filename="${file.filename}">
