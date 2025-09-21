@@ -225,21 +225,21 @@ module.exports = function(s,config,lang,app,io){
                 endTimeOperator: req.query.endOperator,
                 limit: req.query.limit,
                 archived: req.query.archived,
+                itemType: req.query.type,
                 endIsStartTo: true,
-                noFormat: true,
-                noCount: true,
+                noFormat: false,
+                noCount: false,
+                rowName: 'files',
+                parseRowDetails: true,
                 preliminaryValidationFailed: (
                     user.permissions.get_monitors === "0"
                 )
             },(response) => {
-                response.forEach(function(v){
+                response.files.forEach(function(v){
                     v.details = s.parseJSON(v.details)
                     v.href = '/'+req.params.auth+'/fileBin/'+req.params.ke+'/'+req.params.id+'/'+v.name;
                 })
-                s.closeJsonResponse(res,{
-                    ok: true,
-                    files: response
-                })
+                s.closeJsonResponse(res,response)
             })
         },res,req);
     });
