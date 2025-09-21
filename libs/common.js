@@ -38,7 +38,60 @@ function addCredentialsToUrl(options){
     const urlParts = streamUrl.split('://')
     return [urlParts[0],'://',`${username}:${password}@`,urlParts[1]].join('')
 }
+function humanReadableToMb(str) {
+  const cleanedStr = `${str}`.toUpperCase().replace(/ /g, '').trim();
+  const pattern = /^([\d.]+)(MB|GB|TB|PB|EB)$/i;
+  let match = cleanedStr.match(pattern);
+
+  if (!match) {
+    const numericMatch = cleanedStr.match(/[\d.]+/);
+    if (!numericMatch) {
+      return 10000;
+    }
+    let value = parseFloat(numericMatch[0]);
+    if (isNaN(value)) {
+      return 10000;
+    }
+    return value;
+  }
+
+  let [ , numericPart, unit ] = match;
+  let value = parseFloat(numericPart);
+  switch (unit) {
+    case "MB":
+      break;
+    case "GB":
+      value *= 1000;
+      break;
+    case "TB":
+      value *= 1000 * 1000;
+      break;
+    case "PB":
+      value *= 1000 * 1000 * 1000;
+      break;
+    case "EB":
+      value *= 1000 * 1000 * 1000 * 1000;
+      break;
+    default:
+      break;
+  }
+
+  return value;
+}
+function mbToHumanReadable(mb) {
+  const units = ["MB", "GB", "TB", "PB", "EB"];  // Extend if needed
+  let unitIndex = 0;
+  let value = parseInt(mb);
+  while (value >= 1000 && unitIndex < units.length - 1) {
+    value /= 1000;
+    unitIndex++;
+  }
+  value = parseFloat(value.toFixed(2));
+  return `${value} ${units[unitIndex]}`;
+}
 module.exports = {
+    humanReadableToMb,
+    mbToHumanReadable,
     addCredentialsToUrl,
     getBuffer: getBuffer,
     mergeDeep: mergeDeep,
