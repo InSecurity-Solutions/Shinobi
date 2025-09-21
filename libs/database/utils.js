@@ -217,6 +217,9 @@ module.exports = function(s,config){
        if(options.archived){
            whereQuery.push(['archive','=',`1`])
        }
+       if(options.itemType){
+           whereQuery.push(['type','=',options.itemType])
+       }
        if(options.filename){
            whereQuery.push(['filename','=',options.filename])
            frameLimit = "1";
@@ -325,6 +328,7 @@ module.exports = function(s,config){
         const groupKey = options.groupKey
         const monitorId = options.monitorId
         const archived = options.archived
+        const itemType = options.type
         const theTableSelected = options.table
         const endIsStartTo = options.endIsStartTo
         const userDetails = user.details
@@ -345,6 +349,7 @@ module.exports = function(s,config){
             limit: options.noLimit === '1' ? '0' : options.limit,
             archived: archived,
             rowType: rowName,
+            itemType: itemType,
             endIsStartTo: endIsStartTo
         },(response) => {
             const limit = response.limit
@@ -387,6 +392,7 @@ module.exports = function(s,config){
                     endOperator: endTimeOperator,
                     archived: archived,
                     type: 'count',
+                    itemType: itemType,
                     endIsStartTo: endIsStartTo
                 },(response) => {
                     const count = response.count
