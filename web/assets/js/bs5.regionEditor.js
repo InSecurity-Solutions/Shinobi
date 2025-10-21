@@ -358,13 +358,23 @@ $(document).ready(function(e){
     })
     addOnTabOpen('regionEditor', function () {
         drawMonitorListToSelector(regionEditorMonitorsList,true)
+        var theSelected = `${regionEditorMonitorsList.val()}`
+        var monitor = loadedMonitors[theSelected]
+        loadRegionEditor(monitor)
         initLiveStream()
     })
     addOnTabReopen('regionEditor', function () {
-        initLiveStream()
         var theSelected = `${regionEditorMonitorsList.val()}`
-        drawMonitorListToSelector(regionEditorMonitorsList)
-        regionEditorMonitorsList.val(theSelected)
+        var monitorExists = !!loadedMonitors[theSelected]
+        drawMonitorListToSelector(regionEditorMonitorsList, !monitorExists)
+        if(monitorExists){
+            regionEditorMonitorsList.val(theSelected)
+        }else{
+            theSelected = `${regionEditorMonitorsList.val()}`
+        }
+        var monitor = loadedMonitors[theSelected]
+        loadRegionEditor(monitor)
+        initLiveStream()
     })
     addOnTabAway('regionEditor', function () {
         regionEditorLiveView.find('iframe,img').attr('src','about:blank')
