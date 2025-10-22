@@ -472,7 +472,11 @@ function beginProcessing(){
                             time: row.time,
                             details: row.details,
                         },'GRP_' + groupKey)
-                        await fs.promises.unlink(`${enclosingFolder}${filename}`)
+                        try{
+                            await fs.promises.unlink(`${enclosingFolder}${filename}`)
+                        }catch(err){
+
+                        }
                         if(foldersDeletedFrom.indexOf(enclosingFolder) === -1)foldersDeletedFrom.push(enclosingFolder);
                     }catch(err){
                         normalLog('Timelapse Frame Delete Error',row)
@@ -481,9 +485,13 @@ function beginProcessing(){
                 }
                 for (i = 0; i < foldersDeletedFrom.length; i++) {
                     const folderPath = foldersDeletedFrom[i];
-                    const folderIsEmpty = (await fs.promises.readdir(folderPath)).filter(file => file.indexOf('.jpg') > -1).length === 0;
-                    if(folderIsEmpty){
-                        await fs.promises.rm(folderPath, { recursive: true, force: true })
+                    try{
+                        const folderIsEmpty = (await fs.promises.readdir(folderPath)).filter(file => file.indexOf('.jpg') > -1).length === 0;
+                        if(folderIsEmpty){
+                            await fs.promises.rm(folderPath, { recursive: true, force: true })
+                        }
+                    }catch(err){
+                        
                     }
                 }
                 const deleteResponse = await knexQueryPromise({
