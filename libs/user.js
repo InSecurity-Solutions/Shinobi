@@ -19,6 +19,7 @@ module.exports = function(s,config,lang){
         resetAllStorageCounters,
     } = require("./user/utils.js")(s,config,lang);
     require("./user/logger.js")(s,config,lang)
+    const diskUsedEmitterTimeouts = {}
     let purgeDiskGroup = (groupKey,callback) => {
         const { usedSpace, sizeLimit, addStorageUse } = s.group[groupKey];
         if(usedSpace >= sizeLimit * 0.8){
@@ -94,16 +95,19 @@ module.exports = function(s,config,lang){
     s.sendDiskUsedAmountToClients = function(groupKey){
         //send the amount used disk space to connected users
         if(s.group[groupKey]&&s.group[groupKey].init){
-            s.tx({
-                f: 'diskUsed',
-                size: s.group[groupKey].usedSpace,
-                usedSpace: s.group[groupKey].usedSpace,
-                usedSpaceVideos: s.group[groupKey].usedSpaceVideos,
-                usedSpaceFilebin: s.group[groupKey].usedSpaceFilebin,
-                usedSpaceTimelapseFrames: s.group[groupKey].usedSpaceTimelapseFrames,
-                limit: s.group[groupKey].sizeLimit,
-                addStorage: s.group[groupKey].addStorageUse,
-            },'GRP_'+groupKey);
+            clearTimeout(diskUsedEmitterTimeouts[groupKey])
+            diskUsedEmitterTimeouts[groupKey] = setTimeout(() => {
+                s.tx({
+                    f: 'diskUsed',
+                    size: s.group[groupKey].usedSpace,
+                    usedSpace: s.group[groupKey].usedSpace,
+                    usedSpaceVideos: s.group[groupKey].usedSpaceVideos,
+                    usedSpaceFilebin: s.group[groupKey].usedSpaceFilebin,
+                    usedSpaceTimelapseFrames: s.group[groupKey].usedSpaceTimelapseFrames,
+                    limit: s.group[groupKey].sizeLimit,
+                    addStorage: s.group[groupKey].addStorageUse,
+                },'GRP_'+groupKey);
+            },1000)
         }
     }
     s.sendCloudDiskUsedAmountToClients = function(groupKey){
