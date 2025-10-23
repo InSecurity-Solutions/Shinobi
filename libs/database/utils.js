@@ -1,10 +1,8 @@
 const async = require("async");
 module.exports = function(s,config){
     const isMySQL = config.databaseType === 'mysql';
-    const runQuery = async.queue(function(data, callback) {
-        s.databaseEngine
-        .raw(data.query,data.values)
-        .asCallback(callback)
+    const runQuery = async.queue(function({ dbQuery }, callback) {
+        dbQuery.asCallback(callback)
     }, 4);
     function stringToSqlTime(value){
         newValue = new Date(value.replace('T',' '))
@@ -155,7 +153,9 @@ module.exports = function(s,config){
                 console.log(JSON.stringify(options,null,3))
             }
             if(callback || options.update || options.insert || options.action === 'delete'){
-                dbQuery.asCallback(function(err,r) {
+                runQuery.push({
+                    dbQuery,
+                },function(err,r){
                     if(err){
                         knexError(dbQuery,options,err)
                     }
