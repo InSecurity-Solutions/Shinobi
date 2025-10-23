@@ -82,8 +82,7 @@ function beginProcessing(){
     } = require('../basic/utils.js')(process.cwd())
     const {
         sqlDate,
-        initiateDatabaseEngine
-    } = require('../sql/utils.js')(s,config)
+    } = require('../database/utils.js')(s,config)
     var theCronInterval = null
     const overlapLocks = {}
     const alreadyDeletedRowsWithNoVideosOnStart = {}
@@ -373,10 +372,10 @@ function beginProcessing(){
                         ['archive','!=',`1`],
                         ['time','<', sqlDate('10 MINUTE')],
                     ]
-                },(err,evs) => {
+                }, async (err,evs) => {
                     if(evs && evs[0]){
                         const videosToDelete = [];
-                        evs.forEach(function(ev){
+                        for(ev of evs){
                             var filename
                             var details
                             try{
@@ -390,12 +389,13 @@ function beginProcessing(){
                             }
                             var dir = getVideoDirectory(ev)
                             filename = formattedTime(ev.time)+'.'+ev.ext
-                            fileExists = fs.existsSync(dir+filename)
-                            if(fileExists !== true){
+                            try{
+                                var fileExists = await fs.promises.stat(dir+filename)
+                            }catch(err){
                                 deleteVideo(ev)
                                 sendToWebSocket({f:'video_delete',filename:filename+'.'+ev.ext,mid:ev.mid,ke:ev.ke,time:ev.time,end: formattedTime(new Date,'YYYY-MM-DD HH:mm:ss')},'GRP_'+ev.ke);
                             }
-                        });
+                        };
                         if(videosToDelete.length > 0 || config.debugLog === true){
                             postMessage({f:'deleteNoVideo',msg:videosToDelete.length+' SQL rows with no file deleted',ke:v.ke,time:'moment()'})
                         }
@@ -491,7 +491,7 @@ function beginProcessing(){
                             await fs.promises.rm(folderPath, { recursive: true, force: true })
                         }
                     }catch(err){
-                        
+
                     }
                 }
                 const deleteResponse = await knexQueryPromise({
@@ -707,8 +707,8 @@ function beginProcessing(){
                 debugLog('--- deleteOldEventCounts Complete')
                 await checkFilterRules(v)
                 debugLog('--- checkFilterRules Complete')
-                await deleteRowsWithNoVideo(v)
-                debugLog('--- deleteRowsWithNoVideo Complete')
+                // await deleteRowsWithNoVideo(v)
+                // debugLog('--- deleteRowsWithNoVideo Complete')
                 debugLog('--- Running Post Extenders')
                 onCronGroupProcessed(v)
                 onCronGroupProcessedAwaited(v)
@@ -756,7 +756,6 @@ function beginProcessing(){
             }
         })
     }
-    initiateDatabaseEngine()
     setIntervalForCron()
     doCronJobs()
 }
