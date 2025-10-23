@@ -287,23 +287,30 @@ module.exports = function(s,config,lang){
                                     screenShot: snapBuffer,
                                     isStaticFile: true
                                 })
-                            }).catch(() => {
-                                sendTempImage()
+                            }).catch((err) => {
+                                resolve({
+                                    screenShot: null,
+                                    isStaticFile: true
+                                })
                             })
                         }
                     })
                 }
             }
             if(options.useIcon === true){
-                checkExists(streamDir + 'icon.jpg',function(success){
+                checkExists(streamDir + 'icon.jpg', async function(success){
                     if(success === false){
                         noIconChecks()
                     }else{
-                        var snapBuffer = fs.readFileSync(streamDir + 'icon.jpg')
-                        resolve({
-                            screenShot: snapBuffer,
-                            isStaticFile: false
-                        })
+                        try{
+                            var snapBuffer = await fs.promises.readFile(streamDir + 'icon.jpg')
+                            resolve({
+                                screenShot: snapBuffer,
+                                isStaticFile: false
+                            })
+                        }catch(err){
+                            noIconChecks()
+                        }
                     }
                 })
             }else{
