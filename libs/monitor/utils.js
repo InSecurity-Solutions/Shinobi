@@ -52,6 +52,7 @@ module.exports = (s,config,lang) => {
         const processPID = proc && proc.pid ? parseInt(`${proc.pid}`) : null
         return new Promise((resolve,reject) => {
             let alreadyResolved = false
+            let killTimer = null;
             function doResolve(response){
                 if(alreadyResolved)return;
                 alreadyResolved = true;
@@ -81,18 +82,26 @@ module.exports = (s,config,lang) => {
                     response.msg = 'proc.on.exit'
                     clearTimeout(killTimer)
                     doResolve(response)
-                    treekill(processPID)
+                    // treekill(processPID)
                 });
                 if(proc.killed || !proc.stdin || !proc.stdin.writable){
                     doResolve(response)
                     return
                 }
                 if(proc && proc.stdin) {
+                    proc.stdin.on('error', (err) => {
+                        if (err.code !== 'EPIPE') {
+                            console.error('processKill Stdin error:', err);
+                        }
+                        clearTimeout(killTimer)
+                        doResolve(response)
+                        treekill(processPID)
+                    });
                     try{
                         proc.stdin.write("q\r\n");
                     }catch(err){}
                 }
-                let killTimer = setTimeout(() => {
+                killTimer = setTimeout(() => {
                     if(proc && proc.kill){
                         if(s.isWin){
                             response.msg = 'taskkill'
