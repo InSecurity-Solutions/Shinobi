@@ -72,7 +72,19 @@ $(document).ready(function(){
             $('.events_from_last_24').text(data.count)
         })
     }
-    function onRecentVideosFieldChange(){
+    function isAllMonitorsSelected(percent = 100){
+        var theSelected = `${monitorList.val()}`
+        if(theSelected !== ''){
+            const monitorKeys = Object.values(loadedMonitors)
+            const numberOf = monitorKeys.length
+            var divisor = percent / 100;
+            var allMonitorIds = monitorKeys.map(item => item.mid);
+            return numberOf > 10 && (numberOf >= (allMonitorIds.length * divisor));
+        }else{
+            return false
+        }
+    }
+    function refreshRecentVideos(){
         var theSelected = `${monitorList.val()}`
         loadVideos({
             limit: 0,
@@ -81,29 +93,51 @@ $(document).ready(function(){
             liveStamp()
         })
     }
-    monitorList.change(onRecentVideosFieldChange);
-    videoRangeEl.change(onRecentVideosFieldChange);
+    function refreshRecentVideosOnAgree(){
+        var askToLoad = isAllMonitorsSelected(50)
+        if(!window.skipRecentVideosAgree && askToLoad){
+            $.confirm.create({
+                title: lang.tooManyMonitorsSelected,
+                body: lang.performanceMayBeAffected,
+                clickOptions: {
+                    title: lang.getVideos,
+                    class: 'btn-success'
+                },
+                clickCallback: function(){
+                    refreshRecentVideos()
+                },
+                onCancel: function(){
+                }
+            })
+        }else{
+            refreshRecentVideos()
+        }
+        window.skipRecentVideosAgree = false;
+    }
+    monitorList.change(refreshRecentVideosOnAgree);
+    videoRangeEl.change(refreshRecentVideosOnAgree);
     theBlock.find('.recent-videos-refresh').click(function(){
         var theSelected = `${monitorList.val()}`
         drawMonitorListToSelector(monitorList.find('optgroup'))
         monitorList.val(theSelected)
-        loadVideos({
-            limit: 0,
-            monitorId: theSelected || undefined,
-        },function(){
-            liveStamp()
-        })
+        refreshRecentVideosOnAgree()
     });
     var loadedOnce = false;
-    onDashboardReady(function(){
+    addOnTabReopen('initial', function () {
         if(loadedOnce)return;
         loadedOnce = true;
-        openTab('initial');
         drawMonitorListToSelector(monitorList.find('optgroup'))
-        loadVideos({
-            limit: 0,
-        },function(){
-            liveStamp()
-        })
+        refreshRecentVideosOnAgree()
+    })
+    onDashboardReady(function(){
+        openTab('initial');
+        setTimeout(function(){
+            if(tabTree.name === 'initial'){
+                if(loadedOnce)return;
+                loadedOnce = true;
+                drawMonitorListToSelector(monitorList.find('optgroup'))
+                refreshRecentVideosOnAgree()
+            }
+        },1000)
     })
 })
