@@ -26,8 +26,8 @@ $(document).ready(function(e){
             var classToggle = (dashboardOptions().class_toggle || {})[dataTarget] || []
             var html = `<div id="logViewerStreamContainer_${monitorId}" class="card ${definitions.Theme.isDark ? 'btn-default' : ''} mb-3 search-row">
                 <div id="logViewerStreamHeader_${monitorId}" class_toggle="d-none" data-target="${dataTarget}" class="card-header cursor-pointer d-flex">
-                    <div class="col">
-                        <i class="fa fa-exclamation-triangle"></i> &nbsp; ${monitor.name} <small>(${monitor.mid})</small>
+                    <div class="col" data-mid="${monitorId}">
+                        <i class="fa fa-exclamation-triangle"></i> &nbsp; ${monitor.name} <small>(${monitor.mid})</small>${monitor.status ? ` <small class="monitor_status">(${monitor.status})</small>` : ''}
                     </div>
                     <div class="lastlogtime col text-end"></div>
                 </div>
