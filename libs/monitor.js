@@ -161,6 +161,7 @@ module.exports = function(s,config,lang){
         return s.dir.streams + monitor.ke + '/' + (monitor.mid || monitor.id) + '/'
     }
     s.getRawSnapshotFromMonitor = function(monitor,options){
+        // console.log(new Error(`DEBUG ${monitor.name} ${monitor.mid}`))
         if(!monitor || !monitor.details)return {};
         return new Promise((resolve,reject) => {
             options = options instanceof Object ? options : {flags: ''}
@@ -208,7 +209,7 @@ module.exports = function(s,config,lang){
                         var iconImageFile = streamDir + 'icon.jpg'
                         const snapRawFilters = monitor.details.cust_snap_raw
                         if(snapRawFilters)outputOptions.push(snapRawFilters);
-                        var ffmpegCmd = splitForFFMPEG(`-y -loglevel warning ${isDetectorStream ? '-live_start_index 2' : ''} -re ${inputOptions.join(' ')} -i "${url}" ${outputOptions.join(' ')} -f mjpeg -an -frames:v 1 "${temporaryImageFile}"`)
+                        var ffmpegCmd = splitForFFMPEG(`-y -threads 1 -loglevel warning ${isDetectorStream ? '-live_start_index 2' : ''} -re ${inputOptions.join(' ')} -i "${url}" ${outputOptions.join(' ')} -f mjpeg -an -frames:v 1 "${temporaryImageFile}"`)
                         try{
                             await fs.promises.mkdir(streamDir, {recursive: true}, (err) => {s.debugLog(err)})
                         }catch(err){
