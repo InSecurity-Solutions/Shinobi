@@ -7,6 +7,8 @@ var sideMenuCollapsePoint = $('#side-menu-collapse-point')
 var floatingHideButton = $('#floating-hide-button')
 var floatingBackButton = $('#floating-back-button')
 var monitorIconsLoaded = $('.monitor-icon.unloaded', sidebarMenuInner)
+var sideListMenuDropdownOpen = null
+var sideListScrollTimeout = null
 function buildTabHtml(tabName,tabLabel,tabIcon){
     return `<li class="nav-link side-menu-link cursor-pointer" page-open="${tabName}">
         <div class="d-flex flex-row">
@@ -85,10 +87,7 @@ function correctDropdownPosition(dropdownElement){
 }
 function correctDropdownPositionAfterChange(dropdownElement){
     if(sideListMenuDropdownOpen){
-        clearTimeout(sideListScrollTimeout)
-        sideListScrollTimeout = setTimeout(function(){
-            correctDropdownPosition(sideListMenuDropdownOpen)
-        },500)
+        correctDropdownPosition(sideListMenuDropdownOpen)
     }
 }
 function loadImagesForVisibleSideMenuIcons(){
@@ -205,6 +204,13 @@ function makeMonitorListSortable(){
         },
     })
 }
+function onSideListScroll(){
+    clearTimeout(sideListScrollTimeout)
+    sideListScrollTimeout = setTimeout(function(){
+        correctDropdownPositionAfterChange()
+        loadImagesForVisibleSideMenuIcons()
+    },500)
+}
 $('#monitors_list_search').keyup(function(){
     var monitorBlocks = monitorSideList.find('.monitor_block');
     var searchTerms = $(this).val().toLowerCase().split(' ')
@@ -222,8 +228,6 @@ $('#monitors_list_search').keyup(function(){
         })
     })
 })
-var sideListMenuDropdownOpen = null
-var sideListScrollTimeout = null
 monitorSideList.on('mouseup','[data-bs-toggle="dropdown"]',function(){
     var dropdownElement = $(this).next()
     sideListMenuDropdownOpen = dropdownElement
@@ -234,18 +238,14 @@ monitorSideList.on('mouseup','[data-bs-toggle="dropdown"]',function(){
 monitorSideList.on('hidden.bs.dropdown', '[data-bs-toggle="dropdown"]', function(e) {
     sideListMenuDropdownOpen = null
 })
-sidebarMenuInner.scroll(() => {
-    correctDropdownPositionAfterChange()
-    loadImagesForVisibleSideMenuIcons()
-})
+sidebarMenuInner.scroll(onSideListScroll)
 $('[data-target="#monitorSideList"]').click(function(){
     setTimeout(resizeMonitorIcons,500)
 })
 $(window).resize(function(){
     fixSideMenuScroll()
     resizeMonitorIcons()
-    correctDropdownPositionAfterChange()
-    loadImagesForVisibleSideMenuIcons()
+    onSideListScroll()
 })
 onDashboardReady(function(){
     pageTabLinks.find(`.side-menu-link.go-home`).addClass('page-link-active active');
