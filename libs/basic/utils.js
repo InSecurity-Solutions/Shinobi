@@ -6,7 +6,11 @@ const fetch  = require('node-fetch');
 const FormData = require('form-data');
 const { AbortController } = require('node-abort-controller')
 const DigestFetch = require('digest-fetch')
+const https = require('https');
 module.exports = (processCwd,config) => {
+    let httpsAgent = new https.Agent({
+        rejectUnauthorized: false,
+    });
     const parseJSON = (string) => {
         var parsed
         try{
@@ -90,7 +94,7 @@ module.exports = (processCwd,config) => {
     }
     const fetchTimeout = (url, ms, { signal, ...options } = {}) => {
         const controller = new AbortController();
-        const promise = fetch(url, { signal: controller.signal, ...options });
+        const promise = fetch(url, { signal: controller.signal, agent: httpsAgent, ...options });
         if (signal) signal.addEventListener("abort", () => controller.abort());
         const timeout = setTimeout(() => controller.abort(), ms);
         return promise.finally(() => clearTimeout(timeout));
@@ -288,6 +292,17 @@ module.exports = (processCwd,config) => {
       }
       return obj;
     }
+    function convertNumbersToStrings(form) {
+        if (!form || !form.details || typeof form.details !== 'object') {
+            return form;
+        }
+        for (let key in form.details) {
+            if (typeof form.details[key] === 'number') {
+                form.details[key] = form.details[key].toString();
+            }
+        }
+        return form;
+    }
     return {
         parseJSON: parseJSON,
         stringJSON: stringJSON,
@@ -312,5 +327,6 @@ module.exports = (processCwd,config) => {
         moveFile,
         setTimeoutPromise,
         cleanStringsInObject,
+        convertNumbersToStrings,
     }
 }
