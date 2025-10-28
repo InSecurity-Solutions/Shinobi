@@ -12,6 +12,7 @@ module.exports = (s,config,lang) => {
     const {
         parseJSON,
     } = require('../basic/utils.js')(process.cwd(),config)
+    const ignoreDtsAndGenPts = `+genpts+igndts -muxdelay 0 -muxpreload 0`
     if(!config.outputsWithAudio)config.outputsWithAudio = ['hls','flv','mp4','rtmp'];
     if(!config.outputsNotCapableOfPresets)config.outputsNotCapableOfPresets = [];
     const hasCudaEnabled = (monitor) => {
@@ -415,6 +416,9 @@ module.exports = (s,config,lang) => {
             if(e.details.stream_rotate && e.details.stream_rotate !== "no" && e.details.stream_vcodec !== 'copy'){
                 streamFilters.push(buildRotationFiltersFromConfiguration(`stream_`,e))
             }
+            if(!arrayContains('-fflags',streamFlags)){
+                streamFlags.push(`-fflags ${ignoreDtsAndGenPts}`)
+            }
             if(outputCanHaveAudio && audioCodec !== 'no'){
                 streamFlags.push(`-c:a ` + audioCodec)
             }else{
@@ -563,6 +567,9 @@ module.exports = (s,config,lang) => {
             if(videoExtIsMp4 && !config.noDefaultRecordingSegmentFormatOptions){
                 customRecordingFlags.push(`-segment_format_options movflags=faststart`)
             }
+            if(!arrayContains('-fflags',customRecordingFlags)){
+                customRecordingFlags.push(`-fflags ${ignoreDtsAndGenPts}`)
+            }
             if(videoCodec === 'h264_vaapi'){
                 recordingFilters.push('format=nv12,hwupload')
             }
@@ -615,6 +622,9 @@ module.exports = (s,config,lang) => {
                 outputFlags.push(buildInputMap(e,e.details.input_map_choices.detector_audio))
             }else{
                 outputFlags.push('-map 0:a')
+            }
+            if(!arrayContains('-fflags',outputFlags)){
+                outputFlags.push(`-fflags ${ignoreDtsAndGenPts}`)
             }
             outputFlags.push('-acodec pcm_s16le -f s16le -ac 1 -ar 16000 pipe:6')
         }
@@ -763,6 +773,9 @@ module.exports = (s,config,lang) => {
                     outputFlags.push(`-g 1`)
                 }
             }
+            if(!arrayContains('-fflags',outputFlags)){
+                outputFlags.push(`-fflags ${ignoreDtsAndGenPts}`)
+            }
             outputFlags.push(`-f hls -live_start_index -3 -hls_time ${hlsTime} -hls_list_size ${hlsListSize} -start_number 0 -hls_allow_cache 0 -hls_flags +delete_segments+omit_endlist+discont_start "${e.sdir}detectorStream.m3u8"`)
         }
         return outputFlags.join(' ')
@@ -848,6 +861,9 @@ module.exports = (s,config,lang) => {
         } = getDefaultSubstreamFields(monitor)
         ffmpegParts.push(`-loglevel ${monitor.details.loglevel || 'warning'}`)
         ffmpegParts.push(createInputMap(monitor,channelNumber,inputAndConnectionFields))
+        if(!arrayContains('-fflags',ffmpegParts)){
+            ffmpegParts.push(`-fflags ${ignoreDtsAndGenPts}`)
+        }
         ffmpegParts.push(createStreamChannel(monitor,channelNumber,outputFields))
         return ffmpegParts.join(' ')
     }
