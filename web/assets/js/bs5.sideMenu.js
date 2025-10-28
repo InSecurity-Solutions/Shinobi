@@ -6,6 +6,7 @@ var monitorSideList = $('#monitorSideList')
 var sideMenuCollapsePoint = $('#side-menu-collapse-point')
 var floatingHideButton = $('#floating-hide-button')
 var floatingBackButton = $('#floating-back-button')
+var monitorIconsLoaded = $('.monitor-icon.unloaded', sidebarMenuInner)
 function buildTabHtml(tabName,tabLabel,tabIcon){
     return `<li class="nav-link side-menu-link cursor-pointer" page-open="${tabName}">
         <div class="d-flex flex-row">
@@ -25,8 +26,8 @@ function buildTabHtml(tabName,tabLabel,tabIcon){
         </div>
       </li>`
 }
-function drawMonitorIconToMenu(item){
-    var html = `<li class="nav-item monitor-icon monitor_block glM${item.mid}" data-ke="${item.ke}" data-mid="${item.mid}" data-status-code="${item.code}">
+function drawMonitorIconToMenu(item, reloadIconList){
+    var html = `<li class="nav-item monitor-icon unloaded monitor_block glM${item.mid}" data-ke="${item.ke}" data-mid="${item.mid}" data-status-code="${item.code}">
         <div title="Monitor ID : ${item.mid}" class="d-flex d-flex-row align-items-center p-2 mt-0 mb-3 mx-0 btn btn-default rounded shadow-sm cursor-pointer">
           <div class="lh-1 text-start">
             <img class="me-3 snapshot launch-live-grid-monitor" src="${true ? logoLocation196x196 : getApiPrefix('icon') + '/' + item.mid}">
@@ -49,13 +50,15 @@ function drawMonitorIconToMenu(item){
           </div>
         </div>
     </li>`
-    monitorSideList.append(html)
+    monitorSideList.append(html);
+    if(reloadIconList)monitorIconsLoaded = $('.monitor-icon.unloaded', sidebarMenuInner);
 }
 function drawMonitors(){
     monitorSideList.empty()
     $.each(loadedMonitors,function(n,item){
         drawMonitorIconToMenu(item)
     })
+    monitorIconsLoaded = $('.monitor-icon.unloaded', sidebarMenuInner)
 }
 function resizeMonitorIcons(){
     var monitorIcons = sidebarMenuInner.find('.monitor_block img')
@@ -86,6 +89,33 @@ function correctDropdownPositionAfterChange(dropdownElement){
         sideListScrollTimeout = setTimeout(function(){
             correctDropdownPosition(sideListMenuDropdownOpen)
         },500)
+    }
+}
+function loadImagesForVisibleSideMenuIcons(){
+    var container = sidebarMenuInner[0];
+    var containerRect = container.getBoundingClientRect();
+    var hasUpdatedIcons = false;
+    monitorIconsLoaded.each(function() {
+        var iconRect = this.getBoundingClientRect();
+
+        // Check if element is within the container's visible area
+        var isVisible = (
+            iconRect.bottom >= containerRect.top &&
+            iconRect.top <= containerRect.bottom &&
+            iconRect.right >= containerRect.left &&
+            iconRect.left <= containerRect.right
+        );
+
+        if (isVisible) {
+            var $icon = $(this);
+            var monitorId = $icon.data('mid'); // This gets data-mid attribute
+            mainSocket.f({ f: 'requestSnapshot', mid: monitorId });
+            $icon.removeClass('unloaded');
+            hasUpdatedIcons = true
+        }
+    });
+    if(hasUpdatedIcons){
+        monitorIconsLoaded = $('.monitor-icon.unloaded', sidebarMenuInner)
     }
 }
 function sortListMonitors(){
@@ -204,7 +234,10 @@ monitorSideList.on('mouseup','[data-bs-toggle="dropdown"]',function(){
 monitorSideList.on('hidden.bs.dropdown', '[data-bs-toggle="dropdown"]', function(e) {
     sideListMenuDropdownOpen = null
 })
-sidebarMenuInner.scroll(correctDropdownPositionAfterChange)
+sidebarMenuInner.scroll(() => {
+    correctDropdownPositionAfterChange()
+    loadImagesForVisibleSideMenuIcons()
+})
 $('[data-target="#monitorSideList"]').click(function(){
     setTimeout(resizeMonitorIcons,500)
 })
@@ -212,6 +245,7 @@ $(window).resize(function(){
     fixSideMenuScroll()
     resizeMonitorIcons()
     correctDropdownPositionAfterChange()
+    loadImagesForVisibleSideMenuIcons()
 })
 onDashboardReady(function(){
     pageTabLinks.find(`.side-menu-link.go-home`).addClass('page-link-active active');

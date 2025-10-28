@@ -349,15 +349,15 @@ module.exports = function(s,config,lang,io){
                         }
                     })
                     try{
-                        (s.group[d.ke] ? Object.values(s.group[d.ke].rawMonitorConfigurations) : []).forEach((monitor) => {
-                            s.cameraSendSnapshot({
-                                mid: monitor.mid,
-                                ke: monitor.ke,
-                                mon: monitor
-                            },{
-                                useIcon: true
-                            })
-                        })
+                        // (s.group[d.ke] ? Object.values(s.group[d.ke].rawMonitorConfigurations) : []).forEach((monitor) => {
+                        //     s.cameraSendSnapshot({
+                        //         mid: monitor.mid,
+                        //         ke: monitor.ke,
+                        //         mon: monitor
+                        //     },{
+                        //         useIcon: true
+                        //     })
+                        // })
                     }catch(err){
                         s.debugLog(err)
                     }
@@ -371,6 +371,16 @@ module.exports = function(s,config,lang,io){
             if((d.id||d.uid||d.mid)&&cn.ke){
             try{
                 switch(d.f){
+                    case'requestSnapshot':
+                        var monitorId = d.id || d.mid;
+                        s.cameraSendSnapshot({
+                            mid: monitorId,
+                            ke: cn.ke,
+                            mon: s.group[cn.ke].rawMonitorConfigurations[monitorId]
+                        },{
+                            useIcon: true
+                        })
+                    break;
                     case'monitorOrder':
                         if(d.monitorOrder && d.monitorOrder instanceof Object){
                             s.knexQuery({
