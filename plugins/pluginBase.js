@@ -16,6 +16,7 @@ const http = require("http");
 const { Server: SocketIOServer } = require("socket.io");
 const SocketIOClient = require("socket.io-client");
 const CWSServer = require("cws").Server;
+let stayDisconnected = false;
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Globals guarded so that multiple require() calls don’t duplicate listeners
@@ -220,11 +221,14 @@ module.exports = function makePluginBase(__dirname, cfg = {}) {
     const url = `ws://${config.host || "localhost"}:${config.port}`;
 
     function connect() {
+        cleanupSocket(io)
       const sock = SocketIOClient(url, { transports: ["websocket"] });
       io = sock;
 
       const reconnect = () => {
+          if(stayDisconnected)return;
         if (++retry > MAX_RETRY){
+            stayDisconnected = true;
             s.disconnectWebSocket()
             return plugLog("Max retries reached");
         }
