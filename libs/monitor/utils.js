@@ -1440,12 +1440,14 @@ module.exports = (s,config,lang) => {
                 case checkLog(d,'error while decoding'):
                     s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingText});
                 break;
+                case d.startsWith('DTS'):
                 case checkLog(d,'pkt->duration = 0'):
                 case checkLog(d,'[hls @'):
                 case checkLog(d,'bad cseq'):
                 case checkLog(d,'Past duration'):
                 case checkLog(d,'Last message repeated'):
                 case checkLog(d,'Non-monotonous DTS'):
+                case checkLog(d,'Non-monotonic DTS'):
                 case checkLog(d,'NULL @'):
                 case checkLog(d,'RTP: missed'):
                 case checkLog(d,'deprecated pixel format used'):
