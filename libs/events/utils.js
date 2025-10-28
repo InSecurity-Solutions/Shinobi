@@ -1,6 +1,5 @@
 const fs = require('fs').promises;
 const moment = require('moment');
-const execSync = require('child_process').execSync;
 const exec = require('child_process').exec;
 const spawn = require('child_process').spawn;
 const imageSaveEventLock = {};
@@ -90,7 +89,6 @@ module.exports = (s,config,lang) => {
         var firstMatrix = d.details.matrices ? d.details.matrices[0] : null;
         var tag = firstMatrix ? firstMatrix.tag : '';
         newString = newString
-            .replace(/{{CONFIDENCE}}/g,d.details.confidence)
             .replace(/{{TIME}}/g,d.currentTimestamp)
             .replace(/{{REGION_NAME}}/g,d.details.name)
             .replace(/{{SNAP_PATH}}/g,s.dir.streams+d.ke+'/'+d.id+'/s.jpg')
@@ -634,20 +632,24 @@ module.exports = (s,config,lang) => {
         }else{
             detector_timeout = parseFloat(monitorDetails.detector_timeout)
         }
-        if(!activeMonitor.eventBasedRecording[fileTime])activeMonitor.eventBasedRecording[fileTime] = {};
+        const detectorTimeoutSeconds = detector_timeout * 1000 * 60;
+        if(!activeMonitor.eventBasedRecording[fileTime])activeMonitor.eventBasedRecording[fileTime] = { started: new Date(), secondsRan: 0 };
         if((!overlappingRecordings && monitorDetails.watchdog_reset === '1') || !activeMonitor.eventBasedRecording[fileTime].timeout){
-            clearTimeout(activeMonitor.eventBasedRecording[fileTime].timeout)
-            activeMonitor.eventBasedRecording[fileTime].timeout = setTimeout(function(){
-                activeMonitor.eventBasedRecording[fileTime].allowEnd = true
-                try{
-                    activeMonitor.eventBasedRecording[fileTime].process.stdin.setEncoding('utf8')
-                    activeMonitor.eventBasedRecording[fileTime].process.stdin.write('q')
-                }catch(err){
-                    s.debugLog(err)
-                }
-                activeMonitor.eventBasedRecording[fileTime].process.kill('SIGINT')
-                delete(activeMonitor.eventBasedRecording[fileTime].timeout)
-            },detector_timeout * 1000 * 60)
+            activeMonitor.eventBasedRecording[fileTime].secondsRan = new Date() - activeMonitor.eventBasedRecording[fileTime].started
+            if(activeMonitor.eventBasedRecording[fileTime].secondsRan < 15 * 1000 * 60){
+                clearTimeout(activeMonitor.eventBasedRecording[fileTime].timeout)
+                activeMonitor.eventBasedRecording[fileTime].timeout = setTimeout(function(){
+                    activeMonitor.eventBasedRecording[fileTime].allowEnd = true
+                    try{
+                        activeMonitor.eventBasedRecording[fileTime].process.stdin.setEncoding('utf8')
+                        activeMonitor.eventBasedRecording[fileTime].process.stdin.write('q')
+                    }catch(err){
+                        s.debugLog(err)
+                    }
+                    activeMonitor.eventBasedRecording[fileTime].process.kill('SIGINT')
+                    delete(activeMonitor.eventBasedRecording[fileTime].timeout)
+                }, detectorTimeoutSeconds)
+            }
         }
         if(!activeMonitor.eventBasedRecording[fileTime].process){
             activeMonitor.eventBasedRecording[fileTime].allowEnd = false;
@@ -674,13 +676,14 @@ module.exports = (s,config,lang) => {
                 if(
                     audioCodec &&
                     audioCodec !== 'no' &&
-                    audioCodec !== 'auto'
+                    audioCodec !== 'auto' &&
+                    audioCodec !== 'aac'
                 ){
-                    outputMap += `-map 0:1? `
+                    outputMap += `-map 0:1 `
                 }
                 const secondsBefore = parseInt(monitorDetails.detector_buffer_seconds_before) || 5
                 let LiveStartIndex = parseInt(secondsBefore / 2 + 1)
-                const ffmpegCommand = `-loglevel warning -live_start_index -${LiveStartIndex} -analyzeduration ${analyzeDuration} -probesize ${probeSize} -re -i "${s.dir.streams+groupKey+'/'+monitorId}/detectorStream.m3u8" ${outputMap}-movflags faststart -fflags +igndts -c:v copy ${noAudio ? '-an' : autoAudio ? '' : `-c:a aac`} -strict -2 -strftime 1 -y "${s.getVideoDirectory(monitorConfig) + filename}"`
+                const ffmpegCommand = `-loglevel warning -live_start_index -${LiveStartIndex} -analyzeduration ${analyzeDuration} -probesize ${probeSize} -re -i "${s.dir.streams+groupKey+'/'+monitorId}/detectorStream.m3u8" ${outputMap}-movflags faststart -fflags +genpts+igndts -c:v copy ${noAudio ? '-an' : autoAudio ? '' : `-c:a aac`} -strict -2 -strftime 1 -y "${s.getVideoDirectory(monitorConfig) + filename}"`
                 s.debugLog(ffmpegCommand)
                 activeMonitor.eventBasedRecording[fileTime].process = spawn(
                     config.ffmpegDir,

@@ -4,11 +4,7 @@ module.exports = function(s,config){
     s.databaseOptions = {
         client: config.databaseType,
         connection: config.db,
-        pool: {
-            min: config.databasePoolMin || 0,
-            max: config.databasePoolMax || 10,
-            propagateCreateError: true
-        }
+        pool: { min: 0, max: 10, propagateCreateError: true }
     }
     const {
         knexQuery,
@@ -22,7 +18,6 @@ module.exports = function(s,config){
         sqlQuery,
         connectDatabase,
         sqlQueryBetweenTimesWithPermissions,
-        sqlQueryBetweenTimesWithPermissionsPromise,
     } = require('./database/utils.js')(s,config)
     s.onBeforeDatabaseLoadExtensions.forEach(function(extender){
         extender(config)
@@ -33,6 +28,5 @@ module.exports = function(s,config){
     s.sqlQuery = sqlQuery
     s.connectDatabase = connectDatabase
     s.sqlQueryBetweenTimesWithPermissions = sqlQueryBetweenTimesWithPermissions
-    s.sqlQueryBetweenTimesWithPermissionsPromise = sqlQueryBetweenTimesWithPermissionsPromise
     require('./database/preQueries.js')(s,config)
 }

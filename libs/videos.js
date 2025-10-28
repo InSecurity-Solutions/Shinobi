@@ -108,6 +108,7 @@ module.exports = function(s,config,lang){
         e.dir = s.getVideoDirectory(e)
         k.dir = e.dir.toString()
         const activeMonitor = s.group[e.ke].activeMonitors[e.id]
+        const monitorEventsCounted = activeMonitor ? activeMonitor.detector_motion_count || [] : []
         //get file directory
         k.fileExists = fs.existsSync(k.dir+k.file)
         if(k.fileExists!==true){
@@ -125,8 +126,7 @@ module.exports = function(s,config,lang){
         if(k.fileExists === true){
             //close video row
             k.details = k.details && k.details instanceof Object ? k.details : {}
-            var listOEvents = activeMonitor.detector_motion_count || []
-            var listOTags = listOEvents.filter(row => row.details.reason === 'object').map(row => row.details.matrices.map(matrix => matrix.tag).join(',')).join(',').split(',')
+            var listOTags = monitorEventsCounted.filter(row => row.details.reason === 'object').map(row => row.details.matrices.map(matrix => matrix.tag).join(',')).join(',').split(',')
             if(listOTags && !k.objects){
                 k.objects = [...new Set(listOTags)].filter(item => !!item).join(',');
             }else if(k.objects[0] instanceof Object){
@@ -156,8 +156,6 @@ module.exports = function(s,config,lang){
                 sendVideoToMasterNode(filePath,response)
             }else{
                 var href = '/videos/'+e.ke+'/'+e.mid+'/'+k.filename
-
-                const monitorEventsCounted = activeMonitor.detector_motion_count
                 s.txWithSubPermissions({
                     f: 'video_build_success',
                     hrefNoAuth: href,

@@ -83,9 +83,6 @@ module.exports = function (s, config, lang) {
             this.on('eventsError', function (e) {
                 onvifEventLog(`ONVIF Event Error`,e)
             })
-            this.on('eventsError', function (e) {
-                onvifEventLog(`ONVIF Event Error`,e)
-            })
 
         })
     }

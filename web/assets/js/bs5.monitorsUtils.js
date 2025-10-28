@@ -331,7 +331,7 @@ function buildStreamUrl(monitorId){
 
 function buildEmbedUrl(monitor){
     var monitorId = monitor.mid;
-    var streamURL = `${getApiPrefix(`embed`)}/${monitorId}/fullscreen|jquery|gui|relative?host=${location.pathname}`
+    var streamURL = `${getApiPrefix(`embed`)}/${monitorId}/fullscreen|jquery|gui|relative?host=${location.origin + location.pathname}`
     return streamURL;
 }
 
@@ -685,14 +685,14 @@ function launchImportMonitorWindow(callback){
         reader.readAsText(f);
     });
 }
-function redAlertNotify({ title, text, type }) {
+function redAlertNotify({ title, text, type, hide = false }) {
     var redAlertNotice = redAlertNotices[title];
     if (redAlertNotice) {
         redAlertNotice.update({
             title: title,
             text: text,
             type: type,
-            hide: false,
+            hide: hide,
             delay: 30000
         });
     } else {
@@ -700,7 +700,7 @@ function redAlertNotify({ title, text, type }) {
             title: title,
             text: text,
             type: type,
-            hide: false,
+            hide: hide,
             delay: 30000
         });
         redAlertNotices[title].on('close', function() {

@@ -249,6 +249,13 @@ module.exports = function(s,config,lang,app,io){
                 clearTimeout(s.failedLoginAttempts[req.body.mail].timeout)
                 delete(s.failedLoginAttempts[req.body.mail])
             }
+            if(
+                focus !== config.renderPaths.index
+            ){
+                const isSuperUser = focus === config.renderPaths.super
+                const user = data.$user;
+                s.runExtensionsForArray('onUserLogin', null, isSuperUser ? [user, '$', user.mail, req.ip] : [user, user.ke, user.uid, req.ip])
+            }
             if(req.query.json=='true'){
                 delete(data.config);
                 delete(data.__dirname);
@@ -363,9 +370,6 @@ module.exports = function(s,config,lang,app,io){
                 // dash
                 default:
                     var chosenRender = 'home'
-                    if(userInfo.details.sub && userInfo.details.landing_page && userInfo.details.landing_page !== '' && config.renderPaths[userInfo.details.landing_page]){
-                        chosenRender = userInfo.details.landing_page
-                    }
                     renderPage(config.renderPaths[chosenRender],{
                         $user: userInfo,
                         config: s.getConfigWithBranding(req.hostname),
@@ -629,13 +633,13 @@ module.exports = function(s,config,lang,app,io){
                     channelRow.streams=[]
                     channelRow.streamsSortedByType={}
                     buildStreamURL(channelRow,details.stream_type)
-                    if(details.stream_channels&&details.stream_channels!==''){
-                        details.stream_channels=JSON.parse(details.stream_channels)
-                        details.stream_channels.forEach(function(b,m){
+                    const streamChannels = s.parseJSON(details.stream_channels)
+                    if(streamChannels){
+                        streamChannels.forEach(function(b,m){
                             buildStreamURL(channelRow,b.stream_type,m.toString())
                         })
                     }
-                    if(details.tv_channel==='1'){
+                    if(details.tv_channel === '1'){
                         tvChannelMonitors.push(channelRow)
                     }
                 })
@@ -1550,57 +1554,6 @@ module.exports = function(s,config,lang,app,io){
                 counted: Object.keys(selectedObject).length,
                 tags: selectedObject,
             }))
-        },res,req)
-    })
-    /**
-    * API : Object Detection Counter Status
-     */
-    app.get([
-        config.webPaths.apiPrefix+':auth/eventCounts/:ke',
-        config.webPaths.apiPrefix+':auth/eventCounts/:ke/:id'
-    ], function (req,res){
-        res.setHeader('Content-Type', 'application/json')
-        s.auth(req.params,function(user){
-            const monitorId = req.params.id
-            const groupKey = req.params.ke
-            const {
-                monitorPermissions,
-                monitorRestrictions,
-            } = s.getMonitorsPermitted(user.details,monitorId)
-            const {
-                isRestricted,
-                isRestrictedApiKey,
-                apiKeyPermissions,
-            } = s.checkPermission(user);
-            if(
-                isRestrictedApiKey && apiKeyPermissions.watch_videos_disallowed ||
-                isRestricted && (
-                    monitorId && !monitorPermissions[`${monitorId}_video_view`] ||
-                    monitorRestrictions.length === 0
-                )
-            ){
-                s.closeJsonResponse(res,{ok: false, msg: lang['Not Authorized'], videos: []});
-                return
-            }
-            s.sqlQueryBetweenTimesWithPermissions({
-                table: 'Events Counts',
-                user: user,
-                noCount: true,
-                groupKey: req.params.ke,
-                monitorId: req.params.id,
-                startTime: req.query.start,
-                endTime: req.query.end,
-                startTimeOperator: req.query.startOperator,
-                endTimeOperator: req.query.endOperator,
-                limit: req.query.limit,
-                archived: req.query.archived,
-                endIsStartTo: !!req.query.endIsStartTo,
-                parseRowDetails: true,
-                rowName: 'counts',
-                preliminaryValidationFailed: false
-            },(response) => {
-                res.end(s.prettyPrint(response))
-            })
         },res,req)
     })
     /**

@@ -3463,7 +3463,6 @@ module.exports = (s,config,lang) => {
                     "possible": yesNoPossibility
                  },
                  {
-                     isAdvanced: true,
                     "name": "detail=control_base_url",
                     "field": lang['Custom Base URL'],
                     "description": "",

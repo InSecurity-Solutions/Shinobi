@@ -19,7 +19,20 @@ module.exports = function(s,config,lang){
         resetAllStorageCounters,
     } = require("./user/utils.js")(s,config,lang);
     require("./user/logger.js")(s,config,lang)
-    let purgeDiskGroup = () => {}
+    const diskUsedEmitterTimeouts = {}
+    let purgeDiskGroup = (groupKey,callback) => {
+        const { usedSpace, sizeLimit, addStorageUse } = s.group[groupKey];
+        if(usedSpace >= sizeLimit * 0.8){
+            s.runExtensionsForArray('onDiskFull', null, [groupKey, usedSpace, sizeLimit])
+        }
+        for(let storageName in addStorageUse){
+            var storageItem = addStorageUse[storageName];
+            if(storageItem.usedSpace >= storageItem.sizeLimit * 0.8){
+                s.runExtensionsForArray('onAddStorageDiskFull', null, [groupKey, storageItem.usedSpace, storageItem.sizeLimit, storageName])
+            }
+        }
+        callback()
+    }
     const runQuery = async.queue(function(groupKey, callback) {
         purgeDiskGroup(groupKey,callback)
     }, 1);
@@ -82,16 +95,19 @@ module.exports = function(s,config,lang){
     s.sendDiskUsedAmountToClients = function(groupKey){
         //send the amount used disk space to connected users
         if(s.group[groupKey]&&s.group[groupKey].init){
-            s.tx({
-                f: 'diskUsed',
-                size: s.group[groupKey].usedSpace,
-                usedSpace: s.group[groupKey].usedSpace,
-                usedSpaceVideos: s.group[groupKey].usedSpaceVideos,
-                usedSpaceFilebin: s.group[groupKey].usedSpaceFilebin,
-                usedSpaceTimelapseFrames: s.group[groupKey].usedSpaceTimelapseFrames,
-                limit: s.group[groupKey].sizeLimit,
-                addStorage: s.group[groupKey].addStorageUse,
-            },'GRP_'+groupKey);
+            clearTimeout(diskUsedEmitterTimeouts[groupKey])
+            diskUsedEmitterTimeouts[groupKey] = setTimeout(() => {
+                s.tx({
+                    f: 'diskUsed',
+                    size: s.group[groupKey].usedSpace,
+                    usedSpace: s.group[groupKey].usedSpace,
+                    usedSpaceVideos: s.group[groupKey].usedSpaceVideos,
+                    usedSpaceFilebin: s.group[groupKey].usedSpaceFilebin,
+                    usedSpaceTimelapseFrames: s.group[groupKey].usedSpaceTimelapseFrames,
+                    limit: s.group[groupKey].sizeLimit,
+                    addStorage: s.group[groupKey].addStorageUse,
+                },'GRP_'+groupKey);
+            },1000)
         }
     }
     s.sendCloudDiskUsedAmountToClients = function(groupKey){
@@ -338,7 +354,6 @@ module.exports = function(s,config,lang){
                     formDetails.edit_days = details.edit_days
                     formDetails.use_admin = details.use_admin
                     formDetails.use_ldap = details.use_ldap
-                    formDetails.landing_page = details.landing_page
                     //check
                     if(details.edit_days == "0"){
                         formDetails.days = details.days;

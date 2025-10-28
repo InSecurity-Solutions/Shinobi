@@ -1,7 +1,7 @@
-module.exports = function(s,config,lang){
+module.exports = function(s,config,lang,app,io){
     require('./events/onvif.js')(s,config,lang)
     require('./events/noEventsDetector.js')(s,config,lang)
-    require('./events/lineCrossCounter.js')(s,config,lang);
+    require('./events/lineCrossCounter.js')(s,config,lang,app,io);
     const { bindTagLegendForMonitors } = require('./events/utils.js')(s,config,lang)
     s.onAccountSave(function(theGroup,formDetails,user){
         const groupKey = user.ke

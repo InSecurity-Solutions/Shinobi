@@ -16,6 +16,7 @@ const http = require("http");
 const { Server: SocketIOServer } = require("socket.io");
 const SocketIOClient = require("socket.io-client");
 const CWSServer = require("cws").Server;
+let stayDisconnected = false;
 
 // ────────────────────────────────────────────────────────────────────────────────
 // Globals guarded so that multiple require() calls don’t duplicate listeners
@@ -220,11 +221,14 @@ module.exports = function makePluginBase(__dirname, cfg = {}) {
     const url = `ws://${config.host || "localhost"}:${config.port}`;
 
     function connect() {
+        cleanupSocket(io)
       const sock = SocketIOClient(url, { transports: ["websocket"] });
       io = sock;
 
       const reconnect = () => {
+          if(stayDisconnected)return;
         if (++retry > MAX_RETRY){
+            stayDisconnected = true;
             s.disconnectWebSocket()
             return plugLog("Max retries reached");
         }
@@ -290,7 +294,7 @@ module.exports = function makePluginBase(__dirname, cfg = {}) {
         const separate = det.detector_use_detect_object === "1";
         const width = parseFloat(separate && det.detector_scale_x_object ? det.detector_scale_x_object : det.detector_scale_x);
         const height = parseFloat(separate && det.detector_scale_y_object ? det.detector_scale_y_object : det.detector_scale_y);
-        s.monitorInfo.set(mKey, { separate, width, height });
+        s.monitorInfo.set(mKey, { isObjectDetectionSeparate: separate, separate, width, height });
 
         imageBuffers.delete(mKey);
         runExtenders(s.ext.cameraInit, m, cn, tx);

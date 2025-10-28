@@ -52,6 +52,7 @@ module.exports = (s,config,lang) => {
         const processPID = proc && proc.pid ? parseInt(`${proc.pid}`) : null
         return new Promise((resolve,reject) => {
             let alreadyResolved = false
+            let killTimer = null;
             function doResolve(response){
                 if(alreadyResolved)return;
                 alreadyResolved = true;
@@ -74,18 +75,33 @@ module.exports = (s,config,lang) => {
             }
             try{
                 proc.removeAllListeners()
+                proc.on('error',(error) => {
+                    sendError(error.toString())
+                })
                 proc.on('exit',() => {
                     response.msg = 'proc.on.exit'
                     clearTimeout(killTimer)
                     doResolve(response)
-                    treekill(processPID)
+                    // treekill(processPID)
                 });
+                if(proc.killed || !proc.stdin || !proc.stdin.writable){
+                    doResolve(response)
+                    return
+                }
                 if(proc && proc.stdin) {
+                    proc.stdin.on('error', (err) => {
+                        if (err.code !== 'EPIPE') {
+                            console.error('processKill Stdin error:', err);
+                        }
+                        clearTimeout(killTimer)
+                        doResolve(response)
+                        treekill(processPID)
+                    });
                     try{
                         proc.stdin.write("q\r\n");
                     }catch(err){}
                 }
-                let killTimer = setTimeout(() => {
+                killTimer = setTimeout(() => {
                     if(proc && proc.kill){
                         if(s.isWin){
                             response.msg = 'taskkill'
@@ -153,6 +169,7 @@ module.exports = (s,config,lang) => {
             clearTimeout(activeMonitor.timeoutToRestart)
             clearTimeout(activeMonitor.fatalErrorTimeout);
             delete(activeMonitor.onvifConnection)
+            delete(activeMonitor.buildingTimelapseVideo)
             // if(activeMonitor.onChildNodeExit){
             //     activeMonitor.onChildNodeExit()
             // }
@@ -221,7 +238,7 @@ module.exports = (s,config,lang) => {
                 })
             }
             const temporaryImageFile = streamDir + s.gid(5) + '.jpg'
-            const ffmpegCmd = splitForFFMPEG(`-y -loglevel warning -re ${inputOptions.join(' ')} -i "${url}" ${outputOptions.join(' ')} -f mjpeg -an -frames:v 1 "${temporaryImageFile}"`)
+            const ffmpegCmd = splitForFFMPEG(`-y -threads 1 -loglevel warning -re ${inputOptions.join(' ')} -i "${url}" ${outputOptions.join(' ')} -f mjpeg -an -frames:v 1 "${temporaryImageFile}"`)
             const snapProcess = spawn(config.ffmpegDir, ffmpegCmd, {detached: true})
             snapProcess.stderr.on('data',function(data){
                 // s.debugLog(data.toString())
@@ -672,6 +689,7 @@ module.exports = (s,config,lang) => {
             const groupKey = options.ke
             const monitorId = options.id || options.mid
             const deleteFiles = options.deleteFiles === undefined ? true : options.deleteFiles
+            const monitorConfig = Object.assign({}, s.group[groupKey].rawMonitorConfigurations[monitorId])
             s.userLog({
                 ke: groupKey,
                 mid: monitorId
@@ -707,6 +725,7 @@ module.exports = (s,config,lang) => {
             delete(s.group[groupKey].activeMonitors[monitorId]);
             delete(s.group[groupKey].rawMonitorConfigurations[monitorId]);
             response.msg = `${lang.monitorDeleted} ${lang.byUser} : ${userId}`
+            s.runExtensionsForArray('onMonitorDelete', null, [monitorConfig, options])
         }catch(err){
             response.ok = false
             response.err = err
@@ -1348,7 +1367,7 @@ module.exports = (s,config,lang) => {
                 var filename = d.split('.')[0].split(' [')[0].trim()+'.'+e.ext
                 s.insertCompletedVideo(e,{
                     file: filename,
-                    events: activeMonitor.detector_motion_count
+                    events: activeMonitor ? activeMonitor.detector_motion_count || [] : []
                 },function(err,response){
                     s.userLog(e,{type:lang['Video Finished'],msg:{filename:d}})
                     if(
@@ -1530,7 +1549,7 @@ module.exports = (s,config,lang) => {
         const typeIsLocal = e.type === 'local'
         const doPingTest = e.type !== 'socket' && e.type !== 'dashcam' && e.protocol !== 'udp' && e.type !== 'local' && e.details.skip_ping !== '1';
         if(!theGroup.startMonitorInQueue){
-            theGroup.startMonitorInQueue = createQueueAwaited(0.5, 1)
+            theGroup.startMonitorInQueue = createQueueAwaited(0.5, config.monitorStartQueueSize || 1)
         }
         const startMonitorInQueue = theGroup.startMonitorInQueue
         if(!activeMonitor.isStarted)return;

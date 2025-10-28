@@ -24,6 +24,7 @@ module.exports = (s,config,lang,app,io) => {
         update,
         remove,
         list,
+        listWithSizes,
         remountAll,
         remount,
         unmount,
@@ -35,7 +36,7 @@ module.exports = (s,config,lang,app,io) => {
      */
     app.get(config.webPaths.superApiPrefix+':auth/mountManager/list', function (req,res){
         s.superAuth(req.params, async (resp) => {
-            const response = await list();
+            const response = await listWithSizes();
             s.closeJsonResponse(res, response);
         },res,req);
     });

@@ -808,7 +808,7 @@ function createWallViewWindow(windowName){
     var el = $(document)
     var width = el.width()
     var height = el.height()
-    window.open(getApiPrefix() + '/wallview/' + $user.ke + (windowName ? 'window=' + windowName : ''), 'wallview_'+windowName, 'height='+height+',width='+width)
+    window.open(getApiPrefix() + '/wallview/' + $user.ke + `${(windowName ? '?window=' + windowName + '&' : '?')}host=${location.origin + location.pathname}`, 'wallview_'+windowName, 'height='+height+',width='+width)
 }
 function fullScreenLiveGridStream(monitorItem){
     var videoElement = monitorItem.find('.stream-element')

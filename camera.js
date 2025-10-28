@@ -56,7 +56,7 @@ require('./libs/ffmpeg.js')(s,config,lang, async () => {
     //monitor/camera handlers
     require('./libs/monitor.js')(s,config,lang)
     //event functions : motion, object matrix handler
-    require('./libs/events.js')(s,config,lang)
+    require('./libs/events.js')(s,config,lang,app,io)
     //alarm events
     require('./libs/alarms.js')(s,config,lang,app)
     //recording functions

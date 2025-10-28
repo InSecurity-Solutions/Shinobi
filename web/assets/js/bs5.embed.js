@@ -4,7 +4,7 @@ var liveGridElements = {}
 var runningJpegStreams = {}
 var containerElement = $(`#monitors_live`)
 var liveGrid = $('#monitors_live .stream-element-container')
-var websocketPath = checkCorrectPathEnding(urlPrefix) + 'socket.io'
+var websocketPath = checkCorrectPathEnding(urlPrefix.startsWith('http') ? urlPrefix.replace(location.origin, '') : urlPrefix) + 'socket.io'
 //
 var onLiveStreamInitiateExtensions = []
 function onLiveStreamInitiate(callback){
@@ -579,8 +579,9 @@ $(document).ready(function(e){
                 }
             break;
             case'monitor_status':
-                if(monitorId === d.id && (d.code === 2 || d.code === 3)){
+                if(monitorConfig.mid === d.id && (d.code === 2 || d.code === 3)){
                     setTimeout(function(){
+                        console.log('Trying')
                         requestMonitorInit()
                     },2000)
                 }
