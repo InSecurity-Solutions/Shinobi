@@ -579,8 +579,9 @@ $(document).ready(function(e){
                 }
             break;
             case'monitor_status':
-                if(monitorId === d.id && (d.code === 2 || d.code === 3)){
+                if(monitorConfig.mid === d.id && (d.code === 2 || d.code === 3)){
                     setTimeout(function(){
+                        console.log('Trying')
                         requestMonitorInit()
                     },2000)
                 }
