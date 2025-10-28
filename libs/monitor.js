@@ -11,6 +11,7 @@ module.exports = function(s,config,lang){
     const {
         asyncSetTimeout,
         cleanStringsInObject,
+        convertNumbersToStrings,
     } = require('./basic/utils.js')(process.cwd(),config)
     const {
         splitForFFMPEG,
@@ -730,6 +731,7 @@ module.exports = function(s,config,lang){
         s.checkDetails(e)
         s.initiateMonitorObject({ke:e.ke,mid:monitorId})
         checkObjectsInMonitorDetails(e)
+        convertNumbersToStrings(e)
         switch(e.functionMode){
             case'watch_on':
                 monitorAddViewer(e,cn)
