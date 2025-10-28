@@ -1201,7 +1201,8 @@ editorForm.find('[name="type"]').change(function(e){
             redAlertNotify({
                 title: lang['Monitor Saved'],
                 text: '<b>'+newMonitorData.name+'</b> <small>'+newMonitorData.mid+'</small> has been saved.',
-                type: 'success'
+                type: 'success',
+                hide: true
             })
         }
     }
