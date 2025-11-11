@@ -681,6 +681,7 @@ module.exports = (s,config,lang) => {
                 ){
                     outputMap += `-map 0:1 `
                 }
+                if(config.noEventBasedRecordingMaps)outputMap = '';
                 const secondsBefore = parseInt(monitorDetails.detector_buffer_seconds_before) || 5
                 let LiveStartIndex = parseInt(secondsBefore / 2 + 1)
                 const ffmpegCommand = `-threads 1 -loglevel warning -live_start_index -${LiveStartIndex} -analyzeduration ${analyzeDuration} -probesize ${probeSize} -re -i "${s.dir.streams+groupKey+'/'+monitorId}/detectorStream.m3u8" ${outputMap}-movflags faststart -fflags +genpts+igndts -c:v copy ${noAudio ? '-an' : autoAudio ? '' : `-c:a aac`} -strict -2 -strftime 1 -y "${s.getVideoDirectory(monitorConfig) + filename}"`
