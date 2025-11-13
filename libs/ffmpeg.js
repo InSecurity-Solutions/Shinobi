@@ -93,22 +93,24 @@ module.exports = async (s,config,lang,onFinish) => {
                                 delete(s.dataPortTokens[dataPortToken])
                             })
                             if(!config.debugLogMonitorsVerbose){
+                                const checkLog = function(string,x){return string.indexOf(x)>-1}
                                 cameraProcess.stderr.on('data',(data) => {
                                     const string = data.toString()
-                                    var checkLog = function(x){return string.indexOf(x)>-1}
                                     switch(true){
                                         case string.startsWith('DTS'):
-                                        case checkLog('pkt->duration = 0'):
-                                        case checkLog('bad cseq'):
-                                        case checkLog('[hls @'):
-                                        case checkLog('Past duration'):
-                                        case checkLog('Last message repeated'):
-                                        case checkLog('Non-monotonous DTS'):
-                                        case checkLog('Non-monotonic DTS'):
-                                        case checkLog('invalid dropping'):
-                                        case checkLog('NULL @'):
-                                        case checkLog('RTP: missed'):
-                                        case checkLog('deprecated pixel format used'):
+                                        case checkLog(string,'Queue input is backward'):
+                                        case checkLog(string,'pkt->duration = 0'):
+                                        case checkLog(string,'bad cseq'):
+                                        case checkLog(string,'[hls @'):
+                                        case checkLog(string,'Past duration'):
+                                        case checkLog(string,'Last message repeated'):
+                                        case checkLog(string,'Non-monotonous DTS'):
+                                        case checkLog(string,'Non-monotonic DTS'):
+                                        case checkLog(string,'invalid dropping'):
+                                        case checkLog(string,'NULL @'):
+                                        case checkLog(string,'RTP: missed'):
+                                        case checkLog(string,'Application provided'):
+                                        case checkLog(string,'deprecated pixel format used'):
                                                 return;
                                         break;
                                     }
