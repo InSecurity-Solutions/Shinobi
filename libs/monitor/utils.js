@@ -1600,7 +1600,7 @@ module.exports = (s,config,lang) => {
                     resetStreamCheck(e)
                 })
             }
-            if(!activeMonitor.criticalErrors['453'])s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true});
+            // if(!activeMonitor.criticalErrors['453'])s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true});
             //check host to see if has password and user in it
             clearTimeout(activeMonitor.recordingChecker)
             try{
