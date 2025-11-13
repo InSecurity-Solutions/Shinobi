@@ -220,7 +220,7 @@ module.exports = function(s,config,lang,app,io){
                 },connectionId)
                 s.insertTimelapseFrameDatabaseRow({
                     ke: groupKey
-                },data.queryInfo)
+                },data.queryInfo,fileWritePath)
                 resolve(response)
             })
         })
