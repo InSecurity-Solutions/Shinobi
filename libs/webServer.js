@@ -7,8 +7,8 @@ const app = express()
 module.exports = function(s,config,lang,io){
     const socketIoOptions = {
         transports: ['websocket'],
-        pingTimeout: 130000,
-        pingInterval: 60000,
+        pingTimeout: config.socketIoPingTimeout || 130000,
+        pingInterval: config.socketIoPingInterval || 60000,
     }
     require('./monitor/websocket.js')(s,config,lang,io);
     app.disable('x-powered-by');
