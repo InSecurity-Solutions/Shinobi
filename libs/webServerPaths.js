@@ -1166,7 +1166,12 @@ module.exports = function(s,config,lang,app,io){
                 return
             }
             if(req.params.f===''){response.msg = lang.monitorGetText1;res.end(s.prettyPrint(response));return}
-            if(req.params.f!=='stop'&&req.params.f!=='start'&&req.params.f!=='record'){
+            if(
+                req.params.f!=='stop' &&
+                req.params.f!=='start' &&
+                req.params.f!=='record' &&
+                req.params.f!=='idle'
+            ){
                 response.msg = 'Mode not recognized.';
                 res.end(s.prettyPrint(response));
                 return;
