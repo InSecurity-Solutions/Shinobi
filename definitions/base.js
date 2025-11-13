@@ -3341,8 +3341,8 @@ module.exports = function(s,config,lang){
                             {
                                 "fieldType": "btn",
                                 "class": `btn-success fill refresh-data mb-3`,
-                                "icon": `refresh`,
-                                "btnContent": `${lang['Refresh']}`,
+                                "icon": `search`,
+                                "btnContent": `${lang['Search']}`,
                             },
                         ],
                      },
@@ -3357,6 +3357,16 @@ module.exports = function(s,config,lang){
                 noHeader: true,
                "section-pre-class": "col-md-8",
                "info": [
+                   {
+                       "fieldType": "div",
+                       "id": "videosTable_draw_area_notice",
+                       "divContent": `<div class="text-center">
+                            <i class="fa fa-5x mb-3 fa-hand-pointer-o fa-rotate-270"></i>
+                        </div>
+                        <h3 class="text-center">
+                            <div>${lang['Ready to Search']}</div>
+                        </h3>`
+                   },
                    {
                        "fieldType": "table",
                        "attribute": `data-classes="table table-striped"`,

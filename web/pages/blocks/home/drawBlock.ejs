@@ -214,7 +214,7 @@ drawBlock = function(theBlock){
                    fieldElement = `<form ${attributes.join(' ')} class="${fieldClass.join(' ')}" ></form>`
              break;
              case'table':
-                   fieldElement = `<table ${hidden} ${attributes.join(' ')} class="${fieldClass.join(' ')}"><tbody></tbody></table>`
+                   fieldElement = `<table ${hidden} ${attributes.join(' ')} class="${fieldClass.join(' ')}">${field.divContent || `<tbody></tbody>`}</table>`
              break;
              case'number':
                    if(field.numberMin){
