@@ -261,10 +261,6 @@ module.exports = function(s,config,lang,io){
                     }
                 };
 
-                cn.closeSocketVideoStream = function() {
-                    cleanup();
-                };
-
                 // Handle socket disconnect
                 cn.on('disconnect', cleanup);
 
@@ -331,7 +327,9 @@ module.exports = function(s,config,lang,io){
 
                 if (cb) cb(null, true);
             };
-
+            cn.closeSocketVideoStream = function() {
+                cleanup();
+            };
             if (s.group[d.ke] && s.group[d.ke].users && s.group[d.ke].users[d.auth]) {
                 onSuccess(s.group[d.ke].users[d.auth]);
             } else {
