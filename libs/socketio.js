@@ -222,6 +222,7 @@ module.exports = function(s,config,lang,io){
             let onSegment;
             let onInitialized;
 
+            var tx = function(z){cn.emit('data',z);}
             const cleanup = () => {
                 if (mp4frag) {
                     if (onSegment) mp4frag.removeListener('segment', onSegment);
