@@ -4,12 +4,15 @@ $(document).ready(function(){
     var theList = $('#monitorsListRows')
     var apiKeySelector = $('#multi_mon_api_key_selector')
     var multiMonitorSelect = $('#multimon_select_all')
+    var iconsLoaded = $('.monitor-card-preview.unloaded-icon', theList)
+    var monitorListMenuDropdownOpen = null
+    var monitorListScrollTimeout = null
     function drawRowToList(row){
         var streamUrl = libURL + buildStreamUrl(row.mid).replace($user.auth_token,selectedApiKey)
         theList.append(`
         <div data-mid="${row.mid}" class="col-md-4 card-page-selection glM${row.mid}">
             <div class="${definitions.Theme.isDark ? 'text-white' : 'text-dark'} mb-3 card shadow-sm btn-default">
-                <div class="card monitor-card-preview snapshot launch-live-grid-monitor cursor-pointer" style="background-image:url(${getApiPrefix('icon') + '/' + row.mid})"></div>
+                <div class="card monitor-card-preview snapshot launch-live-grid-monitor cursor-pointer unloaded-icon"></div>
                 ${buildMiniMonitorCardBody(loadedMonitors[row.mid],null,`<div>
                 <div class="mb-2">
                     <div class="d-flex flex-row">
@@ -50,6 +53,7 @@ $(document).ready(function(){
         $.each(getLoadedMonitorsAlphabetically(),function(n,row){
             drawRowToList(row)
         })
+        iconsLoaded = $('.monitor-card-preview.unloaded-icon', theList)
     }
     function getSelectedMonitors(){
         var monitorsSelected = [];
@@ -88,8 +92,44 @@ $(document).ready(function(){
             dropdownElement[0].style = `transform:translate(0px, ${-p.top + 20}px)!important;`
         }
     }
-    var monitorListMenuDropdownOpen = null
-    var monitorListScrollTimeout = null
+    function loadIconsForVisibleCards(){
+        var container = theList[0];
+        var containerRect = container.getBoundingClientRect();
+        var hasUpdatedIcons = false;
+        iconsLoaded.each(function() {
+            var iconRect = this.getBoundingClientRect();
+
+            // Check if element is within the container's visible area
+            var isVisible = (
+                iconRect.bottom >= containerRect.top &&
+                iconRect.top <= containerRect.bottom &&
+                iconRect.right >= containerRect.left &&
+                iconRect.left <= containerRect.right
+            );
+
+            if (isVisible) {
+                var $icon = $(this);
+                var monitorId = $icon.data('mid'); // This gets data-mid attribute
+                var monitorIconUrl = `${getApiPrefix('icon') + '/' + monitorId}`;
+                $icon.css('background-image',`url(${monitorIconUrl})`)
+                $icon.removeClass('unloaded-icon');
+                hasUpdatedIcons = true
+            }
+        });
+        if(hasUpdatedIcons){
+            iconsLoaded = $('.monitor-card-preview.unloaded-icon', theList)
+        }
+    }
+    function onMonitorListScroll(){
+        clearTimeout(monitorListScrollTimeout)
+        monitorListScrollTimeout = setTimeout(function(){
+            loadIconsForVisibleCards()
+        },500)
+    }
+    function toggleScrollAction(toggleOn){
+        $(document.documentElement)[toggleOn ? 'on' : 'off']('scroll', onMonitorListScroll);
+        if(toggleOn)onMonitorListScroll()
+    }
     theBlock.on('mouseup','[data-bs-toggle="dropdown"]',function(){
         var dropdownElement = $(this).next()
         monitorListMenuDropdownOpen = dropdownElement
@@ -173,10 +213,15 @@ $(document).ready(function(){
     addOnTabOpen('monitorsList', function () {
         loadMonitorsFromMemory()
         drawMonitorsListApiKeyList()
+        toggleScrollAction(true)
     })
     addOnTabReopen('monitorsList', function () {
         loadMonitorsFromMemory()
         drawMonitorsListApiKeyList()
+        toggleScrollAction(true)
+    })
+    addOnTabAway('monitorsList', function () {
+        toggleScrollAction(false)
     })
     onWebSocketEvent(function (d){
         switch(d.f){
