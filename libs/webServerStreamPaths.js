@@ -242,11 +242,14 @@ module.exports = function(s,config,lang,app){
                     req.dir+=req.params.file;
                 }
                 res.on('finish',function(){res.end();});
-                if (fs.existsSync(req.dir)){
-                    fs.createReadStream(req.dir).pipe(res);
-                }else{
-                    res.end(lang['File Not Found'])
-                }
+
+                fs.access(req.dir, fs.constants.F_OK, (err) => {
+                    if (err) {
+                        res.end(lang['File Not Found'])
+                    } else {
+                        fs.createReadStream(req.dir).pipe(res);
+                    }
+                });
             },res,req)
         },res,req);
     })
