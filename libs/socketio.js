@@ -774,17 +774,14 @@ module.exports = function(s,config,lang,io){
         // super page socket functions
         cn.on('super',function(d){
             if(!cn.init&&d.f=='init'){
-                d.ok=s.superAuth(d.auth ? { auth: d.auth } : {mail:d.mail,pass:d.pass},function(data){
+                d.ok=s.superAuth({ auth: d.auth },function(data){
                     cn.mail = data.$user.mail
                     cn.join('$');
-                    var tempSessionKey = d.auth || s.gid(30)
-                    cn.superSessionKey = tempSessionKey
-                    s.superUsersApi[tempSessionKey] = data
-                    s.superUsersApi[tempSessionKey].cnid = cn.id
+                    s.superUsersApi[d.auth].cnid = cn.id
                     cn.ip=cn.request.connection.remoteAddress
                     s.userLog({ke:'$',mid:'$USER'},{type:lang['Websocket Connected'],msg:{for:lang['Superuser'],id:cn.mail,ip:cn.ip}})
                     cn.init='super';
-                    s.tx({f:'init_success',mail:cn.mail,superSessionKey:tempSessionKey},cn.id);
+                    s.tx({f:'init_success',mail:cn.mail},cn.id);
                 })
                 if(d.ok===false){
                     cn.disconnect();
@@ -1020,9 +1017,6 @@ module.exports = function(s,config,lang,io){
             }
             if(cn.cron){
                 delete(s.cron);
-            }
-            if(cn.superSessionKey){
-                delete(s.superUsersApi[cn.superSessionKey])
             }
             s.onWebSocketDisconnectionExtensions.forEach(function(extender){
                 extender(cn)
