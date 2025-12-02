@@ -6,7 +6,16 @@ const {
 } = require('../common.js')
 module.exports = (config) => {
     var currentlyUpdating = false
+    const isValidStreamName = (streamName) => {
+        const pathTraversalPatterns = [/\.\.\//g, /\/\/+/g, /^\/.*/g];
+        let cleanName = streamName;
+        pathTraversalPatterns.forEach(pattern => {
+            cleanName = cleanName.replace(pattern, '');
+        });
+        return cleanName === streamName;
+    };
     return {
+        isValidStreamName,
         getSystemInfo: (s) => {
             const response = {
                 "Time Started": s.timeStarted,

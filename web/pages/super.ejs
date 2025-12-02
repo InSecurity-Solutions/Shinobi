@@ -241,12 +241,11 @@ function onInitSuccess(theAction){
 }
 $.ccio.cx=function(x){return $.ccio.ws.emit('super',x)}
 $.ccio.ws.on('connect',function(d){
-    $.ccio.cx({f:'init',mail:$user.mail,pass:$user.pass,machineId: `<%- config.machineId %>`})
+    $.ccio.cx({f:'init',auth: $user.sessionKey,machineId: `<%- config.machineId %>`})
 })
 $.ccio.ws.on('f',function(d){
     switch(d.f){
         case'init_success':
-            $user.sessionKey = d.superSessionKey
             drawUserList()
             drawSystemLogs()
             drawSystemInfo()

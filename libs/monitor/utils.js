@@ -792,7 +792,7 @@ module.exports = (s,config,lang) => {
             activeMonitor.isStarted = false
             activeMonitor.isRecording = false
             s.tx({f:'monitor_stopping',mid:monitorId,ke:groupKey,time:s.formattedTime()},'GRP_'+groupKey);
-            s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true})
+            // s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true})
             s.userLog(e,{type:lang['Monitor Stopped'],msg:lang.MonitorStoppedText});
             clearTimeout(activeMonitor.delete)
             if(e.delete === 1){
@@ -1600,7 +1600,7 @@ module.exports = (s,config,lang) => {
                     resetStreamCheck(e)
                 })
             }
-            if(!activeMonitor.criticalErrors['453'])s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true});
+            // if(!activeMonitor.criticalErrors['453'])s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true});
             //check host to see if has password and user in it
             clearTimeout(activeMonitor.recordingChecker)
             try{

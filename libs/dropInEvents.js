@@ -28,6 +28,9 @@ module.exports = function(s,config,lang,app,io){
         triggerEvent,
     } = require('./events/utils.js')(s,config,lang)
     const {
+        convertAviToMp4,
+    } = require('./video/utils.js')(s,config,lang)
+    const {
         deleteFilesInFolder,
     } = require('./basic/utils.js')(process.cwd(), config)
     if(config.dropInEventServer === true){
@@ -49,7 +52,53 @@ module.exports = function(s,config,lang,app,io){
             }
             return newPath;
         }
-        var processFile = function(filePath,monitorConfig){
+        const processAviFile = async function({ filePath, monitorConfig }){
+            var ke = monitorConfig.ke
+            var mid = monitorConfig.mid
+            const tempMp4File = `${s.dir.streams}${ke}/${mid}/${(new Date()).getTime()}.mp4`
+            try{
+                await convertAviToMp4({
+                    input: filePath,
+                    output: tempMp4File,
+                })
+                await processMp4File({ filePath: tempMp4File, monitorConfig })
+                await deleteFile(tempMp4File, 6)
+            }catch(err){
+                console.error(err)
+            }
+        }
+        const processMp4File = async function({ filePath, monitorConfig }){
+            const stats = await fs.promises.stat(filePath)
+            const mid = monitorConfig.mid
+            const ke = monitorConfig.ke
+            var startTime = stats.ctime
+            var endTime = stats.mtime
+            var filename = getFileNameFromPath(filePath)
+            var shinobiFilename = s.formattedTime(startTime) + '.mp4'
+            var recordingPath = s.getVideoDirectory(monitorConfig) + shinobiFilename
+            var writeStream = fs.createWriteStream(recordingPath)
+            fs.createReadStream(filePath).pipe(writeStream)
+            writeStream.on('finish', () => {
+                s.insertCompletedVideo(monitorConfig,{
+                    file: shinobiFilename,
+                    events: [
+                        {
+                          id: mid,
+                          ke: ke,
+                          time: new Date(),
+                          details: {
+                              confidence: 100,
+                              name: filename,
+                              plug: "dropInEvent",
+                              reason: "ftpServer"
+                          }
+                        }
+                    ],
+                },function(){
+                })
+            })
+        }
+        var processFile = async function(filePath,monitorConfig){
             var ke = monitorConfig.ke
             var mid = monitorConfig.mid
             var filename = getFileNameFromPath(filePath)
@@ -76,37 +125,23 @@ module.exports = function(s,config,lang,app,io){
                 })
             }else{
                 var reason = "ftpServer"
-                if(search(filename,'.mp4')){
-                    fs.stat(filePath,function(err,stats){
-                        if(err)return;
-                        var startTime = stats.ctime
-                        var endTime = stats.mtime
-                        var shinobiFilename = s.formattedTime(startTime) + '.mp4'
-                        var recordingPath = s.getVideoDirectory(monitorConfig) + shinobiFilename
-                        var writeStream = fs.createWriteStream(recordingPath)
-                        fs.createReadStream(filePath).pipe(writeStream)
-                        writeStream.on('finish', () => {
-                            s.insertCompletedVideo(monitorConfig,{
-                                file: shinobiFilename,
-                                events: [
-                                    {
-                                      id: mid,
-                                      ke: ke,
-                                      time: new Date(),
-                                      details: {
-                                          confidence: 100,
-                                          name: filename,
-                                          plug: "dropInEvent",
-                                          reason: "ftpServer"
-                                      }
-                                    }
-                                ],
-                            },function(){
-                            })
-                        })
-                    })
+                if(search(filename.toLowerCase(),'.avi')){
+                    try{
+                        await processAviFile({ filePath, monitorConfig })
+                    }catch(err){
+                        console.log('dropInEvents : processAviFile : error',err)
+                        return;
+                    }
                 }
-                var completeAction = function(){
+                if(search(filename,'.mp4')){
+                    try{
+                        await processMp4File({ filePath, monitorConfig })
+                    }catch(err){
+                        console.log('dropInEvents : processMp4File : error',err)
+                        return;
+                    }
+                }
+                function completeAction(){
                     triggerEvent({
                         id: mid,
                         ke: ke,
@@ -116,7 +151,7 @@ module.exports = function(s,config,lang,app,io){
                             plug: "dropInEvent",
                             reason: reason
                         },
-                    },config.dropInEventForceSaveEvent)
+                    }, config.dropInEventForceSaveEvent)
                 }
                 if(search(filename,'.txt')){
                     fs.readFile(filePath,{encoding: 'utf-8'},function(err,data){
@@ -130,7 +165,6 @@ module.exports = function(s,config,lang,app,io){
                 }else{
                     completeAction()
                 }
-
             }
         }
         function deleteFile(filePath, numberOfMinutes = 5){
@@ -163,7 +197,7 @@ module.exports = function(s,config,lang,app,io){
                 }else{
                     if(!fileQueue[filePath]){
                         // console.log('Processing File in FTP : ', filePath)
-                        processFile(filePath, monitorConfig)
+                        await processFile(filePath, monitorConfig)
                         if(config.dropInEventDeleteFileAfterTrigger){
                             const aboveFolder = path.dirname(filePath);
                             const monitorDirectory = path.join(s.dir.dropInEvents, monitorConfig.ke, monitorConfig.mid);

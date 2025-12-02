@@ -5,6 +5,11 @@ const https = require('https');
 const express = require('express');
 const app = express()
 module.exports = function(s,config,lang,io){
+    const socketIoOptions = {
+        transports: ['websocket'],
+        pingTimeout: config.socketIoPingTimeout || 130000,
+        pingInterval: config.socketIoPingInterval || 60000,
+    }
     require('./monitor/websocket.js')(s,config,lang,io);
     app.disable('x-powered-by');
     //get page URL
@@ -116,20 +121,20 @@ module.exports = function(s,config,lang,io){
             if(config.webPaths.home !== '/'){
                 io.attach(serverHTTPS,{
                     path:'/socket.io',
-                    transports: ['websocket']
+                    ...socketIoOptions
                 })
             }
             io.attach(serverHTTPS,{
                 path:s.checkCorrectPathEnding(config.webPaths.home)+'socket.io',
-                transports: ['websocket']
+                ...socketIoOptions
             })
             io.attach(serverHTTPS,{
                 path:s.checkCorrectPathEnding(config.webPaths.admin)+'socket.io',
-                transports: ['websocket']
+                ...socketIoOptions
             })
             io.attach(serverHTTPS,{
                 path:s.checkCorrectPathEnding(config.webPaths.super)+'socket.io',
-                transports: ['websocket']
+                ...socketIoOptions
             })
             if(sslInfo.autoRedirect === true){
                 app.use(function(req, res, next) {
@@ -163,20 +168,20 @@ module.exports = function(s,config,lang,io){
     if(config.webPaths.home !== '/'){
         io.attach(server,{
             path:'/socket.io',
-            transports: ['websocket']
+            ...socketIoOptions
         })
     }
     io.attach(server,{
         path:s.checkCorrectPathEnding(config.webPaths.home)+'socket.io',
-        transports: ['websocket']
+        ...socketIoOptions
     })
     io.attach(server,{
         path:s.checkCorrectPathEnding(config.webPaths.admin)+'socket.io',
-        transports: ['websocket']
+        ...socketIoOptions
     })
     io.attach(server,{
         path:s.checkCorrectPathEnding(config.webPaths.super)+'socket.io',
-        transports: ['websocket']
+        ...socketIoOptions
     })
     if(config.useUWebsocketJs === true){
         io.engine.ws = new (require('cws').Server)({

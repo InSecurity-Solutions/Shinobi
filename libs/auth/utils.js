@@ -1,5 +1,6 @@
 var fs = require('fs');
 module.exports = function(s,config,lang){
+    s.superAuthTimeouts = {}
     function basicAuth(username,password){
         const response = { ok: false }
         return new Promise((resolve,reject) => {
@@ -35,6 +36,13 @@ module.exports = function(s,config,lang){
     //     }
     //     return response
     // }
+    function resetSuperSessionTimeout(sessionKey){
+        clearTimeout(s.superAuthTimeouts[sessionKey])
+        s.superAuthTimeouts[sessionKey] = setTimeout(function(){
+            console.log('Clear Super Session',sessionKey)
+            delete(s.superUsersApi[sessionKey])
+        }, 1000 * 60 * 15)
+    }
     function superUserAuth(params){
         const response = { ok: false }
         if(!fs.existsSync(s.location.super)){
@@ -60,7 +68,7 @@ module.exports = function(s,config,lang){
                                 (
                                     username && username.toLowerCase() === superUser.mail.toLowerCase() && //email matches
                                     (
-                                        password === superUser.pass || //user give it already hashed
+                                        // password === superUser.pass || //user give it already hashed
                                         superUser.pass === s.createHash(password) || //hash and check it
                                         superUser.pass.toLowerCase() === s.md5(password).toLowerCase() //check if still using md5
                                     )
@@ -97,6 +105,12 @@ module.exports = function(s,config,lang){
             if(authResponse.ok){
                 response.ok = true
                 response.user = authResponse.user
+                const sessionKey = s.gid(30)
+                response.user.sessionKey = sessionKey
+                s.superUsersApi[sessionKey] = {
+                    $user: response.user,
+                }
+                resetSuperSessionTimeout(sessionKey)
             }else{
                 response.msg = lang['Not Authorized']
             }
@@ -210,5 +224,6 @@ module.exports = function(s,config,lang){
         createTwoFactorAuth: createTwoFactorAuth,
         twoFactorVerification: twoFactorVerification,
         ldapLogin: ldapLogin,
+        resetSuperSessionTimeout,
     }
 }
