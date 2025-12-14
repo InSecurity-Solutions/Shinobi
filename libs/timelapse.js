@@ -561,7 +561,7 @@ module.exports = function(s,config,lang,app,io){
         s.auth(req.params,function(user){
             const groupKey = req.params.ke
             const monitorId = req.params.id
-            const actionParameter = !!req.params.action
+            const actionParameter = req.params.action
             const {
                 monitorPermissions,
                 monitorRestrictions,
