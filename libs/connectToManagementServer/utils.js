@@ -66,13 +66,19 @@ module.exports = (s,config,lang) => {
         }
         return response
     }
+    function terminateSshToManagement(serverIp){
+        if(s.connectedMgmtServers[serverIp]){
+            s.connectedMgmtServers[serverIp].sshWorker.terminate()
+            delete(s.connectedMgmtServers[serverIp].sshWorker)
+        }
+    }
     async function queueToggleSshToManagement(serverIp, p2pKey, onlyClose){
         if(sshDisabled)return;
         clearTimeout(queuedSshRestart[serverIp])
         queuedSshRestart[serverIp] = setTimeout(() => {
             delete(queuedSshRestart[serverIp])
             if(onlyClose){
-                if(s.connectedMgmtServers[serverIp])s.connectedMgmtServers[serverIp].sshWorker.terminate()
+                terminateSshToManagement(serverIp)
             }else{
                 provideSshToManagement(serverIp, p2pKey)
             }
@@ -110,7 +116,7 @@ module.exports = (s,config,lang) => {
         worker.on('exit', (code) => {
             if(!s.connectedMgmtServers[serverIp].wantTerminate){
                 console.log('cameraPeer SSH Exited, Restarting...', serverIp, code)
-                queueToggleSshToManagement(serverIp, p2pKey, true)
+                s.connectedMgmtServers[serverIp].sshWorker = provideSshToManagement(serverIp, p2pKey)
             }else{
                 console.log('cameraPeer SSH Exited, NOT Restarting...', serverIp, code)
             }
@@ -186,7 +192,7 @@ module.exports = (s,config,lang) => {
             s.debugLog('disconnectFromManagmentServer ERR',err)
         }
         try{
-            queueToggleSshToManagement(serverIp, null, true);
+            terminateSshToManagement(serverIp);
         }catch(err){
             s.debugLog('disconnectFromManagmentSshServer ERR',err)
         }
@@ -197,7 +203,7 @@ module.exports = (s,config,lang) => {
         mgmtConnection.wantTerminate = false;
         mgmtConnection.worker.terminate();
         try{
-            queueToggleSshToManagement(serverIp, null, true);
+            terminateSshToManagement(serverIp);
         }catch(err){
             s.debugLog('resetConnectionToManagementSshServer ERR',err)
         }
