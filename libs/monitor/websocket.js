@@ -3,13 +3,18 @@ module.exports = function(s,config,lang,io){
     s.onOtherWebSocketMessages(async (d,cn,tx) => {
         const authKey = cn.auth
         const groupKey = cn.ke
-        const user = s.group[groupKey].users[authKey];
+        const user = s.group[groupKey] && s.group[groupKey].users && s.group[groupKey].users[authKey];
         const monitorId = d.mid || d.id;
         const callbackId = d.callbackId;
         const response = { f: 'callback', callbackId, args: [true] }
         switch(d.f){
             case'getMonitors':
                 response.ff = 'getMonitors'
+                if(!user || !user.details){
+                    response.msg = lang['Not Authorized'];
+                    tx(response);
+                    break;
+                }
                 var {
                     monitorPermissions,
                     monitorRestrictions,
@@ -37,6 +42,11 @@ module.exports = function(s,config,lang,io){
             break;
             case'addOrEditMonitor':
                 response.ff = 'addOrEditMonitor'
+                if(!user || !user.details){
+                    response.msg = lang['Not Authorized'];
+                    tx(response);
+                    break;
+                }
                 var {
                     monitorPermissions,
                     monitorRestrictions,
