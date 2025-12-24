@@ -1735,6 +1735,7 @@ module.exports = (s,config,lang) => {
         const monitorDetails = monitorConfig.details
         const maxCount = !monitorDetails.fatal_max || isNaN(monitorDetails.fatal_max) ? 0 : parseFloat(monitorDetails.fatal_max);
         clearTimeout(activeMonitor.fatalErrorTimeout);
+        if(!activeMonitor.errorFatalCount)activeMonitor.errorFatalCount = 0
         ++activeMonitor.errorFatalCount;
         if(activeMonitor.isStarted === true){
             activeMonitor.fatalErrorTimeout = setTimeout(function(){
@@ -1744,7 +1745,7 @@ module.exports = (s,config,lang) => {
                 }else{
                     launchMonitorProcesses(monitorConfig)
                 };
-            },5000);
+            },activeMonitor.errorFatalCount >= 3 ? 1000 * 60 * 60 : 5000);
         }else{
             await cameraDestroy(e)
         }
@@ -1809,7 +1810,6 @@ module.exports = (s,config,lang) => {
             activeMonitor.isRecording = false
         }
         //set up fatal error handler
-        activeMonitor.errorFatalCount = 0;
         delete(activeMonitor.childNode)
         if(e.details.detector_ptz_follow === '1'){
             // setHomePositionPreset(e)
