@@ -1733,6 +1733,7 @@ module.exports = (s,config,lang) => {
         const activeMonitor = getActiveMonitor(groupKey,monitorId)
         const monitorConfig = copyMonitorConfiguration(groupKey,monitorId)
         const monitorDetails = monitorConfig.details
+        if(!activeMonitor || !monitorDetails)return await cameraDestroy(e);
         const maxCount = !monitorDetails.fatal_max || isNaN(monitorDetails.fatal_max) ? 0 : parseFloat(monitorDetails.fatal_max);
         clearTimeout(activeMonitor.fatalErrorTimeout);
         if(!activeMonitor.errorFatalCount)activeMonitor.errorFatalCount = 0
