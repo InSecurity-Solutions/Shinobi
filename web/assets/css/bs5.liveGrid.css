@@ -1,7 +1,20 @@
 #monitors_live {
     overflow: hidden;
+    height: 100%;
+}
+#tab-liveGrid {
+    overflow: auto;
+    height: 100vh;
 }
 
+#monitors_live, #tab-liveGrid {
+    -ms-overflow-style: none;  /* Internet Explorer 10+ */
+    scrollbar-width: none;  /* Firefox */
+}
+#monitors_live::-webkit-scrollbar,
+#tab-liveGrid::-webkit-scrollbar {
+    display: none;  /* Safari and Chrome */
+}
 .mdl-card__media {
     background-color: #333;
     background-repeat: repeat;
@@ -124,7 +137,8 @@
 .monitor_item.fullscreen img.stream-element{height:100%;width:auto}
 .monitor_item.fullscreen canvas.stream-element{height:auto;width:auto;background-color:black;}
 .monitor_item .stream-element{border: 0;object-fit: fill;height: 100%;width:100%}
-.monitor_item{position:relative;padding:0;transition:none;background:#000;height:100%;}
+.monitor_item{position:relative;padding:0;height:100%;transition:none;background:#000;}
+.monitor_item.border-between{border: 1px solid #6a8cc8;}
 .monitor_item .mdl-card{min-height:auto;border:1px solid #272727;border-radius:0px;overflow:hidden}
 .monitor_item .mdl-card__media{height:100%;position:relative;padding:0!important;display:inline-block!important;background:#000;}
 .monitor_item.selected .stream-element{height:600px}

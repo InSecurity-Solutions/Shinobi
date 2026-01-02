@@ -14,7 +14,8 @@ async function executeExtender(extenderContainer, args = []){
         await extender(...args)
     }
 }
-
+window.executeEventHandlers = executeExtender
+window.createEventHandler = addExtender
 var accountSettings = {
     onLoadFieldsExtensions: [],
     onLoadFields: function(...extender){
