@@ -1615,7 +1615,12 @@ $(document).ready(function(e){
     //     loadPreviouslyOpenedLiveGridBlocks()
     // })
     onToggleSideBarMenuHide(function (isHidden){
-        setTimeout(updateAllLiveGridElementsHeightWidth,2000)
+        setTimeout(function(){
+            updateAllLiveGridElementsHeightWidth()
+            onWindowResizeTimeout(null, function(){
+                setPauseScrollTimeout(true)
+            })
+        },2000)
     })
     onWebSocketEvent(async function (d){
         switch(d.f){
