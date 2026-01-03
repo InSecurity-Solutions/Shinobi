@@ -261,7 +261,7 @@ $(document).ready(function(e){
     })
     .on('click','.zip-selected-frames',function(e){
         e.preventDefault()
-        var frames = getSelectedRows(true)
+        var frames = getSelectedRows()
         zipVideosAndDownloadWithConfirm(frames)
         return false;
     })
@@ -282,13 +282,20 @@ $(document).ready(function(e){
         var endDate = dateRange.endDate
         var selectedMonitor = monitorsList.val()
         window.askedForTimelapseVideoBuild = true
-        var parsedFrames = currentPlaylistArray.map(function(frame){
+        var parsedFrames = getSelectedRows().map(function(frame){
             return {
                 mid: frame.mid,
                 ke: frame.ke,
                 filename: frame.filename,
             }
         });
+        if(parsedFrames.length === 0){
+            return new PNotify({
+                title: lang['Invalid Data'],
+                text: lang.notEnoughFramesText1,
+                type: 'danger'
+            })
+        };
         mainSocket.f({
             f: 'timelapseVideoBuild',
             mid: selectedMonitor,
@@ -332,7 +339,7 @@ $(document).ready(function(e){
         }else if(tabTree.name !== 'timelapseViewer'){
             new PNotify({
                 title: lang['Timelapse Video Build Complete'],
-                text: `${lang['File Download Ready']}.<br><br><a class="btn btn-sm btn-success" href="${buildFileBinUrl(data)}">${lang.Download}</a>`,
+                text: `${lang['File Download Ready']}.<br><br><a class="btn btn-sm btn-success download-file" href="${buildFileBinUrl(data)}">${lang.Download}</a>`,
                 type: 'success',
             })
         }
@@ -351,7 +358,7 @@ $(document).ready(function(e){
                     </div>
                 </div>
                 <div style="display:none;" class="download-button pr-2">
-                    <a class="badge badge-sm badge-success" download href="${fileBinUrl}"><i class="fa fa-download"></i></a>
+                    <a class="badge badge-sm badge-success download-file" href="${fileBinUrl}"><i class="fa fa-download"></i></a>
                 </div>
                 <div style="display:none;" class="download-button pr-2">
                     <a class="badge badge-sm badge-primary open-fileBin-video" href="${fileBinUrl}"><i class="fa fa-play"></i></a>

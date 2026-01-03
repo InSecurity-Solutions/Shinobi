@@ -540,6 +540,10 @@ module.exports = function(s,config,lang,app,io){
             }
             const framesPerSecond = s.getPostData(req, 'fps')
             const framesPosted = s.getPostData(req, 'frames', true) || []
+            if(framesPosted.length === 0){
+                s.closeJsonResponse(res,{ok: false, msg: lang.notEnoughFramesText1});
+                return
+            }
             initiateTimelapseVideoBuild({
                 groupKey,
                 monitorId,
@@ -667,19 +671,32 @@ module.exports = function(s,config,lang,app,io){
     s.onOtherWebSocketMessages((d,connection) => {
         switch(d.f){
             case'timelapseVideoBuild':
-                initiateTimelapseVideoBuild({
-                    groupKey: d.ke,
-                    monitorId: d.mid,
-                    framesPosted: d.frames,
-                    framesPerSecond: d.fps,
-                }).then((buildResponse) => {
+                if(d.frames.length === 0){
+                    response.msg = lang.notEnoughFramesText1
                     s.tx({
                         f: 'timelapse_build_requested',
                         ke: d.ke,
                         mid: d.mid,
-                        buildResponse: buildResponse,
+                        buildResponse: {
+                            ok: false,
+                            msg: lang.notEnoughFramesText1
+                        },
                     },'GRP_'+d.ke);
-                })
+                }else{
+                    initiateTimelapseVideoBuild({
+                        groupKey: d.ke,
+                        monitorId: d.mid,
+                        framesPosted: d.frames,
+                        framesPerSecond: d.fps,
+                    }).then((buildResponse) => {
+                        s.tx({
+                            f: 'timelapse_build_requested',
+                            ke: d.ke,
+                            mid: d.mid,
+                            buildResponse: buildResponse,
+                        },'GRP_'+d.ke);
+                    })
+                }
             break;
         }
     })
