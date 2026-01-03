@@ -1,3 +1,4 @@
+var detectionDrawDelays = {};
 $(document).ready(function(e){
     var loadedLiveGrids = {}
     var monitorPops = {}
@@ -14,7 +15,7 @@ $(document).ready(function(e){
     var liveGridWindowResizeTimeout = null;
     var liveGridPlayingNow = {};
     var currentPtzPresetPosition = {};
-    var detectionDrawDelays = {};
+    var toStayClosed = {}
     var lastWindowWidth = liveGrid.width()
     var lastWindowHeight = liveGrid.height()
     var windowInFocus = true;
