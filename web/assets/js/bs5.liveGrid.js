@@ -1013,7 +1013,7 @@ $(document).ready(function(e){
     }
     function setPauseScrollTimeout(forceResume){
         clearTimeout(liveGridPauseScrollTimeout)
-        if(tabTree.name === 'liveGrid'){
+        if(tabTree.name === 'liveGrid' && fullscreenInUse === false){
             liveGridPauseScrollTimeout = setTimeout(function(){
                 setPauseStatusForMonitorItems(forceResume)
             },200)
@@ -1126,17 +1126,19 @@ $(document).ready(function(e){
         setPauseScrollTimeout();
     }
     function onWindowResize(){
-        const windowHeight = $(window).height();
-        liveGridTab.css('height',`${windowHeight}px!important`)
-        liveGrid.css('height',`${windowHeight}px!important`)
-        const availableHeight = windowHeight;
-        const numRows = dashboardOptions().liveGridAutoPlaceSize || 3
-        const cellHeight = Math.floor(availableHeight / numRows / legend[numRows]);
-        liveGridData.cellHeight(cellHeight);
-        setTimeout(function(){
-            executeEventHandlers('onLiveGridResize',[])
-        },500)
-        return cellHeight;
+        if(fullscreenInUse === false){
+            const windowHeight = $(window).height();
+            liveGridTab.css('height',`${windowHeight}px!important`)
+            liveGrid.css('height',`${windowHeight}px!important`)
+            const availableHeight = windowHeight;
+            const numRows = dashboardOptions().liveGridAutoPlaceSize || 3
+            const cellHeight = Math.floor(availableHeight / numRows / legend[numRows]);
+            liveGridData.cellHeight(cellHeight);
+            setTimeout(function(){
+                executeEventHandlers('onLiveGridResize',[])
+            },500)
+            return cellHeight;
+        }
     }
     function setCosmeticDefaultGridSize(){
         const chosenSize = dashboardOptions().liveGridAutoPlaceSize || 3
@@ -1775,6 +1777,15 @@ $(document).ready(function(e){
     liveGridTab.scroll(function(){
         setPauseScrollTimeout()
     })
+    document.addEventListener('fullscreenchange', (event) => {
+        if (document.fullscreenElement) {
+            fullscreenInUse = true
+        } else {
+            setTimeout(function(){
+                fullscreenInUse = false
+            },500)
+        }
+    });
     dashboardSwitchCallbacks.monitorOrder = function(toggleState){
         if(toggleState !== 1){
             $('.monitor_item').attr('gs-auto-position','yes')
