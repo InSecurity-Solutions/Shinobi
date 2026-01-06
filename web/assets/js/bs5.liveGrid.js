@@ -1777,15 +1777,19 @@ $(document).ready(function(e){
     liveGridTab.scroll(function(){
         setPauseScrollTimeout()
     })
-    document.addEventListener('fullscreenchange', (event) => {
-        if (document.fullscreenElement) {
-            fullscreenInUse = true
-        } else {
+    function exitFullscreenHandler(){
+        if (!document.webkitIsFullScreen && !document.mozFullScreen && !document.msFullscreenElement){
             setTimeout(function(){
                 fullscreenInUse = false
             },500)
+        }else{
+            fullscreenInUse = true
         }
-    });
+    }
+    document.addEventListener('fullscreenchange', exitFullscreenHandler, false);
+    document.addEventListener('mozfullscreenchange', exitFullscreenHandler, false);
+    document.addEventListener('MSFullscreenChange', exitFullscreenHandler, false);
+    document.addEventListener('webkitfullscreenchange', exitFullscreenHandler, false);
     dashboardSwitchCallbacks.monitorOrder = function(toggleState){
         if(toggleState !== 1){
             $('.monitor_item').attr('gs-auto-position','yes')
