@@ -1950,7 +1950,7 @@ module.exports = (s,config,lang) => {
                     if(isRestricted && !monitorPermissions[`${monitorId}_monitor_edit`] || cannotSeeImportantSettings){
                         r[n] = removeSenstiveInfoFromMonitorConfig(v);
                     }
-                    if(s.group[v.ke] && s.group[v.ke].activeMonitors[v.mid]){
+                    if(s.group[v.ke] && s.group[v.ke].activeMonitors && s.group[v.ke].activeMonitors[v.mid]){
                         const activeMonitor = s.group[v.ke].activeMonitors[v.mid]
                         r[n].currentlyWatching = Object.keys(activeMonitor.watch).length
                         r[n].currentCpuUsage = activeMonitor.currentCpuUsage
