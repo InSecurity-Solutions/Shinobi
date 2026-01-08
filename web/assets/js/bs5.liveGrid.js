@@ -1781,7 +1781,7 @@ $(document).ready(function(e){
         if (!document.webkitIsFullScreen && !document.mozFullScreen && !document.msFullscreenElement){
             setTimeout(function(){
                 fullscreenInUse = false
-            },500)
+            },1000)
         }else{
             fullscreenInUse = true
         }
