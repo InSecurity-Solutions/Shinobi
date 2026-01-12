@@ -1359,7 +1359,7 @@ module.exports = (s,config,lang) => {
         const activeMonitor = getActiveMonitor(groupKey,monitorId)
         const monitorConfig = getMonitorConfiguration(groupKey,monitorId)
         const monitorDetails = monitorConfig.details
-        const autoCompressionEnabled = monitorDetails.auto_compress_videos === '1'
+        const autoCompressionEnabled = !config.disableAutoCompressVideos && monitorDetails.auto_compress_videos === '1'
         var checkLog = function(d,x){return d.indexOf(x)>-1}
         activeMonitor.spawn.stdio[8].on('data',function(d){
             d=d.toString();
@@ -1943,80 +1943,84 @@ module.exports = (s,config,lang) => {
                 if(err){
                     return []
                 }
-                r.forEach(function(v,n){
-                    const monitorId = v.mid;
-                    v.details = JSON.parse(v.details)
-                    var details = v.details;
-                    if(isRestricted && !monitorPermissions[`${monitorId}_monitor_edit`] || cannotSeeImportantSettings){
-                        r[n] = removeSenstiveInfoFromMonitorConfig(v);
-                    }
-                    if(s.group[v.ke] && s.group[v.ke].activeMonitors && s.group[v.ke].activeMonitors[v.mid]){
-                        const activeMonitor = s.group[v.ke].activeMonitors[v.mid]
-                        r[n].currentlyWatching = Object.keys(activeMonitor.watch).length
-                        r[n].currentCpuUsage = activeMonitor.currentCpuUsage
-                        r[n].status = activeMonitor.monitorStatus
-                        r[n].code = activeMonitor.monitorStatusCode
-                        r[n].subStreamChannel = activeMonitor.subStreamChannel
-                        r[n].subStreamActive = !!activeMonitor.subStreamProcess
-                    }
-                    function getStreamUrl(type,channelNumber){
-                        var streamURL
-                        if(channelNumber){channelNumber = '/'+channelNumber}else{channelNumber=''}
-                        switch(type){
-                            case'mjpeg':
-                                streamURL='/'+authKey+'/mjpeg/'+v.ke+'/'+v.mid+channelNumber
-                            break;
-                            case'hls':
-                                streamURL='/'+authKey+'/hls/'+v.ke+'/'+v.mid+channelNumber+'/s.m3u8'
-                            break;
-                            case'h264':
-                                streamURL='/'+authKey+'/h264/'+v.ke+'/'+v.mid+channelNumber
-                            break;
-                            case'flv':
-                                streamURL='/'+authKey+'/flv/'+v.ke+'/'+v.mid+channelNumber+'/s.flv'
-                            break;
-                            case'mp4':
-                                streamURL='/'+authKey+'/mp4/'+v.ke+'/'+v.mid+channelNumber+'/s.mp4'
-                            break;
-                            case'useSubstream':
-                                try{
-                                    const monitorConfig = s.group[v.ke].rawMonitorConfigurations[v.mid]
-                                    const monitorDetails = monitorConfig.details
-                                    const subStreamChannelNumber = 1 + (monitorDetails.stream_channels || []).length
-                                    const subStreamType = monitorConfig.details.substream.output.stream_type
-                                    streamURL = getStreamUrl(subStreamType,subStreamChannelNumber)
-                                }catch(err){
-                                    s.debugLog(err)
-                                }
-                            break;
+                try{
+                    r.forEach(function(v,n){
+                        const monitorId = v.mid;
+                        v.details = JSON.parse(v.details)
+                        var details = v.details;
+                        if(isRestricted && !monitorPermissions[`${monitorId}_monitor_edit`] || cannotSeeImportantSettings){
+                            r[n] = removeSenstiveInfoFromMonitorConfig(v);
                         }
-                        return streamURL
-                    }
-                    var buildStreamURL = function(type,channelNumber){
-                        var streamURL = getStreamUrl(type,channelNumber)
-                        if(streamURL){
-                            if(!r[n].streamsSortedByType[type]){
-                                r[n].streamsSortedByType[type]=[]
+                        if(s.group[v.ke] && s.group[v.ke].activeMonitors[v.mid]){
+                            const activeMonitor = s.group[v.ke].activeMonitors[v.mid]
+                            r[n].currentlyWatching = Object.keys(activeMonitor.watch).length
+                            r[n].currentCpuUsage = activeMonitor.currentCpuUsage
+                            r[n].status = activeMonitor.monitorStatus
+                            r[n].code = activeMonitor.monitorStatusCode
+                            r[n].subStreamChannel = activeMonitor.subStreamChannel
+                            r[n].subStreamActive = !!activeMonitor.subStreamProcess
+                        }
+                        function getStreamUrl(type,channelNumber){
+                            var streamURL
+                            if(channelNumber){channelNumber = '/'+channelNumber}else{channelNumber=''}
+                            switch(type){
+                                case'mjpeg':
+                                    streamURL='/'+authKey+'/mjpeg/'+v.ke+'/'+v.mid+channelNumber
+                                break;
+                                case'hls':
+                                    streamURL='/'+authKey+'/hls/'+v.ke+'/'+v.mid+channelNumber+'/s.m3u8'
+                                break;
+                                case'h264':
+                                    streamURL='/'+authKey+'/h264/'+v.ke+'/'+v.mid+channelNumber
+                                break;
+                                case'flv':
+                                    streamURL='/'+authKey+'/flv/'+v.ke+'/'+v.mid+channelNumber+'/s.flv'
+                                break;
+                                case'mp4':
+                                    streamURL='/'+authKey+'/mp4/'+v.ke+'/'+v.mid+channelNumber+'/s.mp4'
+                                break;
+                                case'useSubstream':
+                                    try{
+                                        const monitorConfig = s.group[v.ke].rawMonitorConfigurations[v.mid]
+                                        const monitorDetails = monitorConfig.details
+                                        const subStreamChannelNumber = 1 + (monitorDetails.stream_channels || []).length
+                                        const subStreamType = monitorConfig.details.substream.output.stream_type
+                                        streamURL = getStreamUrl(subStreamType,subStreamChannelNumber)
+                                    }catch(err){
+                                        s.debugLog(err)
+                                    }
+                                break;
                             }
-                            r[n].streamsSortedByType[type].push(streamURL)
-                            r[n].streams.push(streamURL)
+                            return streamURL
                         }
-                        return streamURL
-                    }
-                    if(!details.tv_channel_id||details.tv_channel_id==='')details.tv_channel_id = 'temp_'+s.gid(5)
-                    if(details.snap==='1'){
-                        r[n].snapshot = '/'+authKey+'/jpeg/'+v.ke+'/'+v.mid+'/s.jpg'
-                    }
-                    r[n].streams=[]
-                    r[n].streamsSortedByType={}
-                    buildStreamURL(details.stream_type)
-                    if(details.stream_channels&&details.stream_channels!==''){
-                        details.stream_channels=s.parseJSON(details.stream_channels)
-                        details.stream_channels.forEach(function(b,m){
-                            buildStreamURL(b.stream_type,m.toString())
-                        })
-                    }
-                })
+                        var buildStreamURL = function(type,channelNumber){
+                            var streamURL = getStreamUrl(type,channelNumber)
+                            if(streamURL){
+                                if(!r[n].streamsSortedByType[type]){
+                                    r[n].streamsSortedByType[type]=[]
+                                }
+                                r[n].streamsSortedByType[type].push(streamURL)
+                                r[n].streams.push(streamURL)
+                            }
+                            return streamURL
+                        }
+                        if(!details.tv_channel_id||details.tv_channel_id==='')details.tv_channel_id = 'temp_'+s.gid(5)
+                        if(details.snap==='1'){
+                            r[n].snapshot = '/'+authKey+'/jpeg/'+v.ke+'/'+v.mid+'/s.jpg'
+                        }
+                        r[n].streams=[]
+                        r[n].streamsSortedByType={}
+                        buildStreamURL(details.stream_type)
+                        if(details.stream_channels&&details.stream_channels!==''){
+                            details.stream_channels=s.parseJSON(details.stream_channels)
+                            details.stream_channels.forEach(function(b,m){
+                                buildStreamURL(b.stream_type,m.toString())
+                            })
+                        }
+                    })
+                }catch(err){
+                    console.log(err)
+                }
                 resolve(r);
             })
         })

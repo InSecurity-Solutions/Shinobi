@@ -717,7 +717,7 @@ module.exports = (s,config,lang) => {
                         objects: overlappingRecordings && d.details && d.details.matrices instanceof Array ? d.details.matrices : undefined,
                         endTime: moment(new Date()).subtract(secondBefore,'seconds')._d,
                     },function(err,response){
-                        const autoCompressionEnabled = monitorDetails.auto_compress_videos === '1';
+                        const autoCompressionEnabled = !config.disableAutoCompressVideos && monitorDetails.auto_compress_videos === '1';
                         if(autoCompressionEnabled){
                             reEncodeVideoAndBinOriginalAddToQueue({
                                 video: response.insertQuery,
