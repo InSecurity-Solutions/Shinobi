@@ -68,7 +68,7 @@ module.exports = function(s,config,lang,io){
                     if(!form){
                        response.msg = lang.monitorEditText1;
                    }else{
-                       form.mid = monitorId.replace(/[^\w\s]/gi,'').replace(/ /g,'')
+                       form.mid = `${monitorId || form.mid}`.replace(/[^\w\s]/gi,'').replace(/ /g,'')
                        if(form && form.name){
                            s.checkDetails(form)
                            form.ke = groupKey
