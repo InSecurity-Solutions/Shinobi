@@ -556,11 +556,12 @@ function importMonitor(textData){
         var parsedData = textData instanceof Object ? textData : safeJsonParse(mergeConcattedJsonString(textData))
         function postMonitor(v){
             var monitorId = v.mid
-            $.post(`${getApiPrefix('configureMonitor')}/${monitorId}`,{
-                data: JSON.stringify(v,null,3)
-            },function(d){
-                debugLog(d)
-            })
+            configureMonitor(v)
+            // $.post(`${getApiPrefix('configureMonitor')}/${monitorId}`,{
+            //     data: JSON.stringify(v,null,3)
+            // },function(d){
+            //     debugLog(d)
+            // })
         }
         //zoneminder one monitor
         if(parsedData.monitor){
