@@ -14,6 +14,15 @@ async function executeExtender(extenderContainer, args = []){
         await extender(...args)
     }
 }
+function removeEventFromHandler(extenderContainer, functionName){
+    if(dashboardExtensions[extenderContainer]){
+        dashboardExtensions[extenderContainer]
+        const index = dashboardExtensions[extenderContainer].findIndex(fn => typeof fn === 'function' && fn.name === functionName);
+        if (index > -1) {
+            dashboardExtensions[extenderContainer].splice(index, 1);
+        }
+    }
+}
 window.executeEventHandlers = executeExtender
 window.createEventHandler = addExtender
 var accountSettings = {
