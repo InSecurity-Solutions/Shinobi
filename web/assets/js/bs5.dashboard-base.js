@@ -311,7 +311,7 @@ function liveStamp(){
 function loadMonitorsIntoMemory(callback){
     $.getJSON(`${getApiPrefix(`monitor`)}`,function(data){
         $.each(data,function(n,monitor){
-            monitor.details = safeJsonParse(monitor.details)
+            monitor.details = convertNumbersToStrings(safeJsonParse(monitor.details))
             loadedMonitors[monitor.mid] = monitor
         })
         callback(data)
@@ -1123,4 +1123,15 @@ function getQueryString(){
         theObject[parts[0]] = parts[1]
     })
     return theObject
+}
+function convertNumbersToStrings(form) {
+    if (!form || !form.details || typeof form.details !== 'object') {
+        return form;
+    }
+    for (let key in form.details) {
+        if (typeof form.details[key] === 'number') {
+            form.details[key] = form.details[key].toString();
+        }
+    }
+    return form;
 }

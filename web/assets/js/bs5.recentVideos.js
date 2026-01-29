@@ -72,14 +72,12 @@ $(document).ready(function(){
             $('.events_from_last_24').text(data.count)
         })
     }
-    function isAllMonitorsSelected(percent = 100){
-        var theSelected = `${monitorList.val()}`
-        if(theSelected !== ''){
-            const monitorKeys = Object.values(loadedMonitors)
+    function isAllMonitorsSelected(totalBefore){
+        var theSelected = monitorList.val()
+        if(!theSelected || theSelected === ''){
+            const monitorKeys = Object.keys(loadedMonitors)
             const numberOf = monitorKeys.length
-            var divisor = percent / 100;
-            var allMonitorIds = monitorKeys.map(item => item.mid);
-            return numberOf > 10 && (numberOf >= (allMonitorIds.length * divisor));
+            return numberOf >= totalBefore;
         }else{
             return false
         }
@@ -97,8 +95,8 @@ $(document).ready(function(){
         var askToLoad = isAllMonitorsSelected(50)
         if(!window.skipRecentVideosAgree && askToLoad){
             $.confirm.create({
-                title: lang.tooManyMonitorsSelected,
-                body: lang.performanceMayBeAffected,
+                title: lang['Recent Videos'],
+                body: `${lang.tooManyMonitorsSelected}. ${lang.performanceMayBeAffected}`,
                 clickOptions: {
                     title: lang.getVideos,
                     class: 'btn-success'
@@ -131,6 +129,7 @@ $(document).ready(function(){
     })
     onDashboardReady(function(){
         openTab('initial');
+        var loadedMonitorsWaitTimeAdded = Object.keys(loadedMonitors).length * 20
         setTimeout(function(){
             if(tabTree.name === 'initial'){
                 if(loadedOnce)return;
@@ -138,6 +137,6 @@ $(document).ready(function(){
                 drawMonitorListToSelector(monitorList.find('optgroup'))
                 refreshRecentVideosOnAgree()
             }
-        },1000)
+        },1000 * loadedMonitorsWaitTimeAdded)
     })
 })

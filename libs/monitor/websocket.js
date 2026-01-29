@@ -10,6 +10,11 @@ module.exports = function(s,config,lang,io){
         switch(d.f){
             case'getMonitors':
                 response.ff = 'getMonitors'
+                if(!user || !user.details){
+                    response.msg = lang['Not Authorized'];
+                    tx(response);
+                    break;
+                }
                 var {
                     monitorPermissions,
                     monitorRestrictions,
@@ -37,6 +42,11 @@ module.exports = function(s,config,lang,io){
             break;
             case'addOrEditMonitor':
                 response.ff = 'addOrEditMonitor'
+                if(!user || !user.details){
+                    response.msg = lang['Not Authorized'];
+                    tx(response);
+                    break;
+                }
                 var {
                     monitorPermissions,
                     monitorRestrictions,
@@ -58,7 +68,7 @@ module.exports = function(s,config,lang,io){
                     if(!form){
                        response.msg = lang.monitorEditText1;
                    }else{
-                       form.mid = monitorId.replace(/[^\w\s]/gi,'').replace(/ /g,'')
+                       form.mid = `${monitorId || form.mid}`.replace(/[^\w\s]/gi,'').replace(/ /g,'')
                        if(form && form.name){
                            s.checkDetails(form)
                            form.ke = groupKey

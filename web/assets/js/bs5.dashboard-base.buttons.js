@@ -120,6 +120,18 @@ $(document).ready(function(){
         allTabChoosersInParent.removeClass('active')
         el.addClass('active')
         parent.find(`[tab-section="${tabName}"]`).show()
+    })
+    .on('click','.download-file', function(e){
+        e.preventDefault()
+        var el = $(this)
+        var downloadUrl = el.attr('href')
+        var filename = el.data('name')
+        if(!filename){
+            var urlParts = downloadUrl.split('/')
+            filename = urlParts[urlParts.length - 1]
+        }
+        downloadFile(downloadUrl,filename)
+        return false;
     });
     if(!isMobile){
         $('body').on('mousedown',"select[multiple]",function(e){

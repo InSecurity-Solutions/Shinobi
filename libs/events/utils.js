@@ -681,6 +681,7 @@ module.exports = (s,config,lang) => {
                 ){
                     outputMap += `-map 0:1 `
                 }
+                if(config.noEventBasedRecordingMaps)outputMap = '';
                 const secondsBefore = parseInt(monitorDetails.detector_buffer_seconds_before) || 5
                 let LiveStartIndex = parseInt(secondsBefore / 2 + 1)
                 const ffmpegCommand = `-threads 1 -loglevel warning -live_start_index -${LiveStartIndex} -analyzeduration ${analyzeDuration} -probesize ${probeSize} -re -i "${s.dir.streams+groupKey+'/'+monitorId}/detectorStream.m3u8" ${outputMap}-movflags faststart -fflags +genpts+igndts -c:v copy ${noAudio ? '-an' : autoAudio ? '' : `-c:a aac`} -strict -2 -strftime 1 -y "${s.getVideoDirectory(monitorConfig) + filename}"`
@@ -716,7 +717,7 @@ module.exports = (s,config,lang) => {
                         objects: overlappingRecordings && d.details && d.details.matrices instanceof Array ? d.details.matrices : undefined,
                         endTime: moment(new Date()).subtract(secondBefore,'seconds')._d,
                     },function(err,response){
-                        const autoCompressionEnabled = monitorDetails.auto_compress_videos === '1';
+                        const autoCompressionEnabled = !config.disableAutoCompressVideos && monitorDetails.auto_compress_videos === '1';
                         if(autoCompressionEnabled){
                             reEncodeVideoAndBinOriginalAddToQueue({
                                 video: response.insertQuery,

@@ -39,7 +39,7 @@ module.exports = function(s,config,lang){
     function resetSuperSessionTimeout(sessionKey){
         clearTimeout(s.superAuthTimeouts[sessionKey])
         s.superAuthTimeouts[sessionKey] = setTimeout(function(){
-            // console.log('Clear Super Session',sessionKey)
+            console.log('Clear Super Session',sessionKey)
             delete(s.superUsersApi[sessionKey])
         }, 1000 * 60 * 15)
     }

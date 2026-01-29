@@ -1182,7 +1182,7 @@ editorForm.find('[name="type"]').change(function(e){
             loadedMonitor[n] = n === 'details' ? safeJsonParse(v) : v
         })
         if(d.new === true){
-            drawMonitorIconToMenu(newMonitorData)
+            drawMonitorIconToMenu(newMonitorData, true)
         }
         switch(newMonitorData.mode){
             case'start':case'record':

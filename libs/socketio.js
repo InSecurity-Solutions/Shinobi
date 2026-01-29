@@ -211,90 +211,131 @@ module.exports = function(s,config,lang,io){
             }
         })
         //unique MP4 socket stream
-        cn.on('MP4',function(d, cb){
-            if(!s.group[d.ke]||!s.group[d.ke].activeMonitors||!s.group[d.ke].activeMonitors[d.id]){
-                cn.disconnect();return;
-            }
-            cn.ip=cn.request.connection.remoteAddress;
-            var toUTC = function(){
-                return new Date().toISOString();
-            }
-            var tx=function(z){cn.emit('data',z);}
-            const onFail = (msg) => {
-                tx({f:'stop_reconnect',msg:msg,token_used:d.auth,ke:d.ke});
+        cn.on('MP4', function(d, cb) {
+            if (!s.group[d.ke] || !s.group[d.ke].activeMonitors || !s.group[d.ke].activeMonitors[d.id]) {
                 cn.disconnect();
+                return;
             }
+
+            cn.ip = cn.request.connection.remoteAddress;
+            let mp4frag;
+            let onSegment;
+            let onInitialized;
+
+            var tx = function(z){cn.emit('data',z);}
+            const cleanup = () => {
+                if (mp4frag) {
+                    if (onSegment) mp4frag.removeListener('segment', onSegment);
+                    if (onInitialized) mp4frag.removeListener('initialized', onInitialized);
+                }
+                cn.removeAllListeners('MP4Command');
+            };
+
+            const onFail = (msg) => {
+                tx({f: 'stop_reconnect', msg: msg, token_used: d.auth, ke: d.ke});
+                cleanup();
+                cn.disconnect();
+            };
+
             const onSuccess = (r) => {
                 r = r[0];
-                validatedAndBindAuthenticationToSocketConnection(cn,d)
-                var mp4frag = s.group[d.ke].activeMonitors[d.id].mp4frag[d.channel];
-                var onInitialized = () => {
-                    cn.emit('mime', mp4frag.mime);
-                    mp4frag.removeListener('initialized', onInitialized);
-                };
-                //event listener
-                var onSegment = function(data){
-                    cn.emit('segment', data);
-                };
-                cn.closeSocketVideoStream = function(){
-                    if(mp4frag){
-                        mp4frag.removeListener('segment', onSegment)
-                        mp4frag.removeListener('initialized', onInitialized)
-                    }
+                validatedAndBindAuthenticationToSocketConnection(cn, d);
+
+                mp4frag = s.group[d.ke].activeMonitors[d.id].mp4frag[d.channel];
+                if (!mp4frag) {
+                    onFail('MP4 fragment not available');
+                    return;
                 }
-                if (cb) cb(null, true);
-                cn.on('MP4Command',function(msg){
-                    try{
+
+                // Define handlers
+                onSegment = function(data) {
+                    if (cn.connected) {
+                        cn.emit('segment', data);
+                    }
+                };
+
+                onInitialized = function() {
+                    if (cn.connected) {
+                        cn.emit('mime', mp4frag.mime);
+                        mp4frag.removeListener('initialized', onInitialized);
+                    }
+                };
+
+                // Handle socket disconnect
+                cn.on('disconnect', cleanup);
+
+                // MP4 command handler
+                cn.on('MP4Command', function(msg) {
+                    if (!cn.connected) return;
+
+                    try {
                         switch (msg) {
-                            case 'mime' ://client is requesting mime
-                                var mime = mp4frag.mime;
+                            case 'mime':
+                                const mime = mp4frag.mime;
                                 if (mime) {
-                                    cn.emit('mime', mime);
+                                    setImmediate(() => cn.emit('mime', mime)); // Defer to next tick
                                 } else {
                                     mp4frag.on('initialized', onInitialized);
                                 }
-                            break;
-                            case 'initialization' ://client is requesting initialization segment
-                                cn.emit('initialization', mp4frag.initialization);
-                            break;
-                            case 'segment' ://client is requesting a SINGLE segment
-                                var segment = mp4frag.segment;
+                                break;
+
+                            case 'initialization':
+                                setImmediate(() => cn.emit('initialization', mp4frag.initialization));
+                                break;
+
+                            case 'segment':
+                                const segment = mp4frag.segment;
                                 if (segment) {
-                                    cn.emit('segment', segment);
+                                    setImmediate(() => cn.emit('segment', segment));
                                 } else {
                                     mp4frag.once('segment', onSegment);
                                 }
-                            break;
-                            case 'segments' ://client is requesting ALL segments
-                                //send current segment first to start video asap
-                                var segment = mp4frag.segment;
-                                if (segment) {
-                                    cn.emit('segment', segment);
-                                }
-                                //add listener for segments being dispatched by mp4frag
-                                mp4frag.on('segment', onSegment);
-                            break;
-                            case 'pause' :
+                                break;
+
+                            case 'segments':
+                                // Remove existing listener to avoid duplicates
                                 mp4frag.removeListener('segment', onSegment);
-                            break;
-                            case 'resume' :
+                                // Add listener for future segments
                                 mp4frag.on('segment', onSegment);
-                            break;
-                            case 'stop' ://client requesting to stop receiving segments
-                                cn.closeSocketVideoStream()
-                            break;
+
+                                // Send current segment if available
+                                const currentSegment = mp4frag.segment;
+                                if (currentSegment) {
+                                    setImmediate(() => cn.emit('segment', currentSegment));
+                                }
+                                break;
+
+                            case 'pause':
+                                mp4frag.removeListener('segment', onSegment);
+                                break;
+
+                            case 'resume':
+                                // Ensure we don't add duplicate listeners
+                                mp4frag.removeListener('segment', onSegment);
+                                mp4frag.on('segment', onSegment);
+                                break;
+
+                            case 'stop':
+                                cleanup();
+                                break;
                         }
-                    }catch(err){
-                        onFail(err)
+                    } catch(err) {
+                        console.error('MP4Command error:', err);
+                        onFail(err.message);
                     }
-                })
-            }
-            if(s.group[d.ke]&&s.group[d.ke].users&&s.group[d.ke].users[d.auth]){
+                });
+
+                if (cb) cb(null, true);
+            };
+            cn.closeSocketVideoStream = function() {
+                cleanup();
+            };
+            if (s.group[d.ke] && s.group[d.ke].users && s.group[d.ke].users[d.auth]) {
                 onSuccess(s.group[d.ke].users[d.auth]);
-            }else{
-                streamConnectionAuthentication(d,cn.ip).then(onSuccess).catch(onFail)
+            } else {
+                streamConnectionAuthentication(d, cn.ip).then(onSuccess).catch(onFail);
             }
-        })
+        });
         //main socket control functions
         cn.on('f',function(d){
             if(!cn.ke&&d.f==='init'){//socket login
@@ -349,15 +390,15 @@ module.exports = function(s,config,lang,io){
                         }
                     })
                     try{
-                        (s.group[d.ke] ? Object.values(s.group[d.ke].rawMonitorConfigurations) : []).forEach((monitor) => {
-                            s.cameraSendSnapshot({
-                                mid: monitor.mid,
-                                ke: monitor.ke,
-                                mon: monitor
-                            },{
-                                useIcon: true
-                            })
-                        })
+                        // (s.group[d.ke] ? Object.values(s.group[d.ke].rawMonitorConfigurations) : []).forEach((monitor) => {
+                        //     s.cameraSendSnapshot({
+                        //         mid: monitor.mid,
+                        //         ke: monitor.ke,
+                        //         mon: monitor
+                        //     },{
+                        //         useIcon: true
+                        //     })
+                        // })
                     }catch(err){
                         s.debugLog(err)
                     }
@@ -371,6 +412,16 @@ module.exports = function(s,config,lang,io){
             if((d.id||d.uid||d.mid)&&cn.ke){
             try{
                 switch(d.f){
+                    case'requestSnapshot':
+                        var monitorId = d.id || d.mid;
+                        s.cameraSendSnapshot({
+                            mid: monitorId,
+                            ke: cn.ke,
+                            mon: s.group[cn.ke].rawMonitorConfigurations[monitorId]
+                        },{
+                            useIcon: true
+                        })
+                    break;
                     case'monitorOrder':
                         if(d.monitorOrder && d.monitorOrder instanceof Object){
                             s.knexQuery({
@@ -723,17 +774,14 @@ module.exports = function(s,config,lang,io){
         // super page socket functions
         cn.on('super',function(d){
             if(!cn.init&&d.f=='init'){
-                d.ok=s.superAuth(d.auth ? { auth: d.auth } : {mail:d.mail,pass:d.pass},function(data){
+                d.ok=s.superAuth({ auth: d.auth },function(data){
                     cn.mail = data.$user.mail
                     cn.join('$');
-                    var tempSessionKey = d.auth || s.gid(30)
-                    cn.superSessionKey = tempSessionKey
-                    s.superUsersApi[tempSessionKey] = data
-                    s.superUsersApi[tempSessionKey].cnid = cn.id
+                    s.superUsersApi[d.auth].cnid = cn.id
                     cn.ip=cn.request.connection.remoteAddress
                     s.userLog({ke:'$',mid:'$USER'},{type:lang['Websocket Connected'],msg:{for:lang['Superuser'],id:cn.mail,ip:cn.ip}})
                     cn.init='super';
-                    s.tx({f:'init_success',mail:cn.mail,superSessionKey:tempSessionKey},cn.id);
+                    s.tx({f:'init_success',mail:cn.mail},cn.id);
                 })
                 if(d.ok===false){
                     cn.disconnect();
@@ -969,9 +1017,6 @@ module.exports = function(s,config,lang,io){
             }
             if(cn.cron){
                 delete(s.cron);
-            }
-            if(cn.superSessionKey){
-                delete(s.superUsersApi[cn.superSessionKey])
             }
             s.onWebSocketDisconnectionExtensions.forEach(function(extender){
                 extender(cn)

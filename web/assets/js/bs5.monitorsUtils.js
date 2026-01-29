@@ -556,11 +556,12 @@ function importMonitor(textData){
         var parsedData = textData instanceof Object ? textData : safeJsonParse(mergeConcattedJsonString(textData))
         function postMonitor(v){
             var monitorId = v.mid
-            $.post(`${getApiPrefix('configureMonitor')}/${monitorId}`,{
-                data: JSON.stringify(v,null,3)
-            },function(d){
-                debugLog(d)
-            })
+            configureMonitor(v)
+            // $.post(`${getApiPrefix('configureMonitor')}/${monitorId}`,{
+            //     data: JSON.stringify(v,null,3)
+            // },function(d){
+            //     debugLog(d)
+            // })
         }
         //zoneminder one monitor
         if(parsedData.monitor){
@@ -836,6 +837,118 @@ function muteMonitorAudio(monitorId,buttonEl){
     var volumeIcon = monitorMutes[monitorId] !== 1 ? 'volume-up' : 'volume-off'
     if(buttonEl)buttonEl.find('i').removeClass('fa-volume-up fa-volume-off').addClass('fa-' + volumeIcon)
 }
+function getLoadedMonitors(unusedParameter, runningOnly, asArray){
+    const theMonitors = asArray ? [] : {}
+    if(asArray){
+        return Object.values(loadedMonitors)
+    }else{
+        $.each(loadedMonitors,function(monitorId,monitor){
+            if(
+                !runningOnly ||
+                monitor.mode === 'start' ||
+                monitor.mode === 'record'
+            ){
+                theMonitors[monitor.mid] = monitor
+            }
+        })
+    }
+    return theMonitors;
+}
+function getMonitorAfter(monitorLiveId, getValue, monitors = loadedMonitors) {
+    let passedMentioned = false;
+    let foundProp = null;
+    let foundValue = null;
+    for (var prop in monitors) {
+        if (passedMentioned) {
+            foundProp = prop;
+            foundValue = monitors[prop];
+            break;
+        } else if (monitorLiveId === prop) {
+            passedMentioned = true;
+        }
+    }
+    if (!foundProp) {
+        for (var prop in monitors) {
+            foundProp = prop;
+            foundValue = monitors[prop];
+            break;
+        }
+    }
+
+    return getValue ? foundValue : foundProp;
+}
+function getMonitorsAfter(monitorLiveId, numberOf, monitors = loadedMonitors) {
+    let passedMentioned = !monitorLiveId || false;
+    let iterated = 0;
+    const foundMonitors = {};
+    let wrapped = false;
+
+    // First pass: find monitors after the specified one
+    for (var prop in monitors) {
+        if (passedMentioned) {
+            if (iterated === numberOf) {
+                return foundMonitors;
+            }
+            ++iterated;
+            foundMonitors[prop] = monitors[prop];
+        } else if (monitorLiveId === prop) {
+            passedMentioned = true;
+        }
+    }
+
+    // If not enough monitors were found after the specified one, wrap around to the beginning
+    if (iterated < numberOf) {
+        for (var prop in monitors) {
+            if (iterated === numberOf) {
+                return foundMonitors;
+            }
+            ++iterated;
+            foundMonitors[prop] = monitors[prop];
+        }
+    }
+
+    return foundMonitors;
+}
+function getMonitorBefore(monitorLiveId, getValue, monitors = loadedMonitors) {
+    const monitorKeys = Object.keys(monitors);
+    const index = monitorKeys.indexOf(monitorLiveId);
+
+    let previousKey;
+    if (index === -1) {
+        // If the monitorLiveId is not found, start from the end
+        previousKey = monitorKeys[monitorKeys.length - 1];
+    } else if (index === 0) {
+        // If it's the first monitor, wrap around to the last one
+        previousKey = monitorKeys[monitorKeys.length - 1];
+    } else {
+        // Otherwise, get the previous monitor
+        previousKey = monitorKeys[index - 1];
+    }
+
+    return getValue ? monitors[previousKey] : previousKey;
+}
+function getMonitorsBefore(monitorLiveId, numberOf, monitors = loadedMonitors) {
+    const monitorKeys = Object.keys(monitors);
+    const index = monitorKeys.indexOf(monitorLiveId);
+    const foundMonitors = {};
+
+    let startIndex;
+    if (index === -1) {
+        // If the monitorLiveId is not found, start from the end
+        startIndex = monitorKeys.length - 1;
+    } else {
+        // Start from the monitor before the specified one
+        startIndex = index - 1;
+    }
+
+    for (let i = 0; i < numberOf; i++) {
+        const currentIndex = (startIndex - i + monitorKeys.length) % monitorKeys.length; // Wrap around using modulo
+        const key = monitorKeys[currentIndex];
+        foundMonitors[key] = monitors[key];
+    }
+
+    return foundMonitors;
+}
 function getMonitorsFromIds(monitorIds){
     var foundMonitors = []
     monitorIds.forEach((monitorId) => {
@@ -854,6 +967,22 @@ function getListOfTagsFromMonitors(){
         }
     })
     return listOftags
+}
+function getMonitorsIdsFromTagGroup(tag){
+    var searchingFor = tag.split(',').map(item => item.trim())
+    var listOfMonitors = []
+    $.each(getLoadedMonitors(),function(monitorLiveId,monitor){
+        if(monitor.tags){
+            for(tag of searchingFor){
+                if(monitor.tags.includes(tag)){
+                    const monitorId = monitor.mid;
+                    listOfMonitors.push({ monitorId });
+                    break;
+                }
+            }
+        }
+    })
+    return listOfMonitors
 }
 function sanitizeTagList(tags){
     var allTags = getListOfTagsFromMonitors()

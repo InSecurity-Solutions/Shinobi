@@ -573,7 +573,7 @@ module.exports = function(s,config,lang){
             return
         }
         cleanStringsInObject(form)
-        form.mid = form.mid.replace(/[^\w\s]/gi,'').replace(/ /g,'')
+        form.mid = `${form.mid}`.replace(/[^\w\s]/gi,'').replace(/ /g,'')
         const selectResponse = await s.knexQueryPromise({
             action: "select",
             columns: "*",

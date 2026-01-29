@@ -10,6 +10,9 @@ var httpProxy = require('http-proxy');
 var proxy = httpProxy.createProxyServer({})
 var ejs = require('ejs');
 module.exports = function(s,config,lang,app){
+    const {
+        isValidStreamName,
+     } = require('./system/utils.js')(config)
     const { getAdminUser } = require('./user/utils.js')(s,config,lang);
     function cantLiveStreamPermission(user,monitorId,permission){
         const {
@@ -225,7 +228,7 @@ module.exports = function(s,config,lang,app){
     app.get([config.webPaths.apiPrefix+':auth/hls/:ke/:id/:file',config.webPaths.apiPrefix+':auth/hls/:ke/:id/:channel/:file'], function (req,res){
         s.auth(req.params,function(user){
             const monitorId = req.params.id
-            if(cantLiveStreamPermission(user,monitorId,'watch_stream')){
+            if(cantLiveStreamPermission(user,monitorId,'watch_stream') || !isValidStreamName(req.params.file)){
                 s.closeJsonResponse(res,{ok: false, msg: lang['Not Authorized']});
                 return;
             }
@@ -242,11 +245,14 @@ module.exports = function(s,config,lang,app){
                     req.dir+=req.params.file;
                 }
                 res.on('finish',function(){res.end();});
-                if (fs.existsSync(req.dir)){
-                    fs.createReadStream(req.dir).pipe(res);
-                }else{
-                    res.end(lang['File Not Found'])
-                }
+
+                fs.access(req.dir, fs.constants.F_OK, (err) => {
+                    if (err) {
+                        res.end(lang['File Not Found'])
+                    } else {
+                        fs.createReadStream(req.dir).pipe(res);
+                    }
+                });
             },res,req)
         },res,req);
     })

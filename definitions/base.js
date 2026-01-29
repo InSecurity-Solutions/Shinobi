@@ -267,38 +267,13 @@ module.exports = function(s,config,lang){
                 "color": "navy",
                 "info": [
                     {
-                        "field": lang['Force Monitors Per Row'],
-                        attribute:'localStorage="montage_use"',
-                        selector:'st_force_mon_rows',
-                        "description": "",
-                        "default": "0",
-                        "example": "",
-                        "fieldType": "select",
-                        "possible": [
-                            {
-                               "name": lang.No,
-                               "value": "0"
-                            },
-                            {
-                               "name": lang.Yes,
-                               "value": "1"
-                            }
-                        ]
-                    },
-                    {
-                        "field": lang['Monitors per row'],
-                        "form-group-class":"st_force_mon_rows_input st_force_mon_rows_1",
-                        attribute:'localStorage="montage"',
-                        "placeholder": "3",
-                    },
-                    {
                           "field": lang.hlsOptions,
                           "name": "localStorage=hlsOptions",
                           fieldType:"textarea",
                           "placeholder": "{}",
                     },
                 ]
-            },
+             },
              "Preferences": {
                 "name": lang.Preferences,
                 "color": "navy",
@@ -2559,9 +2534,25 @@ module.exports = function(s,config,lang){
                                   color: 'red',
                               },
                               {
+                                  label: lang['Open Next Monitors'],
+                                  class: 'open-next-monitors cursor-pointer',
+                                  color: 'blue',
+                              },
+                              {
+                                  label: lang['Open Previous'],
+                                  class: 'open-previous-monitors cursor-pointer',
+                                  color: 'blue',
+                              },
+                              {
                                   label: lang['Remember Positions'],
                                   class: 'cursor-pointer',
                                   attributes: 'shinobi-switch="monitorOrder" ui-change-target=".dot" on-class="dot-green" off-class="dot-grey"',
+                                  color: 'grey',
+                              },
+                              {
+                                  label: lang['Maintain Grid'],
+                                  class: 'cursor-pointer',
+                                  attributes: 'shinobi-switch="liveGridMaintainGrid" ui-change-target=".dot" on-class="dot-green" off-class="dot-grey"',
                                   color: 'grey',
                               },
                               {
@@ -2606,6 +2597,17 @@ module.exports = function(s,config,lang){
                                   attributes: 'shinobi-switch="popOnEvent" ui-change-target=".dot" on-class="dot-green" off-class="dot-grey"',
                                   color: 'grey',
                               },
+                              ...[
+                                  1,2,3
+                                  //,4,6
+                              ].map(gridNumber => {
+                                  return {
+                                      label: `${gridNumber} x ${gridNumber}`,
+                                      class: 'cursor-pointer auto-place-monitors',
+                                      attributes: `data-number="${gridNumber}"`,
+                                      color: 'purple',
+                                  }
+                              }),
                           ]
                       },
                       {
@@ -3341,8 +3343,8 @@ module.exports = function(s,config,lang){
                             {
                                 "fieldType": "btn",
                                 "class": `btn-success fill refresh-data mb-3`,
-                                "icon": `refresh`,
-                                "btnContent": `${lang['Refresh']}`,
+                                "icon": `search`,
+                                "btnContent": `${lang['Search']}`,
                             },
                         ],
                      },
@@ -3357,6 +3359,16 @@ module.exports = function(s,config,lang){
                 noHeader: true,
                "section-pre-class": "col-md-8",
                "info": [
+                   {
+                       "fieldType": "div",
+                       "id": "videosTable_draw_area_notice",
+                       "divContent": `<div class="text-center">
+                            <i class="fa fa-5x mb-3 fa-hand-pointer-o fa-rotate-270"></i>
+                        </div>
+                        <h3 class="text-center">
+                            <div>${lang['Ready to Search']}</div>
+                        </h3>`
+                   },
                    {
                        "fieldType": "table",
                        "attribute": `data-classes="table table-striped"`,
