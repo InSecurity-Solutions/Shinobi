@@ -1689,25 +1689,12 @@ $(document).ready(function(e){
                 showHideSubstreamActiveIcon(monitorId,!!subStreamChannel)
                 if(watchToggleCallback[monitorId])watchToggleCallback[monitorId]()
             break;
-            // case'mode_jpeg_off':
-            //     window.jpegModeOn = false
-            //     $.each(loadedMonitors,function(n,v){
-            //         stopJpegStream(v.mid)
-            //         resetMonitorCanvas(v.mid)
-            //         initiateLiveGridPlayer(v)
-            //     })
-            //     $('body').removeClass('jpegMode')
-            // break;
-            // case'mode_jpeg_on':
-            //     window.jpegModeOn = true
-            //     startAllJpegStreams()
-            //     $('body').addClass('jpegMode')
-            // break;
             case'detector_trigger':
                 var monitorId = d.id
                 var matrices = d.details.matrices
-                var liveGridElement = liveGridElements[monitorId]
-                if(!window.dontShowDetection && liveGridElement){
+                var playingNow = liveGridPlayingNow[monitorId]
+                if(!window.dontShowDetection && playingNow){
+                    var liveGridElement = liveGridElements[monitorId]
                     var monitorElement = liveGridElement.monitorItem
                     var livePlayerElement = loadedLiveGrids[monitorId]
                     if(d.doObjectDetection === true){
