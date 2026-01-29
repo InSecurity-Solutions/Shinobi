@@ -52,7 +52,8 @@ function connectWebSocket() {
 
   ws.on('error', (err) => {
     console.error('SSH Socket error:', err);
-    scheduleReconnect();
+    // scheduleReconnect();
+    process.exit(0);
   });
 }
 
