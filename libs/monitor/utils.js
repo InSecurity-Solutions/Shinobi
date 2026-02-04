@@ -1569,122 +1569,127 @@ module.exports = (s,config,lang) => {
         //create host string without username and password
         const strippedHost = stripAuthFromHost(e)
         async function doOnThisMachine(callback){
-            await createCameraFolders(e)
-            activeMonitor.allowStdinWrite = false
-            setMotionLock(e)
-            //start "no motion" checker
-            if(e.details.detector === '1' && e.details.detector_notrigger === '1'){
-                setNoEventsDetector(e)
-            }
-            if(config.childNodes.mode !== 'child' && s.platform!=='darwin' && (e.functionMode === 'record' || (e.functionMode === 'start'&&e.details.detector_record_method==='sip'))){
-                if(activeMonitor.fswatch && activeMonitor.fswatch.close){
-                  activeMonitor.fswatch.close()
-                }
-                activeMonitor.fswatch = fs.watch(e.dir, {encoding : 'utf8'}, (event, filename) => {
-                    switch(event){
-                        case'change':
-                            resetRecordingCheck(e)
-                        break;
-                    }
-                });
-            }
-            if(
-                isMacOS &&
-                isWatchOnlyOrRecord &&
-                (streamTypeIsJPEG || streamTypeIsHLS || jpegApiEnabled)
-            ){
-                if(activeMonitor.fswatchStream && activeMonitor.fswatchStream.close){
-                    activeMonitor.fswatchStream.close()
-                }
-                activeMonitor.fswatchStream = fs.watch(activeMonitor.sdir, {encoding : 'utf8'}, () => {
-                    resetStreamCheck(e)
-                })
-            }
-            // if(!activeMonitor.criticalErrors['453'])s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true});
-            //check host to see if has password and user in it
-            clearTimeout(activeMonitor.recordingChecker)
             try{
-                await cameraDestroy(e)
-            }catch(err){
-                // s.debugLog(err)
-            }
-            async function startVideoProcessor(err,pingResponse){
-                pingResponse = pingResponse ? pingResponse : {success: true}
-                return new Promise((resolve) => {
-                    if(pingResponse.success === true){
-                        activeMonitor.isRecording = true
-                        try{
-                            createCameraFfmpegProcess(e).then((mainProcess) => {
-                                if(mainProcess){
-                                    createEventCounter(e)
-                                    createCameraStreamHandlers(e)
-                                    if(typeIsDashcam){
-                                        setTimeout(function(){
-                                            activeMonitor.allowStdinWrite = true
-                                            s.txToDashcamUsers({
-                                                f : 'enable_stream',
-                                                ke : groupKey,
-                                                mid : monitorId
-                                            },groupKey)
-                                        },30000)
-                                    }
-                                    if(
-                                        isRecord ||
-                                        typeIsMjpeg ||
-                                        typeIsH264 ||
-                                        typeIsLocal
-                                    ){
-                                        catchNewSegmentNames(e)
-                                        cameraFilterFfmpegLog(e)
-                                    }
-                                    if(isRecord){
-                                        s.sendMonitorStatus({
-                                            id: monitorId,
-                                            ke: groupKey,
-                                            status: lang.Recording,
-                                            code: 3
-                                        });
-                                    }else{
-                                        s.sendMonitorStatus({
-                                            id: monitorId,
-                                            ke: groupKey,
-                                            status: lang.Watching,
-                                            code: 2
-                                        });
-                                    }
-                                }
-                                s.onMonitorStartExtensions.forEach(function(extender){
-                                    extender(Object.assign({},theGroup.rawMonitorConfigurations[monitorId]),e)
-                                })
-                                resolve()
-                            })
-                        }catch(err){
-                            console.log('Failed to Load',monitorId,groupKey)
-                            console.log(err)
-                            resolve()
+                await createCameraFolders(e)
+                activeMonitor.allowStdinWrite = false
+                setMotionLock(e)
+                //start "no motion" checker
+                if(e.details.detector === '1' && e.details.detector_notrigger === '1'){
+                    setNoEventsDetector(e)
+                }
+                if(config.childNodes.mode !== 'child' && s.platform!=='darwin' && (e.functionMode === 'record' || (e.functionMode === 'start'&&e.details.detector_record_method==='sip'))){
+                    if(activeMonitor.fswatch && activeMonitor.fswatch.close){
+                      activeMonitor.fswatch.close()
+                    }
+                    activeMonitor.fswatch = fs.watch(e.dir, {encoding : 'utf8'}, (event, filename) => {
+                        switch(event){
+                            case'change':
+                                resetRecordingCheck(e)
+                            break;
                         }
-                      }else{
-                          s.onMonitorPingFailedExtensions.forEach(function(extender){
-                              extender(Object.assign(theGroup.rawMonitorConfigurations[monitorId],{}),e)
-                          })
-                          s.userLog(e,{type:lang["Ping Failed"],msg:lang.skipPingText1});
-                          fatalError(e,"Ping Failed").then(() => {
-                              resolve();
-                          });
-                      }
-                })
-            }
-            if(doPingTest){
+                    });
+                }
+                if(
+                    isMacOS &&
+                    isWatchOnlyOrRecord &&
+                    (streamTypeIsJPEG || streamTypeIsHLS || jpegApiEnabled)
+                ){
+                    if(activeMonitor.fswatchStream && activeMonitor.fswatchStream.close){
+                        activeMonitor.fswatchStream.close()
+                    }
+                    activeMonitor.fswatchStream = fs.watch(activeMonitor.sdir, {encoding : 'utf8'}, () => {
+                        resetStreamCheck(e)
+                    })
+                }
+                // if(!activeMonitor.criticalErrors['453'])s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true});
+                //check host to see if has password and user in it
+                clearTimeout(activeMonitor.recordingChecker)
                 try{
-                    const testResult = await asyncConnectionTest(strippedHost,e.port,2000)
-                    await startVideoProcessor(testResult.err,testResult.response)
+                    await cameraDestroy(e)
                 }catch(err){
+                    // s.debugLog(err)
+                }
+                async function startVideoProcessor(err,pingResponse){
+                    pingResponse = pingResponse ? pingResponse : {success: true}
+                    return new Promise((resolve) => {
+                        if(pingResponse.success === true){
+                            activeMonitor.isRecording = true
+                            try{
+                                createCameraFfmpegProcess(e).then((mainProcess) => {
+                                    if(mainProcess){
+                                        createEventCounter(e)
+                                        createCameraStreamHandlers(e)
+                                        if(typeIsDashcam){
+                                            setTimeout(function(){
+                                                activeMonitor.allowStdinWrite = true
+                                                s.txToDashcamUsers({
+                                                    f : 'enable_stream',
+                                                    ke : groupKey,
+                                                    mid : monitorId
+                                                },groupKey)
+                                            },30000)
+                                        }
+                                        if(
+                                            isRecord ||
+                                            typeIsMjpeg ||
+                                            typeIsH264 ||
+                                            typeIsLocal
+                                        ){
+                                            catchNewSegmentNames(e)
+                                            cameraFilterFfmpegLog(e)
+                                        }
+                                        if(isRecord){
+                                            s.sendMonitorStatus({
+                                                id: monitorId,
+                                                ke: groupKey,
+                                                status: lang.Recording,
+                                                code: 3
+                                            });
+                                        }else{
+                                            s.sendMonitorStatus({
+                                                id: monitorId,
+                                                ke: groupKey,
+                                                status: lang.Watching,
+                                                code: 2
+                                            });
+                                        }
+                                    }
+                                    s.onMonitorStartExtensions.forEach(function(extender){
+                                        extender(Object.assign({},theGroup.rawMonitorConfigurations[monitorId]),e)
+                                    })
+                                    resolve()
+                                })
+                            }catch(err){
+                                console.log('Failed to Load',monitorId,groupKey)
+                                console.log(err)
+                                resolve()
+                            }
+                          }else{
+                              s.onMonitorPingFailedExtensions.forEach(function(extender){
+                                  extender(Object.assign(theGroup.rawMonitorConfigurations[monitorId],{}),e)
+                              })
+                              s.userLog(e,{type:lang["Ping Failed"],msg:lang.skipPingText1});
+                              fatalError(e,"Ping Failed").then(() => {
+                                  resolve();
+                              });
+                          }
+                    })
+                }
+                if(doPingTest){
+                    try{
+                        const testResult = await asyncConnectionTest(strippedHost,e.port,2000)
+                        await startVideoProcessor(testResult.err,testResult.response)
+                    }catch(err){
+                        await startVideoProcessor()
+                    }
+                }else{
                     await startVideoProcessor()
                 }
-            }else{
-                await startVideoProcessor()
+                if(callback)callback()
+            }catch(err){
+                await fatalError(e,"Failed to run on Machine");
+                if(callback)callback()
             }
-            if(callback)callback()
         }
         async function doOnChildMachine(){
             function startVideoProcessor(){
@@ -1741,7 +1746,7 @@ module.exports = (s,config,lang) => {
         if(activeMonitor.isStarted === true){
             activeMonitor.fatalErrorTimeout = setTimeout(function(){
                 if(maxCount !== 0 && activeMonitor.errorFatalCount > maxCount){
-                    s.userLog(e,{type:lang["Fatal Error"],msg:lang.onFatalErrorExit});
+                    s.userLog(e,{type:lang["Fatal Error"],msg:`${lang.onFatalErrorExit}, ${errorMessage}`});
                     s.camera('stop',{mid:monitorId,ke:groupKey})
                 }else{
                     launchMonitorProcesses(monitorConfig)
