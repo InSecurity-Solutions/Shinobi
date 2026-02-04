@@ -11,6 +11,8 @@ module.exports = function(s){
         s.onAccountSave(opt.onAccountSave)
         s.cloudDisksLoaded.push(opt.name)
         if(opt.onGetVideoData)s.cloudDiskUseOnGetVideoDataExtensions[opt.name] = opt.onGetVideoData
+        if(opt.onLoadedUsersAtStartup)s.onLoadedUsersAtStartup(opt.onLoadedUsersAtStartup)
+        if(opt.onProcessReady)s.onProcessReady(opt.onProcessReady)
     }
     s.addSimpleUploader = function(opt){
         s.loadGroupAppExtender(opt.loadGroupAppExtender)
