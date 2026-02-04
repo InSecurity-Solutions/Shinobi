@@ -244,7 +244,7 @@ module.exports = function(s,config,lang,io){
                 },function(err,videos) {
                     if(videos && videos[0]){
                         videos.forEach(function(video){
-                            var storageType = JSON.parse(video.details).type
+                            var storageType = video.type || JSON.parse(video.details).type
                             if(!storageType)storageType = 's3'
                             var videoSize = video.size / 1048576
                             user.cloudDiskUse[storageType].usedSpace += videoSize
@@ -428,8 +428,8 @@ module.exports = function(s,config,lang,io){
                         //check terminal commander
                         checkForTerminalCommands(function(){
                             //load administrators (groups)
-                            loadAdminUsers(function(){
-                                s.runExtensionsForArray('onLoadedUsersAtStartup', null, [])
+                            loadAdminUsers(async function(){
+                                await s.runExtensionsForArrayAwaited('onLoadedUsersAtStartup', null, [])
                                 //load monitors (for groups)
                                 loadMonitors(function(){
                                     //check for orphaned videos
