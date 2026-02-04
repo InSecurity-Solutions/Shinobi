@@ -414,37 +414,24 @@ module.exports = function(s,config){
             }
         })
     }
-    const knexQueryPromise = (options, maxAttempts = 3) => {
-        return new Promise((resolve, reject) => {
-            let attempts = 0;
-            const executeQuery = () => {
-                attempts++;
-                knexQuery(options, (err, rows) => {
-                    if (err) {
-                        if (attempts < maxAttempts) {
-                            console.error(`Database error, attempt : ${attempts},`,err)
-                            executeQuery();
-                        } else {
-                            resolve({
-                                ok: false,
-                                err: err,
-                                rows: null,
-                                attempts: attempts
-                            });
-                        }
-                    } else {
-                        resolve({
-                            ok: true,
-                            err: null,
-                            rows: rows,
-                            attempts: attempts
-                        });
-                    }
-                });
-            };
-            executeQuery();
-        });
-    };
+    const knexQueryPromise = (options) => {
+        return new Promise((resolve,reject) => {
+            knexQuery(options, (err,rows) => {
+                if(err && err.code === 'ECONNRESET'){
+                    console.error('SQL ECONNRESET : Trying Request Again!', new Date())
+                    setTimeout(async function(){
+                        resolve(await knexQueryPromise(options))
+                    }, 1000 * 30)
+                }else{
+                    resolve({
+                        ok: !err,
+                        err: err,
+                        rows: rows,
+                    })
+                }
+            })
+        })
+    }
     const connectDatabase = function(){
         s.databaseEngine = require('knex')(s.databaseOptions)
     }
