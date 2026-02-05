@@ -45,7 +45,7 @@
     "node-fstab": "^1.0.17",
     "node-shinobi": "^1.0.4",
     "node-ssh": "^12.0.4",
-    "nodemailer": "^6.7.1",
+    "nodemailer": "^8.0.0",
     "onvif": "^0.8.0",
     "pam-diff": "^1.1.0",
     "path": "^0.12.7",
