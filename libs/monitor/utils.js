@@ -2023,10 +2023,15 @@ module.exports = (s,config,lang) => {
                             })
                         }
                     })
+                    resolve(r);
                 }catch(err){
-                    console.log(err)
+                    console.log('getMonitors fail, trying again...')
+                    setTimeout(function(){
+                        getMonitors(groupKey, monitorId, authKey, isRestricted, monitorPermissions, monitorRestrictions, cannotSeeImportantSettings, search).then((response) => {
+                            resolve(response)
+                        })
+                    },2000)
                 }
-                resolve(r);
             })
         })
     }
