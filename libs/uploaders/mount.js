@@ -393,7 +393,9 @@ module.exports = function(s,config,lang){
     }
     function onLoadedUsersAtStartup(){
         return new Promise(async (resolve) => {
+            let groupsDone = 0
             let monitorsDoneCount = 0
+            let numberOfGroups = Object.keys(s.group).length
             for(groupKey in s.group){
                 if(s.group[groupKey].mnt){
                     const { err, rows: monitors } = await s.knexQueryPromise({
@@ -418,9 +420,15 @@ module.exports = function(s,config,lang){
                         });
                         scanForOrphanedVideos({ groupKey, monitorId }, { forceCheck: true, checkMax: 'unlimited', rows }).then(function(){
                             ++monitorsDoneCount;
-                            if(monitors.length === monitorsDoneCount)resolve()
+                            if(monitors.length === monitorsDoneCount){
+                                ++groupsDone
+                                if(numberOfGroups === groupsDone)resolve()
+                            }
                         })
                     }
+                }else{
+                    ++groupsDone;
+                    if(numberOfGroups === groupsDone)resolve()
                 }
             }
         })
