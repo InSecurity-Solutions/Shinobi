@@ -395,30 +395,32 @@ module.exports = function(s,config,lang){
         return new Promise(async (resolve) => {
             let monitorsDoneCount = 0
             for(groupKey in s.group){
-                const { err, rows: monitors } = await s.knexQueryPromise({
-                    action: "select",
-                    columns: "mid,ke,name",
-                    table: "Monitors",
-                    where: [
-                        ['ke','=',groupKey],
-                    ]
-                });
-                for(monitor of monitors){
-                    const monitorId = monitor.mid
-                    const { err, rows } = await s.knexQueryPromise({
+                if(s.group[groupKey].mnt){
+                    const { err, rows: monitors } = await s.knexQueryPromise({
                         action: "select",
-                        columns: "*",
-                        table: "Cloud Videos",
+                        columns: "mid,ke,name",
+                        table: "Monitors",
                         where: [
                             ['ke','=',groupKey],
-                            ['mid','=',monitorId],
-                            ['type','=','mnt'],
                         ]
                     });
-                    scanForOrphanedVideos({ groupKey, monitorId }, { forceCheck: true, checkMax: 'unlimited', rows }).then(function(){
-                        ++monitorsDoneCount;
-                        if(monitors.length === monitorsDoneCount)resolve()
-                    })
+                    for(monitor of monitors){
+                        const monitorId = monitor.mid
+                        const { err, rows } = await s.knexQueryPromise({
+                            action: "select",
+                            columns: "*",
+                            table: "Cloud Videos",
+                            where: [
+                                ['ke','=',groupKey],
+                                ['mid','=',monitorId],
+                                ['type','=','mnt'],
+                            ]
+                        });
+                        scanForOrphanedVideos({ groupKey, monitorId }, { forceCheck: true, checkMax: 'unlimited', rows }).then(function(){
+                            ++monitorsDoneCount;
+                            if(monitors.length === monitorsDoneCount)resolve()
+                        })
+                    }
                 }
             }
         })
