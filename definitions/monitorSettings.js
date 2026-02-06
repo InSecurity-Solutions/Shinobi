@@ -297,15 +297,11 @@ module.exports = (s,config,lang) => {
                      ]
                  },
                  {
-                     hidden:true,
                     "name": "detail=rtsp_transport",
                     "field": lang["RTSP Transport"],
                     "description": lang["fieldTextRtspTransport"],
-                    "default": "",
-                    "example": "",
                     "form-group-class": "h_t_input h_t_h264 h_t_hls h_t_mp4 h_t_jpeg h_t_mjpeg",
                     "form-group-class-pre-layer":"h_p_input h_p_rtsp",
-                    "form-group-class-pre-pre-layer":"h_auto_host_input h_auto_host_0 auto_host_fill",
                     "fieldType": "select",
                     "possible": [
                         {
@@ -321,6 +317,11 @@ module.exports = (s,config,lang) => {
                         {
                            "name": "UDP",
                            "value": "udp",
+                           "info": lang["fieldTextRtspTransportUDP"]
+                        },
+                        {
+                           "name": lang['UDP Multicast'],
+                           "value": "udp_multicast",
                            "info": lang["fieldTextRtspTransportUDP"]
                         },
                         {
