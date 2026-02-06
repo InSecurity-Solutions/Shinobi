@@ -567,8 +567,12 @@ module.exports = function(s,config,lang){
         var endData = {
             ok: false
         }
-        if(!form.mid || !s.timeReady){
-            endData.msg = !s.timeReady ? lang.notReadyYet : lang['No Monitor ID Present in Form']
+        if(
+            !form.mid
+             // || !s.timeReady
+         ){
+            // endData.msg = !s.timeReady ? lang.notReadyYet : lang['No Monitor ID Present in Form']
+            endData.msg = lang['No Monitor ID Present in Form']
             if(callback)callback(endData);
             return endData
         }
