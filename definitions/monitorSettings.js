@@ -322,7 +322,7 @@ module.exports = (s,config,lang) => {
                         {
                            "name": lang['UDP Multicast'],
                            "value": "udp_multicast",
-                           "info": lang["fieldTextRtspTransportUDP"]
+                           "info": lang["fieldTextRtspTransportUDPMulticast"]
                         },
                         {
                            "name": "HTTP",

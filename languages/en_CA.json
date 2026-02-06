@@ -1723,7 +1723,7 @@
    "fieldTextRtspTransportTCP": "Set it to this if UDP starts giving undesired results.",
    "fieldTextRtspTransportUDP": "FFMPEG tries this first.",
    "UDP Multicast": "UDP Multicast",
-   "fieldTextRtspTransportUDP": "UDP Multicast",
+   "fieldTextRtspTransportUDPMulticast": "UDP Multicast",
    "fieldTextRtspTransportHTTP": "Standard connection method.",
    "fieldTextMuser": "The user login for your camera",
    "fieldTextMpass": "The password for your camera",
