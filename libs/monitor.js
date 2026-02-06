@@ -490,54 +490,58 @@ module.exports = function(s,config,lang){
         return options
     }
     s.cameraSendSnapshot = async (e,options) => {
-        options = Object.assign({
-            flags: '-s 500x500'
-        },options || {})
-        s.checkDetails(e)
-        if(e.ke && config.doSnapshot === true){
-            if(s.group[e.ke] && s.group[e.ke].rawMonitorConfigurations && s.group[e.ke].rawMonitorConfigurations[e.mid] && s.group[e.ke].rawMonitorConfigurations[e.mid].mode !== 'stop'){
-                async function getRaw(){
-                    var pathDir = s.dir.streams+e.ke+'/'+e.mid+'/'
-                    const {screenShot, isStaticFile} = await s.getRawSnapshotFromMonitor(s.group[e.ke].rawMonitorConfigurations[e.mid],options)
-                    if(screenShot){
-                        s.tx({
-                            f: 'monitor_snapshot',
-                            snapshot: screenShot.toString('base64'),
-                            snapshot_format: 'b64',
-                            mid: e.mid,
-                            ke: e.ke
-                        },'GRP_'+e.ke)
-                    }else{
-                        s.debugLog('Damaged Snapshot Data')
-                        s.tx({f:'monitor_snapshot',snapshot:e.mon.name,snapshot_format:'plc',mid:e.mid,ke:e.ke},'GRP_'+e.ke)
+        try{
+            options = Object.assign({
+                flags: '-s 500x500'
+            },options || {})
+            s.checkDetails(e)
+            if(e.ke && config.doSnapshot === true){
+                if(s.group[e.ke] && s.group[e.ke].rawMonitorConfigurations && s.group[e.ke].rawMonitorConfigurations[e.mid] && s.group[e.ke].rawMonitorConfigurations[e.mid].mode !== 'stop'){
+                    async function getRaw(){
+                        var pathDir = s.dir.streams+e.ke+'/'+e.mid+'/'
+                        const {screenShot, isStaticFile} = await s.getRawSnapshotFromMonitor(s.group[e.ke].rawMonitorConfigurations[e.mid],options)
+                        if(screenShot){
+                            s.tx({
+                                f: 'monitor_snapshot',
+                                snapshot: screenShot.toString('base64'),
+                                snapshot_format: 'b64',
+                                mid: e.mid,
+                                ke: e.ke
+                            },'GRP_'+e.ke)
+                        }else{
+                            s.debugLog('Damaged Snapshot Data')
+                            s.tx({f:'monitor_snapshot',snapshot:e.mon.name,snapshot_format:'plc',mid:e.mid,ke:e.ke},'GRP_'+e.ke)
+                        }
                     }
-                }
-                const onvifDevice = s.group[e.ke].activeMonitors[e.mid].onvifConnection || (await s.createOnvifDevice({ id: e.mid, ke: e.ke })).device;
-                if(onvifDevice){
-                    try{
-                        const screenShot = await s.getSnapshotFromOnvif({
-                            ke: e.ke,
-                            mid: e.mid,
-                        });
-                        s.tx({
-                            f: 'monitor_snapshot',
-                            snapshot: screenShot.toString('base64'),
-                            snapshot_format: 'b64',
-                            mid: e.mid,
-                            ke: e.ke
-                        },'GRP_'+e.ke)
-                    }catch(err){
-                        s.debugLog(err)
+                    const onvifDevice = s.group[e.ke].activeMonitors[e.mid].onvifConnection || (await s.createOnvifDevice({ id: e.mid, ke: e.ke })).device;
+                    if(onvifDevice){
+                        try{
+                            const screenShot = await s.getSnapshotFromOnvif({
+                                ke: e.ke,
+                                mid: e.mid,
+                            });
+                            s.tx({
+                                f: 'monitor_snapshot',
+                                snapshot: screenShot.toString('base64'),
+                                snapshot_format: 'b64',
+                                mid: e.mid,
+                                ke: e.ke
+                            },'GRP_'+e.ke)
+                        }catch(err){
+                            s.debugLog(err)
+                            await getRaw()
+                        }
+                    }else{
                         await getRaw()
                     }
                 }else{
-                    await getRaw()
+                    s.tx({f:'monitor_snapshot',snapshot:'Disabled',snapshot_format:'plc',mid:e.mid,ke:e.ke},'GRP_'+e.ke)
                 }
             }else{
-                s.tx({f:'monitor_snapshot',snapshot:'Disabled',snapshot_format:'plc',mid:e.mid,ke:e.ke},'GRP_'+e.ke)
+                s.tx({f:'monitor_snapshot',snapshot:e.mon.name,snapshot_format:'plc',mid:e.mid,ke:e.ke},'GRP_'+e.ke)
             }
-        }else{
-            s.tx({f:'monitor_snapshot',snapshot:e.mon.name,snapshot_format:'plc',mid:e.mid,ke:e.ke},'GRP_'+e.ke)
+        }catch(err){
+            s.debugLog(err)
         }
     }
     s.getCameraSnapshot = async (e,options) => {
