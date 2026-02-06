@@ -570,7 +570,7 @@ module.exports = function(s,config,lang){
         if(!form.mid || !s.timeReady){
             endData.msg = !s.timeReady ? lang.notReadyYet : lang['No Monitor ID Present in Form']
             if(callback)callback(endData);
-            return
+            return endData
         }
         cleanStringsInObject(form)
         form.mid = `${form.mid}`.replace(/[^\w\s]/gi,'').replace(/ /g,'')
