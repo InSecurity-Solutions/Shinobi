@@ -59,10 +59,9 @@ module.exports = function(s,config,lang){
         s.purgeCloudDiskForGroup({ ke: groupKey },'mnt')
     }
     const deleteObject = async (groupKey, filePath) => {
-        const fullPath = constructFilePath(groupKey, filePath)
         const response = { ok: true }
         try{
-            await fs.rm(fullPath)
+            await fs.rm(filePath)
         }catch(err){
             response.ok = false;
             response.err = err.toString();
@@ -128,7 +127,7 @@ module.exports = function(s,config,lang){
         deleteObject(video.ke, videoDetails.location).then((response) => {
             if (response.err){
                 console.error('Mounted Drive Storage DELETE Error')
-                console.error(err);
+                console.error(response.err);
             }
             callback()
         });
@@ -249,7 +248,7 @@ module.exports = function(s,config,lang){
         deleteObject(e.ke, frameDetails.location).then((response) => {
             if (response.err){
                 console.error('Mounted Drive Storage DELETE Error')
-                console.error(err);
+                console.error(response.err);
             }
             callback()
         });
@@ -421,6 +420,7 @@ module.exports = function(s,config,lang){
                         scanForOrphanedVideos({ groupKey, monitorId }, { forceCheck: true, checkMax: 'unlimited', rows }).then(function(){
                             ++monitorsDoneCount;
                             if(monitors.length === monitorsDoneCount){
+                                s.purgeCloudDiskForGroup({ ke: groupKey },'mnt')
                                 ++groupsDone
                                 if(numberOfGroups === groupsDone)resolve()
                             }
@@ -428,7 +428,9 @@ module.exports = function(s,config,lang){
                     }
                 }else{
                     ++groupsDone;
-                    if(numberOfGroups === groupsDone)resolve()
+                    if(numberOfGroups === groupsDone){
+                        resolve()
+                    }
                 }
             }
         })
