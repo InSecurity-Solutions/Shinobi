@@ -95,7 +95,7 @@ module.exports = function(s,config,lang,app,io){
         // e = user
         if(!storageType){
             var videoDetails = JSON.parse(r.details)
-            videoDetails.type = videoDetails.type || 's3'
+            videoDetails.type = videoDetails.type || r.type || 's3'
         }
         if(s.onDeleteTimelapseFrameFromCloudExtensions[storageType]){
             s.onDeleteTimelapseFrameFromCloudExtensions[storageType](e,video,function(){
