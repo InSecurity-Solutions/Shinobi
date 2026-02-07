@@ -228,6 +228,8 @@ module.exports = function(s,config,lang,io){
             s.cloudDisksLoaded.forEach(function(storageType){
                 user.cloudDiskUse[storageType] = {
                     usedSpace : 0,
+                    usedSpaceVideos : 0,
+                    usedSpaceTimelapseFrames : 0,
                     firstCount : 0
                 }
                 if(s.cloudDiskUseStartupExtensions[storageType])s.cloudDiskUseStartupExtensions[storageType](user,userDetails)
