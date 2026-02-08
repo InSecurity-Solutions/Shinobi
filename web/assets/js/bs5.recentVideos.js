@@ -127,9 +127,8 @@ $(document).ready(function(){
         drawMonitorListToSelector(monitorList.find('optgroup'))
         refreshRecentVideosOnAgree()
     })
-    onDashboardReady(function(){
+    onInitWebsocket(function(){
         openTab('initial');
-        var loadedMonitorsWaitTimeAdded = Object.keys(loadedMonitors).length * 20
         setTimeout(function(){
             if(tabTree.name === 'initial'){
                 if(loadedOnce)return;
@@ -137,6 +136,6 @@ $(document).ready(function(){
                 drawMonitorListToSelector(monitorList.find('optgroup'))
                 refreshRecentVideosOnAgree()
             }
-        },1000 * loadedMonitorsWaitTimeAdded)
+        },1000)
     })
 })
