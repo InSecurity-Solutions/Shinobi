@@ -390,19 +390,6 @@ $(document).ready(function(){
         }
         deleteSelectedMonitors(monitorsSelected)
     });
-    theBlock
-    .find('.ntp-toggle-selected-monitor-settings').click(function(){
-        var monitorsSelected = getSelectedMonitors(true)
-        if(monitorsSelected.length === 0){
-            new PNotify({
-                title: lang['No Monitors Selected'],
-                text: lang['Select atleast one monitor to delete'],
-                type: 'error'
-            });
-            return
-        }
-        toggleNtpOverOnvifForSelectedMonitors(monitorsSelected)
-    });
     theList
     .on('click','.copy-stream-url',function(e){
         e.preventDefault()
@@ -443,9 +430,6 @@ $(document).ready(function(){
     })
     theBlock.find('.import-monitor-settings').click(function(){
         launchImportMonitorWindow()
-    });
-    theBlock.find('.move-monitor-settings').click(function(){
-        launchMoveMonitorWindow()
     });
     theBlock.find('.changeMode-monitor-settings').click(function(){
         launchModeChangeMonitorWindow()
