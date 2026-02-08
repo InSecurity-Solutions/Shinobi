@@ -956,17 +956,17 @@ function getMonitorsFromIds(monitorIds){
     })
     return foundMonitors
 }
-function getListOfTagsFromMonitors(){
+function getListOfTagsFromMonitors(unusedParameter, tagsOnly){
     var listOftags = {}
     $.each(loadedMonitors,function(monitorId,monitor){
         if(monitor.tags){
            monitor.tags.split(',').forEach((tag) => {
                if(!listOftags[tag])listOftags[tag] = [];
-               listOftags[tag].push(monitorId)
+               if(!tagsOnly)listOftags[tag].push(monitorId)
            })
         }
     })
-    return listOftags
+    return tagsOnly ? Object.keys(listOftags) : listOftags
 }
 function getMonitorsIdsFromTagGroup(tag){
     var searchingFor = tag.split(',').map(item => item.trim())
@@ -1317,6 +1317,57 @@ function getRowsMonitorId(rowEl){
 }
 function getMonitorEmbedLink(monitorConfig){
     return `${getApiPrefix('embed')}/${monitorConfig.mid}/fullscreen|jquery|relative`
+}
+function getMonitorIconPath(monitorId){
+    return `${getApiPrefix('icon') + '/' + monitorId}?_time=${new Date()}`
+}
+function setMode(monitorId, mode) {
+    const _this = this;
+    return new Promise((resolve) => {
+        $.getJSON(`${getApiPrefix('monitor')}/${monitorId}/${mode}`,function(data){
+            resolve(data)
+        }).fail((err) => {
+            console.log('Failed Mode Change Trying Again...', monitorId)
+            _this.setMode(monitorId, mode).then(resolve)
+        })
+    });
+}
+function deleteMonitor(monitorId, filesToo) {
+    return new Promise((resolve) => {
+        const _this = this;
+        const url = `${getApiPrefix('configureMonitor')}/${monitorId}/delete${filesToo ? `?deleteFiles=true` : ''}`;
+        $.getJSON(url, (data) => {
+            if(data.ok){
+                delete(loadedMonitors[monitorId])
+            }
+            resolve(data)
+        });
+    });
+}
+function deleteMonitorWithConfirm(monitorId, afterDelete) {
+    const monitor = loadedMonitors[monitorId]
+    $.confirm.create({
+        title: lang['Delete']+' '+monitor.name,
+        body: '<p>'+lang.DeleteMonitorsText+'</p>',
+        clickOptions: [
+            {
+                title:lang['Delete']+' '+lang['Monitors'],
+                class:'btn-danger',
+                callback: async function(){
+                    await deleteMonitor(monitorId, false);
+                    if(afterDelete)afterDelete(monitorId)
+                }
+            },
+            {
+                title:lang['Delete Monitors and Files'],
+                class:'btn-danger',
+                callback: async function(){
+                    await deleteMonitor(monitorId, true);
+                    if(afterDelete)afterDelete(monitorId)
+                }
+            }
+        ]
+    })
 }
 function getRunningMonitors(asArray){
     const foundMonitors = {}

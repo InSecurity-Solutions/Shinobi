@@ -613,7 +613,7 @@ function onSelectorChange(_this,parent){
 }
 
 function createOptionHtml(options){
-    return `<option ${options.selected ? 'selected' : ''} value="${options.value}">${options.label}</option>`
+    return `<option ${options.selected ? 'selected' : ''} value="${options.value}">${options.label || options.name}</option>`
 }
 
 function createOptionListHtml(list){

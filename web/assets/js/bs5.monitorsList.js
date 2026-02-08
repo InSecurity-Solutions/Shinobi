@@ -1,123 +1,93 @@
 $(document).ready(function(){
-    var selectedApiKey = `${$user.auth_token}`
+    var selectedApiKey = null;
     var theBlock = $('#tab-monitorsList')
+    var theTable = $('#monitorsListTable')
     var theList = $('#monitorsListRows')
+    var theHeader = $('#monitorsListHeader')
+    var scrollContainer = $('#monitorsListScrollContainer')
     var apiKeySelector = $('#multi_mon_api_key_selector')
     var multiMonitorSelect = $('#multimon_select_all')
-    var iconsLoaded = $('.monitor-card-preview.unloaded-icon', theList)
-    var monitorListMenuDropdownOpen = null
+    var iconsLoaded = $('.image.unloaded-icon', theList)
+    var advancedSearchModal = $('#monitorsList_advancedSearch')
+    var monitorsListCountEl = $('#monitorsList-count')
+    var renewListTimeout = null;
     var monitorListScrollTimeout = null
+    function resizeTheListHeight(){
+        var excludeHeight = theHeader.height()
+        var viewPortHeight = window.innerHeight
+        scrollContainer.css('max-height', `calc(${viewPortHeight - excludeHeight}px - 5.5rem)`)
+    }
     function drawRowToList(row){
-        var streamUrl = libURL + buildStreamUrl(row.mid).replace($user.auth_token,selectedApiKey)
-        theList.append(`
-        <div data-mid="${row.mid}" class="col-md-4 card-page-selection glM${row.mid}">
-            <div class="${definitions.Theme.isDark ? 'text-white' : 'text-dark'} mb-3 card shadow-sm btn-default">
-                <div class="card monitor-card-preview snapshot launch-live-grid-monitor cursor-pointer unloaded-icon"></div>
-                ${buildMiniMonitorCardBody(loadedMonitors[row.mid],null,`<div>
-                <div class="mb-2">
-                    <div class="d-flex flex-row">
-                        <div class="flex-grow-1">
-                            <span class="monitor_name" title="${row.mid}">${row.name}</span>
-                        </div>
-                        <div class="text-right">
-                            <input class="monitor-list-select form-check-input no-abs m-0" type="checkbox" value="${row.mid}" name="${row.mid}" id="monitorListSelect-${row.mid}">
-                        </div>
-                    </div>
-                    <small class="text-muted monitor_host">${row.host}</small><br>
-                    <small class="text-muted monitor_status">${row.status || lang.Stopped}</small>
-                </div>
-                <div class="d-flex flex-row">
-                    <div class="flex-grow-1">
-                        <a href="javascript:console.log('${row.mid} Export')" class="badge btn btn-dark export-this-monitor-settings"><i class="fa fa-download"></i> ${lang['Export']}</a>
-                        <a href="javascript:console.log('${row.mid} Settings')" class="badge btn btn-dark open-monitor-settings"><i class="fa fa-wrench"></i> ${lang['Edit']}</a>
-                        <a class="badge btn btn-dark copy-stream-url" href="${streamUrl}" target="_blank">${lang['Copy Stream URL']}</a>
-                        <!-- <a class="badge btn btn-primary duplicate-monitor"><i class="fa fa-copy"></i> ${lang['Duplicate']}</a> -->
-                    </div>
-                    <div>
-                        <div class="dropup">
-                            <button type="button" class="d-inline-block badge btn btn-dark dropdown-toggle dropdown-toggle-split" id="monitorMenuItem${row.mid}" data-bs-toggle="dropdown" aria-expanded="false" data-bs-reference="parent">
-                              <i class="fa fa-ellipsis-v" aria-hidden="true"></i>
-                            </button>
-                            <ul class="dropdown-menu ${definitions.Theme.isDark ? 'dropdown-menu-dark bg-dark' : ''} shadow-lg" aria-labelledby="monitorMenuItem${row.mid}">
-                                ${buildDefaultMonitorMenuItems()}
-                            </ul>
-                        </div>
-                    </div>
-                </div>
-              </div>`,true)}
-          </div>
-      </div>`)
-    }
-    function loadMonitorsFromMemory(options,callback){
-        theList.empty();
-        $.each(getLoadedMonitorsAlphabetically(),function(n,row){
-            drawRowToList(row)
-        })
-        iconsLoaded = $('.monitor-card-preview.unloaded-icon', theList)
-    }
-    function getSelectedMonitors(){
-        var monitorsSelected = [];
-        theList.find('.monitor-list-select').each(function(n,v){
-            var el = $(v)
-            if(el.is(':checked')){
-                var key = el.attr('name')
-                monitorsSelected.push(getDbColumnsForMonitor(loadedMonitors[key]))
-            }
-        })
-        return monitorsSelected;
-    }
-    function toggleMonitorListSelectAll(isChecked){
-        var nameField = theList.find('input[type=checkbox][name]')
-        if(isChecked === true){
-            nameField.prop('checked',true)
+        const monitorId = row.mid;
+        const iconPath = getMonitorIconPath(monitorId);
+        const existingElement = theList.find(`[data-mid="${row.mid}"][data-ke="${row.ke}"]`)
+        const tags = (row.tags || '').split(',').map(item => `<span class="badge badge-success">${item}</span>`).join(' ');
+        if(existingElement.length > 0){
+            existingElement.find('.image').attr('src',iconPath)
+            existingElement.find('.name').text(row.name)
+            existingElement.find('.host').text(row.host)
+            existingElement.find('.mode').text(row.mode)
+            existingElement.find('.auto_host').text(row.details.auto_host)
+            existingElement.find('.stream_type').text(row.details.stream_type)
+            existingElement.find('.tags').html(tags)
         }else{
-            nameField.prop('checked',false)
-        }
-    }
-    function drawMonitorsListApiKeyList(){
-        $.getJSON(getApiPrefix(`api`) + '/list',function(d){
-            var html = ''
-            $.each(d.keys || [],function(n,key){
-                html += createOptionHtml({
-                    value: key.code,
-                    label: key.code,
-                })
-            })
-            apiKeySelector.find('optgroup').html(html)
-        })
-    }
-    function correctDropdownPosition(dropdownElement){
-        var p = dropdownElement.offset();
-        if (p.top < 0){
-            dropdownElement[0].style = `transform:translate(0px, ${-p.top + 20}px)!important;`
+            theList.append(`
+                <tr data-mid="${row.mid}" data-ke="${row.ke}" class="search-row">
+                    <td><input class="monitor-list-select form-check-input no-abs m-0" type="checkbox" value="${row.mid}" name="${row.ke}__${row.mid}"></td>
+                    <td><div class="video-thumbnail cursor-pointer launch-live-grid-monitor"><img class="image unloaded-icon" data-mid="${row.mid}" data-ke="${row.ke}" data-src="${iconPath}"></div></td>
+                    <td>
+                        <div class="name">${row.name}</div>
+                        <div><small>${row.mid}</small></div>
+                    </td>
+                    <td>
+                        <div class="host">${row.host}</div>
+                    </td>
+                    <td style="display:none">
+                        <div class="mode">${row.mode}</div>
+                        <div class="auto_host">${row.details.auto_host}</div>
+                        <div class="stream_type">${row.details.stream_type}</div>
+                    </td>
+                    <td>
+                        <span class="monitor_status_icon" style="color:${monitorStatusCodes[`c${row.code}`]}"><i class="fa fa-${monitorStatusCodes[`i${row.code}`]}"></i></span>
+                        <span class="monitor_status">${monitorStatusCodes[row.code]}</span>
+                    </td>
+                    <td class="tags">
+                        ${tags}
+                    </td>
+                    <td class="text-end">
+                        <a class="btn btn-sm btn-primary open-monitor-settings" title="${lang['Edit']}"><i class="fa fa-wrench"></i></a>
+                        <a class="btn btn-sm btn-primary copy-stream-url" title="${lang['Copy Stream URL']}"><i class="fa fa-copy"></i></a>
+                        <a class="btn btn-sm btn-info export" title="${lang.Export}"><i class="fa fa-download"></i></a>
+                        <a class="btn btn-sm btn-danger delete" title="${lang.Delete}"><i class="fa fa-trash-o"></i></a>
+                    </td>
+                </tr>
+            `);
         }
     }
     function loadIconsForVisibleCards(){
-        var container = theList[0];
+        var container = scrollContainer[0];
         var containerRect = container.getBoundingClientRect();
         var hasUpdatedIcons = false;
+
         iconsLoaded.each(function() {
             var iconRect = this.getBoundingClientRect();
-
-            // Check if element is within the container's visible area
             var isVisible = (
                 iconRect.bottom >= containerRect.top &&
                 iconRect.top <= containerRect.bottom &&
                 iconRect.right >= containerRect.left &&
                 iconRect.left <= containerRect.right
             );
-
-            if (isVisible) {
+            if(isVisible){
                 var $icon = $(this);
-                var monitorId = $icon.data('mid'); // This gets data-mid attribute
-                var monitorIconUrl = `${getApiPrefix('icon') + '/' + monitorId}`;
-                $icon.css('background-image',`url(${monitorIconUrl})`)
+                var monitorId = $icon.data('mid');
+                const monitorIconUrl = $icon.data('src');
+                $icon.attr('src', monitorIconUrl);
                 $icon.removeClass('unloaded-icon');
                 hasUpdatedIcons = true
             }
         });
         if(hasUpdatedIcons){
-            iconsLoaded = $('.monitor-card-preview.unloaded-icon', theList)
+            iconsLoaded = $('.image.unloaded-icon', theList)
         }
     }
     function onMonitorListScroll(){
@@ -127,9 +97,240 @@ $(document).ready(function(){
         },500)
     }
     function toggleScrollAction(toggleOn){
-        $(document.documentElement)[toggleOn ? 'on' : 'off']('scroll', onMonitorListScroll);
+        scrollContainer[toggleOn ? 'on' : 'off']('scroll', onMonitorListScroll);
+        $(window)[toggleOn ? 'on' : 'off']('resize', resizeTheListHeight);
         if(toggleOn)onMonitorListScroll()
+        if(toggleOn)resizeTheListHeight()
     }
+    function loadMonitorsFromMemory(){
+        var monitorsListCount = 0
+        $.each(getLoadedMonitorsAlphabetically(),function(n,row){
+            drawRowToList(row)
+            ++monitorsListCount
+        });
+        iconsLoaded = $('.image.unloaded-icon', theList)
+        monitorsListCountEl.text(monitorsListCount)
+    }
+    function getSelectedMonitors(rawMonitors){
+        var monitorsSelected = [];
+        theList.find('.monitor-list-select').each(function(n,v){
+            var el = $(v)
+            if(el.is(':checked')){
+                const [ groupKey, monitorId ] = el.attr('name').split('__')
+                const monitor = loadedMonitors[monitorId]
+                monitorsSelected.push(rawMonitors ? monitor : getDbColumnsForMonitor(monitor))
+            }
+        })
+        return monitorsSelected;
+    }
+    function toggleMonitorListSelectAll(isChecked){
+        var nameField = theList.find('input[type=checkbox][name]:visible')
+        if(isChecked === true){
+            nameField.prop('checked',true)
+        }else{
+            nameField.prop('checked',false)
+        }
+    }
+    async function drawMonitorsListApiKeyList(){
+        const serverKeys = await getApiKeys()
+        var html = createOptionHtml({
+            selected: true,
+            value: $user.auth_token,
+            label: lang['Session Key'],
+        })
+        $.each(serverKeys || [],function(n, key){
+            html += createOptionHtml({
+                value: key.code,
+                label: key.code,
+            })
+        })
+        apiKeySelector.html(html)
+    }
+    function correctDropdownPosition(dropdownElement){
+        var p = dropdownElement.offset();
+        if (p.top < 0){
+            dropdownElement[0].style = `transform:translate(0px, ${-p.top + 20}px)!important;`
+        }
+    }
+    function launchModeChangeMonitorWindow(){
+        var monitorsToChange = getSelectedMonitors(true);
+        var possibleModes = definitions['Monitor Settings'].blocks.Identity.info[0].possible
+        var html = `${lang.ChangeMonitorConfigurationText}
+        <div style="margin-top: 15px;">
+            <div class="form-group">
+                <select class="form-control form-control-sm mode-change-value">
+                    ${possibleModes.map(item => createOptionHtml(item))}
+                </select>
+            </div>
+            <div>
+                <ul>
+                    ${monitorsToChange.map((monitor) => {
+                        return `<li>${monitor.name}</li>`
+                    }).join('\n')}
+                </ul>
+            </div>
+        </div>`
+        $.confirm.create({
+            title: lang['Edit Mode'],
+            body: html,
+            clickOptions: [
+                {
+                    title: lang['Save'],
+                    class: 'btn-success',
+                    callback: async function(){
+                        var targetMode = $.confirm.e.find('.mode-change-value').val();
+                        for(monitor of monitorsToChange){
+                            await setMode(monitor.mid, targetMode)
+                        }
+                    }
+                },
+            ],
+        });
+    }
+    function launchTagEditMonitorWindow(){
+        var monitorsToChange = getSelectedMonitors(true);
+        var listOftags = getListOfTagsFromMonitors(null, true)
+        var html = `${lang.ChangeMonitorConfigurationText}
+        <div style="margin-top: 15px;">
+            <div class="form-group">
+                <select multiple class="form-control form-control-sm tag-change-value">
+                    ${listOftags.map(item => createOptionHtml({ value: item, label: item })).join(',')}
+                </select>
+            </div>
+            <div class="form-group">
+                <select class="form-control form-control-sm tag-change-target">
+                    <option selected value="1">${lang.Add}</option>
+                    <option value="0">${lang.Remove}</option>
+                </select>
+            </div>
+            <div>
+                <ul>
+                    ${monitorsToChange.map((monitor) => {
+                        return `<li>${monitor.name}</li>`
+                    }).join('\n')}
+                </ul>
+            </div>
+        </div>`
+        $.confirm.create({
+            title: lang['Edit Tags'],
+            body: html,
+            clickOptions: [
+                {
+                    title: lang['Save'],
+                    class: 'btn-success',
+                    callback: async function(){
+                        var selectedTags = $.confirm.e.find('.tag-change-value').val();
+                        var toAdd = $.confirm.e.find('.tag-change-target').val() === '1';
+                        for(monitor of monitorsToChange){
+                            var monitorConfig = loadedMonitors[monitor.mid];
+                            var theTags = (monitorConfig.tags || '').split(',')
+                            for(aTag of selectedTags){
+                                if(toAdd){
+                                    if(!theTags.includes(aTag))theTags.push(aTag)
+                                }else{
+                                    if(theTags.includes(aTag)){
+                                        var indexToRemove = theTags.indexOf(aTag)
+                                        theTags.splice(indexToRemove, 1);
+                                    }
+                                }
+                            }
+                            theTags = theTags.filter(item => !!item)
+                            const modifiedConfig = Object.assign({},monitorConfig,{ tags: theTags.join(',') })
+                            await configureMonitor(modifiedConfig)
+                        }
+                    }
+                },
+            ],
+        });
+    }
+    function openAdvancedSearch(){
+        advancedSearchModal.modal('show')
+    }
+    function resetAdvancedSearchOptions(){
+        const nameField = advancedSearchModal.find('[name="name"]')
+        const hostField = advancedSearchModal.find('[name="host"]')
+        const tagsField = advancedSearchModal.find('[name="tags"]')
+        const statusField = advancedSearchModal.find('[name="status"]')
+        // tags field
+        const tagsHtml = getListOfTagsFromMonitors(null, true).map(tag => createOptionHtml({
+            value: tag,
+            label: tag
+        }))
+        tagsField.find('optgroup').html(tagsHtml)
+        //
+        nameField.val("")
+        hostField.val("")
+        tagsField.val("")
+        statusField.val("")
+    }
+    function applyAdvancedSearchFilters({ server, name, host, tags, status }, monitors = getLoadedMonitors()){
+        var matchedMonitors = {}
+        var useName = !!name;
+        var useHost = !!host;
+        var useTags = !!tags;
+        var useStatus = !!status;
+        $.each(monitors,function(monitorLiveId, monitor){
+            try{
+                var matchedName = true
+                var matchedHost = true
+                var matchedTags = true
+                var matchedStatus = true
+                if(useName){
+                    matchedName = monitor.name.includes(name)
+                }
+                if(useHost){
+                    matchedHost = monitor.host.includes(host)
+                }
+                if(useTags){
+                    matchedTags = monitor.tags.includes(tags)
+                }
+                if(useStatus){
+                    matchedStatus = monitor.code == status
+                }
+                if(matchedName && matchedHost && matchedTags && matchedStatus){
+                    matchedMonitors[monitorLiveId] = monitor
+                }
+            }catch(err){
+                console.log(`Failed to search`, monitorLiveId, monitor)
+                console.log(err)
+            }
+        })
+        return matchedMonitors
+    }
+    function displayAdvancedSearchFilters(filteredMonitors){
+        const monitorsListCount = Object.keys(filteredMonitors).length
+        monitorsListCountEl.text(monitorsListCount)
+        theList.find('.search-row').each(function(n,v){
+            var el = $(v)
+            var monitorId = el.attr('data-mid')
+            if(filteredMonitors[`${monitorId}`]){
+                el.show();
+            }else{
+                el.hide();
+            }
+        })
+    }
+    function doAdvancedSearch(form = advancedSearchModal.serializeObject()){
+        const filteredMonitors = applyAdvancedSearchFilters(form)
+        displayAdvancedSearchFilters(filteredMonitors)
+    }
+
+    function checkAdvancedSearchQueue(){
+        if(window.queuedAdvancedFilterOnMonitorsList){
+            doAdvancedSearch(window.queuedAdvancedFilterOnMonitorsList)
+            delete(window.queuedAdvancedFilterOnMonitorsList)
+        }
+    }
+
+    advancedSearchModal.submit(function(e){
+        e.preventDefault()
+        doAdvancedSearch()
+        advancedSearchModal.modal('hide')
+        return false;
+    })
+
+    var monitorListMenuDropdownOpen = null
+    var monitorListScrollTimeout = null
     theBlock.on('mouseup','[data-bs-toggle="dropdown"]',function(){
         var dropdownElement = $(this).next()
         monitorListMenuDropdownOpen = dropdownElement
@@ -138,26 +339,32 @@ $(document).ready(function(){
         },500)
     })
     $('body')
-    .on('click','.create-live-player',function(){
-        var el = $(this).parents('[data-mid]')
-        var monitorId = el.attr('data-mid')
-        createLivePlayerTab(loadedMonitors[monitorId])
+    .on('click','.advanced-filter-monitors-list',function(){
+        var form = {}
+        var el = $(this)
+        $.each([
+            'server',
+            'name',
+            'host',
+            'tags',
+            'status'
+        ],function(n,key){
+            form[key] = el.attr(`filter-${key}`)
+        });
+        window.queuedAdvancedFilterOnMonitorsList = form
+        if(tabTree.name === 'monitorsList'){
+            checkAdvancedSearchQueue()
+        }else{
+            openTab(`monitorsList`,{},null)
+        }
     })
     .on('click','[set-mode]',function(){
         var thisEl = $(this)
         var el = thisEl.parents('[data-mid]')
         var monitorId = el.attr('data-mid')
         var mode = thisEl.attr('set-mode')
-        $.getJSON(`${getApiPrefix('monitor')}/${monitorId}/${mode}`,function(data){
-            console.log(data)
-        })
-    })
-    .on('click','.export-this-monitor-settings',function(){
-        var monitorId = getRowsMonitorId(this)
-        downloadMonitorConfigurationsToDisk([
-            monitorId
-        ])
-    })
+        setMode(monitorId, mode);
+    });
     theBlock
     .find('.export-selected-monitor-settings').click(function(){
         var monitorsSelected = getSelectedMonitors()
@@ -169,10 +376,10 @@ $(document).ready(function(){
             return
         }
         downloadMonitorConfigurationsToDisk(monitorsSelected)
-    })
+    });
     theBlock
     .find('.delete-selected-monitor-settings').click(function(){
-        var monitorsSelected = getSelectedMonitors()
+        var monitorsSelected = getSelectedMonitors(true)
         if(monitorsSelected.length === 0){
             new PNotify({
                 title: lang['No Monitors Selected'],
@@ -181,21 +388,48 @@ $(document).ready(function(){
             });
             return
         }
-        deleteMonitors(monitorsSelected)
-    })
+        deleteSelectedMonitors(monitorsSelected)
+    });
+    theBlock
+    .find('.ntp-toggle-selected-monitor-settings').click(function(){
+        var monitorsSelected = getSelectedMonitors(true)
+        if(monitorsSelected.length === 0){
+            new PNotify({
+                title: lang['No Monitors Selected'],
+                text: lang['Select atleast one monitor to delete'],
+                type: 'error'
+            });
+            return
+        }
+        toggleNtpOverOnvifForSelectedMonitors(monitorsSelected)
+    });
     theList
     .on('click','.copy-stream-url',function(e){
         e.preventDefault()
-        var el = $(this)
-        var href = getFullOrigin() + el.attr('href')
-        copyToClipboard(href)
+        const monitorId = getRowsMonitorId(this)
+        const href = buildStreamUrl(monitorId);
+        copyToClipboard(href);
         new PNotify({
             title: lang['Copied'],
             text: lang['Copied to Clipboard'],
             type: 'success'
-        })
+        });
         return false
     })
+    .on('click','.export',function(){
+        const monitorId = getRowsMonitorId(this)
+        const monitor = loadedMonitors[monitorId];
+        downloadMonitorConfigurationsToDisk([
+            monitor
+        ]);
+    })
+    .on('click','.delete',function(){
+        var el = $(this).parents('[data-mid]')
+        const monitorId = getRowsMonitorId(this)
+        deleteMonitorWithConfirm(monitorId, () => {
+            el.remove();
+        })
+    });
     multiMonitorSelect.change(function(){
         var el = $(this);
         var isChecked = el.prop('checked')
@@ -209,47 +443,45 @@ $(document).ready(function(){
     })
     theBlock.find('.import-monitor-settings').click(function(){
         launchImportMonitorWindow()
+    });
+    theBlock.find('.move-monitor-settings').click(function(){
+        launchMoveMonitorWindow()
+    });
+    theBlock.find('.changeMode-monitor-settings').click(function(){
+        launchModeChangeMonitorWindow()
+    })
+    theBlock.find('.changeTags-monitor-settings').click(function(){
+        launchTagEditMonitorWindow()
     })
     addOnTabOpen('monitorsList', function () {
         loadMonitorsFromMemory()
         drawMonitorsListApiKeyList()
         toggleScrollAction(true)
+        resetAdvancedSearchOptions()
+        checkAdvancedSearchQueue()
     })
     addOnTabReopen('monitorsList', function () {
         loadMonitorsFromMemory()
         drawMonitorsListApiKeyList()
         toggleScrollAction(true)
+        resetAdvancedSearchOptions()
+        checkAdvancedSearchQueue()
     })
     addOnTabAway('monitorsList', function () {
-        toggleScrollAction(false)
+        toggleScrollAction(true)
+        executeEventHandlers('monitorsListOnTabAway')
     })
-    onWebSocketEvent(function (d){
-        switch(d.f){
+    onWebSocketEvent((data) => {
+        switch(data.f){
             case'monitor_edit':
-                clearTimeout(window.renewListTimeout)
-                window.renewListTimeout = setTimeout(() => {
-                    if(tabTree.name === 'monitorsList'){
+                if(tabTree.name === 'monitorsList'){
+                    clearTimeout(renewListTimeout)
+                    renewListTimeout = setTimeout(() => {
                         loadMonitorsFromMemory()
-                    }
-                },5000)
+                    },5000)
+                }
             break;
         }
     })
-    // $('#monitors_list_search').keyup(function(){
-    //     var monitorBlocks = $('.monitor_block');
-    //     var searchTerms = $(this).val().toLowerCase().split(' ')
-    //     if(searchTerms.length === 0 || searchTerms[0] === ''){
-    //         monitorBlocks.show()
-    //         return
-    //     }
-    //     monitorBlocks.hide()
-    //     $.each($.ccio.mon,function(n,monitor){
-    //         var searchThis = JSON.stringify($.ccio.init('cleanMon',monitor)).toLowerCase().replace('"','');
-    //         $.each(searchTerms,function(m,term){
-    //             if(searchThis.indexOf(term) >-1 ){
-    //                 $('.monitor_block[ke="'+monitor.ke+'"][mid="'+monitor.mid+'"]').show()
-    //             }
-    //         })
-    //     })
-    // })
+    createEventHandler('monitorsListOnTabAway')
 })
