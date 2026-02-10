@@ -4,7 +4,11 @@ module.exports = function(s,config){
     s.databaseOptions = {
         client: config.databaseType,
         connection: config.db,
-        pool: { min: 0, max: 10, propagateCreateError: true }
+        pool: {
+            min: config.databasePoolMin || 0,
+            max: config.databasePoolMax || 10,
+            propagateCreateError: true
+        }
     }
     const {
         knexQuery,
