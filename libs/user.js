@@ -178,7 +178,7 @@ module.exports = function(s,config,lang){
         s.sendDiskUsedAmountToClients(e.ke)
         s.sendCloudDiskUsedAmountToClients(e.ke)
         // create monitor management queue
-        theGroup.startMonitorInQueue = createQueueAwaited(0.5, 1)
+        theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
     }
     s.loadGroupApps = function(e){
         // e = user

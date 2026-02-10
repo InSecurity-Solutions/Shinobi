@@ -17,6 +17,8 @@ module.exports = function(s){
         config.productType = 'CE'
     }
     //config defaults
+    if(config.monitorStartQueueSize === undefined){config.monitorStartQueueSize=1}
+    if(config.monitorStartQueueDelay === undefined){config.monitorStartQueueDelay=0.5}
     if(config.cpuUsageMarker === undefined){config.cpuUsageMarker='%Cpu'}
     if(config.customCpuCommand === undefined){config.customCpuCommand=null}
     if(config.autoDropCache === undefined){config.autoDropCache=false}

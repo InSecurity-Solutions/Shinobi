@@ -1551,7 +1551,7 @@ module.exports = (s,config,lang) => {
         const typeIsLocal = e.type === 'local'
         const doPingTest = e.type !== 'socket' && e.type !== 'dashcam' && e.protocol !== 'udp' && e.type !== 'local' && e.details.skip_ping !== '1';
         if(!theGroup.startMonitorInQueue){
-            theGroup.startMonitorInQueue = createQueueAwaited(0.5, config.monitorStartQueueSize || 1)
+            theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
         }
         const startMonitorInQueue = theGroup.startMonitorInQueue
         if(!activeMonitor.isStarted)return;
