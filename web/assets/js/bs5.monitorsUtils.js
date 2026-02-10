@@ -1397,6 +1397,17 @@ async function configureMonitor(monitorConfig){
         });
     })
 }
+async function getMonitors(monitorId){
+    const _this = this;
+    return new Promise((resolve) => {
+        mainSocket.f({
+            f: 'getMonitors',
+            mid: monitorId,
+        },function(response){
+            resolve(response)
+        });
+    })
+}
 function getMonitorStatus(item){
     return definitions['Monitor Status Codes'][item.code] || item.status || lang.Initializing
 }

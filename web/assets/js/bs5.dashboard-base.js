@@ -309,12 +309,12 @@ function liveStamp(){
 }
 
 function loadMonitorsIntoMemory(callback){
-    $.getJSON(`${getApiPrefix(`monitor`)}`,function(data){
-        $.each(data,function(n,monitor){
+    getMonitors().then((monitors) => {
+        $.each(monitors,function(n,monitor){
             monitor.details = convertNumbersToStrings(safeJsonParse(monitor.details))
             loadedMonitors[monitor.mid] = monitor
         })
-        callback(data)
+        if(callback)callback(monitors)
     })
 }
 

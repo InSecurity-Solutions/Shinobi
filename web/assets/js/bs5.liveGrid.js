@@ -719,8 +719,8 @@ $(document).ready(function(e){
         })
     }
     function loadPreviouslyOpenedLiveGridBlocks(){
-        $.getJSON(getApiPrefix(`monitor`),function(data){
-            $.each(data,function(n,v){
+        // $.getJSON(getApiPrefix(`monitor`),function(data){
+            $.each(loadedMonitors,function(n,v){
                 callMonitorToLiveGrid(v)
             })
             setTimeout(function(){
@@ -733,7 +733,7 @@ $(document).ready(function(e){
                 // }
             },1000)
             drawMonitorGroupList()
-        })
+        // })
     }
     function closeAllLiveGridPlayers(rememberClose){
         $.each(loadedMonitors,function(monitorId,monitor){

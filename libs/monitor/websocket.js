@@ -36,7 +36,7 @@ module.exports = function(s,config,lang,io){
                 }else{
                     const cannotSeeImportantSettings = (isRestrictedApiKey && apiKeyPermissions.edit_monitors_disallowed) || userPermissions.monitor_create_disallowed;
                     const monitors = await getMonitors(groupKey, monitorId, authKey, isRestricted, monitorPermissions, monitorRestrictions, cannotSeeImportantSettings, d.search)
-                    response.args = [false, monitors]
+                    response.args = [monitors]
                 }
                 tx(response);
             break;
