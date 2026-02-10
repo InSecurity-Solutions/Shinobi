@@ -49,7 +49,7 @@ $(document).ready(function(){
                     </td>
                     <td>
                         <span class="monitor_status_icon" style="color:${monitorStatusCodes[`c${row.code}`]}"><i class="fa fa-${monitorStatusCodes[`i${row.code}`]}"></i></span>
-                        <span class="monitor_status">${monitorStatusCodes[row.code]}</span>
+                        <span class="monitor_status">${getMonitorStatus(row)}</span>
                     </td>
                     <td class="tags">
                         ${tags}

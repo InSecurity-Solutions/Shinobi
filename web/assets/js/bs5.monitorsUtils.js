@@ -1397,6 +1397,9 @@ async function configureMonitor(monitorConfig){
         });
     })
 }
+function getMonitorStatus(item){
+    return definitions['Monitor Status Codes'][item.code] || item.status || lang.Initializing
+}
 function incrementString(strNum) {
     const originalLength = strNum.length;
     let numericValue = parseInt(strNum, 10);
