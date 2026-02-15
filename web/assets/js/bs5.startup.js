@@ -1,15 +1,3 @@
-var cpuIndicator = $('#indicator-cpu')
-var cpuIndicatorBar = cpuIndicator.find('.progress-bar')
-var cpuIndicatorPercentText = cpuIndicator.find('.indicator-percent')
-var ramIndicator = $('#indicator-ram')
-var ramIndicatorBar = ramIndicator.find('.progress-bar')
-var ramIndicatorUsed = ramIndicator.find('.used')
-var ramIndicatorPercentText = ramIndicator.find('.indicator-percent')
-var diskIndicator = $('#indicator-disk')
-var diskIndicatorBar = diskIndicator.find('.progress-bar')
-var diskIndicatorBarUsed = diskIndicator.find('.value')
-var diskIndicatorPercentText = diskIndicator.find('.indicator-percent')
-var loadedIndicators = {}
 function loadHiddenSectionsInForms(){
     window.boxWrappersHidden = dashboardOptions().boxWrappersHidden || {}
     $.each(boxWrappersHidden,function(boxId,hide){
@@ -88,22 +76,6 @@ function onFullScreenChange() {
 function loadBoxWrappers() {
     window.boxWrappersHidden = dashboardOptions().boxWrappersHidden
 }
-function drawAddStorageIndicators(){
-    $.each(addStorage,function(n,storage){
-        drawIndicatorBar({
-            multiple: true,
-            icon: 'hdd-o',
-            name: storage.name,
-            label: `<span style="text-transform:capitalize">${storage.name}</span> : <span class="value"></span>`,
-        })
-        var el = $(`#indicator-${storage.name}`)
-        loadedIndicators[storage.name] = {
-            value: el.find('.value'),
-            percent: el.find('.indicator-percent'),
-            progressBar: el.find('.progress-bar'),
-        }
-    })
-}
 function showLoginNotices(){
     $.each([
         !$user.details.sub ? {
@@ -152,75 +124,8 @@ function parseDiskUsePercent(diskUsed,diskLimit){
 }
 onWebSocketEvent(function (d){
     switch(d.f){
-        case'init_success':
-            var coreCount = d.os.cpuCount
-            var operatingSystem = d.os.platform
-            var totalRAM = d.os.totalmem
-            cpuIndicator.find('.os_cpuCount').text(coreCount)
-            cpuIndicator.find('.os_platform').text(operatingSystem)
-            ramIndicatorUsed.attr('title',`Total : ${(totalRAM/1048576).toFixed(2)}`)
-            if(d.os.cpuCount > 1){
-                cpuIndicator.find('.os_cpuCount_trailer').html('s')
-            }
-        break;
         case'log':
             logWriterDraw(d.mid, d)
-        break;
-        case'os'://indicator
-            //cpu
-            var cpuPercent = parseFloat(d.cpu).toFixed(1) + '%'
-            cpuIndicatorBar.css('width',cpuPercent)
-            cpuIndicatorPercentText.html(cpuPercent)
-            //ram
-            var ramPercent = parseFloat(d.ram.percent).toFixed(1) + '%'
-            ramIndicatorBar.css('width',ramPercent)
-            ramIndicatorPercentText.html(ramPercent)
-            ramIndicatorUsed.html(d.ram.used.toFixed(2))
-        break;
-        case'diskUsed':
-            var diskLimit = d.limit || 10000
-            var diskUsed = d.size
-            var percent = parseDiskUsePercent(diskUsed,diskLimit);
-            var videosPercent = parseDiskUsePercent(d.usedSpaceVideos,diskLimit);
-            var timelapsePercent = parseDiskUsePercent(d.usedSpaceTimelapseFrames,diskLimit);
-            var fileBinPercent = parseDiskUsePercent(d.usedSpaceFilebin,diskLimit);
-            var humanText = parseFloat(diskUsed)
-            if(humanText > 1000){
-                humanText = (humanText / 1000).toFixed(2) + ' GB'
-            }else{
-                humanText = humanText.toFixed(2) + ' MB'
-            }
-            diskIndicatorBarUsed.html(humanText)
-            diskIndicatorPercentText.html(percent)
-            diskIndicatorBar[0].style.width = videosPercent
-            diskIndicatorBar[0].title = `${lang['Video Share']} : ${videosPercent}`
-            diskIndicatorBar[1].style.width = timelapsePercent
-            diskIndicatorBar[1].title = `${lang['Timelapse Frames Share']} : ${timelapsePercent}`
-            diskIndicatorBar[2].style.width = fileBinPercent
-            diskIndicatorBar[2].title = `${lang['FileBin Share']} : ${fileBinPercent}`
-            if(d.addStorage){
-                $.each(d.addStorage,function(n,storage){
-                    var diskIndicator = loadedIndicators[storage.name]
-                    var diskIndicatorBars = diskIndicator.progressBar
-                    var diskLimit = storage.sizeLimit
-                    var percent = parseDiskUsePercent(storage.usedSpace,diskLimit);
-                    var videosPercent = parseDiskUsePercent(storage.usedSpaceVideos,diskLimit);
-                    var timelapsePercent = parseDiskUsePercent(storage.usedSpaceTimelapseFrames,diskLimit);
-                    //
-                    var humanValue = parseFloat(storage.usedSpace)
-                    if(humanValue > 1000){
-                        humanValue = (humanValue/1000).toFixed(2)+' GB'
-                    }else{
-                        humanValue = humanValue.toFixed(2)+' MB'
-                    }
-                    diskIndicator.value.html(humanValue)
-                    diskIndicator.percent.html(percent)
-                    diskIndicatorBars[0].style.width = videosPercent
-                    diskIndicatorBars[0].title = `${lang['Video Share']} : ${videosPercent}`
-                    diskIndicatorBars[1].style.width = timelapsePercent
-                    diskIndicatorBars[1].title = `${lang['Timelapse Frames Share']} : ${timelapsePercent}`
-                })
-            }
         break;
         case'monitor_status':
             updateInterfaceStatus(d);
@@ -228,12 +133,17 @@ onWebSocketEvent(function (d){
     }
 })
 $(document).ready(function(){
+    onInitWebsocket(function(){
+        loadMonitorsIntoMemory(function(data){
+            setInterfaceCounts(data)
+            onDashboardReadyExecute()
+        })
+    });
     loadHiddenSectionsInForms()
     loadClassToggleStates()
     loadDropdownToggleStates()
     loadLocalStorageInputValues()
     loadBoxWrappers()
-    drawAddStorageIndicators()
     showLoginNotices()
     // set onFullScreenChange
     document.addEventListener("fullscreenchange", onFullScreenChange, false);

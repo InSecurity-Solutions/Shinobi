@@ -1,10 +1,4 @@
 $(document).ready(function(){
-    onInitWebsocket(function(){
-        loadMonitorsIntoMemory(function(data){
-            setInterfaceCounts(data)
-            onDashboardReadyExecute()
-        })
-    });
     $('body')
     // .on('tab-away',function(){
     //
