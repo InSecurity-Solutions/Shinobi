@@ -97,6 +97,7 @@ module.exports = function(s,config,lang){
         if(s.group[groupKey]&&s.group[groupKey].init){
             clearTimeout(diskUsedEmitterTimeouts[groupKey])
             diskUsedEmitterTimeouts[groupKey] = setTimeout(() => {
+                delete diskUsedEmitterTimeouts[groupKey]
                 s.tx({
                     f: 'diskUsed',
                     size: s.group[groupKey].usedSpace,
@@ -178,7 +179,9 @@ module.exports = function(s,config,lang){
         s.sendDiskUsedAmountToClients(e.ke)
         s.sendCloudDiskUsedAmountToClients(e.ke)
         // create monitor management queue
-        theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
+        if(!theGroup.startMonitorInQueue){
+            theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
+        }
     }
     s.loadGroupApps = function(e){
         // e = user
@@ -204,8 +207,10 @@ module.exports = function(s,config,lang){
                 })
                 //disk Used Emitter
                 if(!s.group[e.ke].diskUsedEmitter){
-                    s.group[e.ke].diskUsedEmitter = new events.EventEmitter()
-                    s.group[e.ke].diskUsedEmitter.on('setCloud',function(currentChange,storagePoint){
+                    const emitter = new events.EventEmitter()
+                    emitter.setMaxListeners(4)
+                    s.group[e.ke].diskUsedEmitter = emitter
+                    emitter.on('setCloud',function(currentChange,storagePoint){
                         var amount = currentChange.amount
                         var storageType = currentChange.storageType
                         var cloudDisk = s.group[e.ke].cloudDiskUse[storageType]
@@ -234,7 +239,7 @@ module.exports = function(s,config,lang){
                         s.sendCloudDiskUsedAmountToClients(e.ke)
                     })
                     if(config.cron.deleteOverMax === true){
-                        s.group[e.ke].diskUsedEmitter.on('purgeCloud',function(storageType,storagePoint){
+                        emitter.on('purgeCloud',function(storageType,storagePoint){
                             deleteCloudVideos(e.ke,storageType,storagePoint,function(){
                                 deleteCloudTimelapseFrames(e.ke,storageType,storagePoint,function(){
 
@@ -243,7 +248,7 @@ module.exports = function(s,config,lang){
                         })
                     }
                     //s.setDiskUsedForGroup
-                    s.group[e.ke].diskUsedEmitter.on('set',function(currentChange,storageType){
+                    emitter.on('set',function(currentChange,storageType){
                         //validate current values
                         if(!s.group[e.ke].usedSpace){
                             s.group[e.ke].usedSpace=0
@@ -273,7 +278,7 @@ module.exports = function(s,config,lang){
                         //remove value just used from queue
                         s.sendDiskUsedAmountToClients(e.ke)
                     })
-                    s.group[e.ke].diskUsedEmitter.on('setAddStorage',function(data,storageType){
+                    emitter.on('setAddStorage',function(data,storageType){
                         var currentSize = data.size
                         var storageIndex = data.storageIndex
                         //validate current values

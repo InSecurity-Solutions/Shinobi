@@ -67,12 +67,8 @@ module.exports = async (s,config,lang,onFinish) => {
                         activeMonitor.ffmpeg = sanitizedFfmpegCommand(e,ffmpegCommandString)
                         //clean the string of spatial impurities and split for spawn()
                         const ffmpegCommandParsed = splitForFFMPEG(ffmpegCommandString)
-                        try{
-                            fs.rmSync(e.sdir + 'cmd.txt')
-                        }catch(err){
-
-                        }
-                        fs.writeFileSync(e.sdir + 'cmd.txt',JSON.stringify({
+                        const cmdFilePath = e.sdir + `cmd_${dataPortToken}.txt`
+                        fs.writeFileSync(cmdFilePath,JSON.stringify({
                             dataPortToken: dataPortToken,
                             cmd: ffmpegCommandParsed,
                             pipes: stdioPipes.length,
@@ -85,13 +81,14 @@ module.exports = async (s,config,lang,onFinish) => {
                         var cameraCommandParams = [
                           config.monitorDaemonPath ? config.monitorDaemonPath : __dirname + '/cameraThread/singleCamera.js',
                           config.ffmpegDir,
-                          e.sdir + 'cmd.txt'
+                          cmdFilePath
                         ]
                         const cameraProcess = spawn('node',cameraCommandParams,{detached: true,stdio: stdioPipes})
+                        cameraProcess.stderr.on('close',(data) => {
+                            delete(s.dataPortTokens[dataPortToken])
+                            try{ fs.rmSync(cmdFilePath) }catch(e){}
+                        })
                         if(config.debugLog === true && config.debugLogMonitors === true){
-                            cameraProcess.stderr.on('close',(data) => {
-                                delete(s.dataPortTokens[dataPortToken])
-                            })
                             if(!config.debugLogMonitorsVerbose){
                                 const checkLog = function(string,x){return string.indexOf(x)>-1}
                                 cameraProcess.stderr.on('data',(data) => {

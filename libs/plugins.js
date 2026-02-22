@@ -69,7 +69,7 @@ module.exports = function(s,config,lang,app,io){
         s.runExtensionsForArray('onPluginDisconnected', null, [name, theDetector])
     }
     s.resetDetectorPluginArray = function(){
-        pluginArray = []
+        let pluginArray = []
         Object.keys(s.connectedPlugins).forEach(function(name){
             var plugin = s.connectedPlugins[name]
             if(plugin.plugged === true && plugin.type === 'detector'){
@@ -166,7 +166,7 @@ module.exports = function(s,config,lang,app,io){
     }
     s.sendDetectorInfoToClient = function(data,txFunction){
         s.detectorPluginArray.forEach(function(name){
-            var detectorData = Object.assign(data,{
+            var detectorData = Object.assign({}, data, {
                 notice: s.connectedDetectorPlugins[name].notice,
                 plug: name
             })
@@ -272,9 +272,11 @@ module.exports = function(s,config,lang,app,io){
                         })
                     }
                     s.systemLog('Plugin Disconnected : '+v.id)
+                    clearInterval(s.connectedPlugins[v.id].reconnector)
                     s.connectedPlugins[v.id].reconnector = setInterval(function(){
-                        if(socket.connected===true){
+                        if(socket.connected === true){
                             clearInterval(s.connectedPlugins[v.id].reconnector)
+                            delete s.connectedPlugins[v.id].reconnector
                         }else{
                             socket.connect()
                         }
@@ -297,7 +299,8 @@ module.exports = function(s,config,lang,app,io){
             })
         }
         if(cn.ocv && s.ocv){
-            s.tx({f:'detector_unplugged',plug:s.ocv.plug},'CPU')
+            const pluginName = s.ocv.plug
+            s.tx({f:'detector_unplugged',plug:pluginName},'CPU')
             delete(s.ocv);
             delete(pluginHandlersSet[pluginName])
         }
@@ -369,10 +372,10 @@ module.exports = function(s,config,lang,app,io){
     }
     function sendCopyOfAllMonitorConfigs(){
         const groupKeys = Object.keys(s.group);
-        for(groupKey of groupKeys){
+        for(const groupKey of groupKeys){
             try{
                 const monitorConfigs = Object.values(s.group[groupKey].rawMonitorConfigurations);
-                for(monitorConfig of monitorConfigs){
+                for(const monitorConfig of monitorConfigs){
                     onMonitorUpdate(monitorConfig)
                 }
             }catch(err){

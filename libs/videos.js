@@ -194,8 +194,8 @@ module.exports = function(s,config,lang){
                     })
                 })
             }
+            s.group[e.ke].activeMonitors[e.mid].detector_motion_count = []
         }
-        s.group[e.ke].activeMonitors[e.mid].detector_motion_count = []
     }
     s.deleteVideo = function(e){
         return new Promise((resolve) => {
@@ -424,6 +424,8 @@ module.exports = function(s,config,lang){
                                             fileComplete()
                                         }
                                     })
+                                }else{
+                                    fileComplete()
                                 }
                             })
                         }
@@ -466,20 +468,12 @@ module.exports = function(s,config,lang){
             req.headerWrite['content-disposition']='attachment; filename="'+req.query.downloadName+'"';
         }
         res.writeHead(req.writeCode,req.headerWrite);
-        res.on('finish', () => {
-           file.close();
-        });
-
         res.on('close', () => {
-           file.close();
+            try{ file.destroy() }catch(e){}
         });
-
-        res.on('disconnect', () => {
-           file.close();
-        });
-
-        file.on('close',function(){
-            res.end()
+        file.on('error', (err) => {
+            s.debugLog('streamMp4FileOverHttp file error', err)
+            try{ res.end() }catch(e){}
         });
         file.pipe(res)
         return file

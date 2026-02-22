@@ -161,6 +161,7 @@ module.exports = function(s,config,lang,io){
             const onSuccess = (r) => {
                 r = r[0];
                 const Emitter = createStreamEmitter(d,cn)
+                if(!Emitter) return
                 validatedAndBindAuthenticationToSocketConnection(cn,d,true)
                 var contentWriter
                 cn.closeSocketVideoStream = function(){
@@ -194,6 +195,7 @@ module.exports = function(s,config,lang,io){
             const onSuccess = (r) => {
                 r=r[0];
                 const Emitter = createStreamEmitter(d,cn)
+                if(!Emitter) return
                 validatedAndBindAuthenticationToSocketConnection(cn,d,true)
                 var contentWriter
                 cn.closeSocketVideoStream = function(){
@@ -262,7 +264,7 @@ module.exports = function(s,config,lang,io){
                 };
 
                 // Handle socket disconnect
-                cn.on('disconnect', cleanup);
+                cn.once('disconnect', cleanup);
 
                 // MP4 command handler
                 cn.on('MP4Command', function(msg) {
@@ -434,7 +436,7 @@ module.exports = function(s,config,lang,io){
                                 ]
                             },(err,r) => {
                                 if(r && r[0]){
-                                    details = JSON.parse(r[0].details)
+                                    var details = JSON.parse(r[0].details)
                                     details.monitorOrder = d.monitorOrder
                                     s.knexQuery({
                                         action: "update",
@@ -465,7 +467,7 @@ module.exports = function(s,config,lang,io){
                                 if(r && r[0]){
                                     const monitorListOrder = {}
                                     const orderKeys = Object.keys(d.monitorListOrder)
-                                    details = JSON.parse(r[0].details)
+                                    var details = JSON.parse(r[0].details)
                                     orderKeys.forEach((orderKey) => {
                                         const monitorIds = d.monitorListOrder[orderKey]
                                         const uniqueList = {}
@@ -667,9 +669,7 @@ module.exports = function(s,config,lang,io){
 					    },(err,r) => {
 					        if(err) {
 					            console.log(err)
-					            setTimeout(function(){
-					                callback({total:0, limit:pageSize, videos:[]})
-					            },2000)
+					            callback({total:0, limit:pageSize, videos:[]})
 					        } else {
 					            s.buildVideoLinks(r,{
 					                videoParam: videoSet === 'cloud' ? `cloudVideos` : "videos",
@@ -815,6 +815,10 @@ module.exports = function(s,config,lang,io){
                                 })
                                 updateProcess.stdout.on('data',function(data){
                                     s.systemLog('Update Info',data.toString())
+                                })
+                                updateProcess.on('close', function(){
+                                    updateProcess.removeAllListeners()
+                                    delete updateProcess
                                 })
                             break;
                             case'restart':
@@ -992,7 +996,6 @@ module.exports = function(s,config,lang,io){
                 break;
             }
         })
-         //functions for retrieving cron announcements
         cn.on('disconnect', function () {
             if(cn.socketVideoStream){
                 cn.closeSocketVideoStream()
@@ -1007,16 +1010,15 @@ module.exports = function(s,config,lang,io){
                         })
                     }
                 }else if(!cn.embedded){
-                    if(s.group[cn.ke].users[cn.auth]){
+                    if(s.group[cn.ke] && s.group[cn.ke].users && s.group[cn.ke].users[cn.auth]){
                         s.tx({f:'user_status_change',ke:cn.ke,uid:cn.uid,status:0})
                         s.userLog({ke:cn.ke,mid:'$USER'},{type:lang['Websocket Disconnected'],msg:{mail:s.group[cn.ke].users[cn.auth].mail,id:cn.uid,ip:cn.ip}})
                         delete(s.group[cn.ke].users[cn.auth]);
                     }
-                    if(s.group[cn.ke].dashcamUsers && s.group[cn.ke].dashcamUsers[cn.auth])delete(s.group[cn.ke].dashcamUsers[cn.auth]);
+                    if(s.group[cn.ke] && s.group[cn.ke].dashcamUsers && s.group[cn.ke].dashcamUsers[cn.auth]){
+                        delete(s.group[cn.ke].dashcamUsers[cn.auth]);
+                    }
                 }
-            }
-            if(cn.cron){
-                delete(s.cron);
             }
             s.onWebSocketDisconnectionExtensions.forEach(function(extender){
                 extender(cn)

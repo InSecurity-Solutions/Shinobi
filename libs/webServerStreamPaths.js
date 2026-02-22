@@ -170,20 +170,27 @@ module.exports = function(s,config,lang,app){
                         }
 
                         var Emitter
-                        const chosenChannel = parseInt(req.params.channel) + config.pipeAddition
                         if(!req.params.channel){
                             Emitter = s.group[req.params.ke].activeMonitors[req.params.id].emitter
                         }else{
+                            const chosenChannel = parseInt(req.params.channel) + config.pipeAddition
                             Emitter = s.group[req.params.ke].activeMonitors[req.params.id].emitterChannel[chosenChannel]
                         }
-                        res.writeHead(200, {
+                        let connectionClosed = false
+                            res.writeHead(200, {
                             'Content-Type': 'multipart/x-mixed-replace; boundary=shinobi',
                             'Cache-Control': 'no-cache',
                             'Connection': 'keep-alive',
                             'Pragma': 'no-cache'
                         });
                         var contentWriter
+                        res.on('close', function () {
+                            connectionClosed = true
+                            if(contentWriter) Emitter.removeListener('data', contentWriter)
+                            s.camera('watch_off',{ id: req.params.id, ke: req.params.ke },{ id: req.params.auth + ip + req.headers['user-agent'] })
+                        });
                         fs.readFile(config.defaultMjpeg,'binary',function(err,content){
+                            if(connectionClosed) return
                             res.write("--shinobi\r\n");
                             res.write("Content-Type: image/jpeg\r\n");
                             res.write("Content-Length: " + content.length + "\r\n");
@@ -244,13 +251,15 @@ module.exports = function(s,config,lang,app){
                 }else{
                     req.dir+=req.params.file;
                 }
-                res.on('finish',function(){res.end();});
-
                 fs.access(req.dir, fs.constants.F_OK, (err) => {
                     if (err) {
                         res.end(lang['File Not Found'])
                     } else {
-                        fs.createReadStream(req.dir).pipe(res);
+                        const stream = fs.createReadStream(req.dir)
+                        stream.pipe(res)
+                        res.on('close', () => {
+                            try{ stream.destroy() }catch(e){}
+                        })
                     }
                 });
             },res,req)
@@ -273,12 +282,11 @@ module.exports = function(s,config,lang,app){
                     return
                 }
                 req.dir=s.dir.streams+req.params.ke+'/'+req.params.id+'/s.jpg';
-                    res.writeHead(200, {
+                res.writeHead(200, {
                     'Content-Type': 'image/jpeg',
                     'Cache-Control': 'no-cache',
                     'Pragma': 'no-cache'
-                    });
-                res.on('finish',function(){res.end();});
+                });
                 if (fs.existsSync(req.dir)){
                     fs.createReadStream(req.dir).pipe(res);
                 }else{
@@ -334,6 +342,10 @@ module.exports = function(s,config,lang,app){
                     Emitter = s.group[req.params.ke].activeMonitors[req.params.id].emitterChannel[parseInt(req.params.channel)+config.pipeAddition]
                     chunkChannel = parseInt(req.params.channel)+config.pipeAddition
                 }
+                if(!Emitter){
+                    res.status(503).end('Stream not available')
+                    return
+                }
                 if(s.group[req.params.ke].activeMonitors[req.params.id].firstStreamChunk[chunkChannel]){
                     //variable name of contentWriter
                     var contentWriter
@@ -380,6 +392,7 @@ module.exports = function(s,config,lang,app){
         config.webPaths.apiPrefix+':auth/h264/:ke/:id'
     ], function (req, res) {
         s.auth(req.params,function(user){
+            const monitorId = req.params.id
             if(cantLiveStreamPermission(user,monitorId,'watch_stream')){
                 s.closeJsonResponse(res,{ok: false, msg: lang['Not Authorized']});
                 return;
@@ -392,6 +405,10 @@ module.exports = function(s,config,lang,app){
                     Emitter = s.group[req.params.ke].activeMonitors[req.params.id].streamIn[req.query.feed]
                 }else{
                     Emitter = s.group[req.params.ke].activeMonitors[req.params.id].emitterChannel[parseInt(req.params.feed)+config.pipeAddition]
+                }
+                if(!Emitter){
+                    res.status(503).end('Stream not available')
+                    return
                 }
                 var contentWriter
                 var date = new Date();

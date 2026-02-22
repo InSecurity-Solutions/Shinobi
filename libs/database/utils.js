@@ -417,7 +417,13 @@ module.exports = function(s,config){
     const knexQueryPromise = (options) => {
         return new Promise((resolve,reject) => {
             knexQuery(options, (err,rows) => {
-                if(err && err.code === 'ECONNRESET'){
+                if(
+                    err &&
+                    (
+                        err.code === 'ECONNRESET' ||
+                        err.code === 'ECONNREFUSED'
+                    )
+                ){
                     console.error('SQL ECONNRESET : Trying Request Again!', new Date())
                     setTimeout(async function(){
                         resolve(await knexQueryPromise(options))

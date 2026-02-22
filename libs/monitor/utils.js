@@ -191,6 +191,20 @@ module.exports = (s,config,lang) => {
                     delete(activeMonitor.mp4frag[channel])
                 })
             }
+            try{
+                if(activeMonitor.emitterChannel){
+                    Object.keys(activeMonitor.emitterChannel).forEach(function(channel){
+                        activeMonitor.emitterChannel[channel].removeAllListeners()
+                        delete(activeMonitor.emitterChannel[channel])
+                    })
+                }
+                if(activeMonitor.emitter){
+                    activeMonitor.emitter.removeAllListeners()
+                    delete(activeMonitor.emitter)
+                }
+            }catch(err){
+                s.debugLog(err)
+            }
             if(config.childNodes.enabled === true && config.childNodes.mode === 'child' && config.childNodes.host){
                 s.cx({f:'clearCameraFromActiveList',ke:groupKey,id:e.id})
             }
@@ -398,16 +412,14 @@ module.exports = (s,config,lang) => {
             });
 
             subStreamProcess.on('close',(data) => {
+                subStreamProcess.removeAllListeners()  // <-- add this
                 if(!activeMonitor.allowDestroySubstream){
-                    subStreamProcess.stderr.on('data',(data) => {
-                        s.userLog({
-                            ke: groupKey,
-                            mid: monitorId,
-                        },
-                        {
-                            type: lang["Substream Process"],
-                            msg: lang["Process Crashed for Monitor"],
-                        })
+                    s.userLog({
+                        ke: groupKey,
+                        mid: monitorId,
+                    },{
+                        type: lang["Substream Process"],
+                        msg: lang["Process Crashed for Monitor"],
                     })
                     setTimeout(() => {
                         spawnSubstreamProcess(e)
@@ -538,6 +550,7 @@ module.exports = (s,config,lang) => {
             clearTimeout(streamViewerCountTimeouts[req.originalUrl])
             streamViewerCountTimeouts[req.originalUrl] = setTimeout(() => {
                 setActiveViewer(groupKey,monitorId,connectionId,false)
+                delete streamViewerCountTimeouts[timeoutKey]
             },5000)
         }else{
             s.debugLog(`User is Logged in, Don't add to viewer count`);
@@ -861,6 +874,7 @@ module.exports = (s,config,lang) => {
             clearTimeout(streamViewerCountTimeouts[uniqueId])
             streamViewerCountTimeouts[uniqueId] = setTimeout(() => {
                 monitorRemoveViewer(e,cn)
+                delete streamViewerCountTimeouts[uniqueId]
             },e.monitorTimeout)
         }
     }
@@ -1193,7 +1207,7 @@ module.exports = (s,config,lang) => {
         })
         //emitter for mjpeg
         if(!e.details.stream_mjpeg_clients||e.details.stream_mjpeg_clients===''||isNaN(e.details.stream_mjpeg_clients)===false){e.details.stream_mjpeg_clients=20;}else{e.details.stream_mjpeg_clients=parseInt(e.details.stream_mjpeg_clients)}
-        activeMonitor.emitter = new events.EventEmitter().setMaxListeners(e.details.stream_mjpeg_clients);
+        activeMonitor.emitter = (new events.EventEmitter()).setMaxListeners(e.details.stream_mjpeg_clients);
         if(detectorEnabled && e.details.detector_audio === '1'){
             if(activeMonitor.audioDetector){
               activeMonitor.audioDetector.stop()
@@ -1538,7 +1552,7 @@ module.exports = (s,config,lang) => {
         const theGroup = s.group[groupKey]
         const activeMonitor = theGroup.activeMonitors[monitorId]
         const monitorConfig = theGroup.rawMonitorConfigurations[monitorId]
-        const isMacOS = s.platform !== 'darwin';
+        const isMacOS = s.platform === 'darwin';
         const isWatchOnly = monitorConfig.mode === 'start'
         const isRecord = monitorConfig.mode === 'record'
         const isWatchOnlyOrRecord = isWatchOnly || isRecord;
