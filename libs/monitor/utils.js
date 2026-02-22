@@ -1,5 +1,6 @@
 module.exports = (s,config,lang) => {
     const fs = require('fs');
+    const fsPromises = require('fs').promises;
     const URL = require('url');
     const events = require('events');
     const Mp4Frag = require('mp4frag');
@@ -1250,15 +1251,17 @@ module.exports = (s,config,lang) => {
         }
         if(e.details.record_timelapse === '1'){
             var timelapseRecordingDirectory = s.getTimelapseFrameDirectory(e)
-            activeMonitor.spawn.stdio[7].on('data', function(data){
+            activeMonitor.spawn.stdio[7].on('data', async function(data){
                 try{
                     var fileStream = activeMonitor.recordTimelapseWriter
                     if(!fileStream){
                         var currentDate = s.formattedTime(null,'YYYY-MM-DD')
                         var filename = s.formattedTime() + '.jpg'
                         var location = timelapseRecordingDirectory + currentDate + '/'
-                        if(!fs.existsSync(location)){
-                            fs.mkdirSync(location)
+                        try{
+                            await fsPromises.mkdir(location)
+                        }catch(err){
+                            s.debugLog(err)
                         }
                         fileStream = fs.createWriteStream(location + filename)
                         fileStream.on('error', err => s.debugLog(err))
@@ -1558,7 +1561,7 @@ module.exports = (s,config,lang) => {
         const isWatchOnlyOrRecord = isWatchOnly || isRecord;
         const streamTypeIsJPEG = e.details.stream_type === 'jpeg'
         const streamTypeIsHLS = e.details.stream_type === 'hls'
-        const jpegApiEnabled = e.details.snap === '1'
+        const jpegApiEnabled = config.liveJpegApiEnabled && e.details.snap === '1'
         const typeIsDashcam = e.type === 'dashcam' || e.type === 'socket'
         const typeIsMjpeg = e.type === 'mjpeg'
         const typeIsH264 = e.type === 'h264'

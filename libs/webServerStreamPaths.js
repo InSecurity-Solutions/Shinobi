@@ -177,7 +177,7 @@ module.exports = function(s,config,lang,app){
                             Emitter = s.group[req.params.ke].activeMonitors[req.params.id].emitterChannel[chosenChannel]
                         }
                         let connectionClosed = false
-                            res.writeHead(200, {
+                        res.writeHead(200, {
                             'Content-Type': 'multipart/x-mixed-replace; boundary=shinobi',
                             'Cache-Control': 'no-cache',
                             'Connection': 'keep-alive',

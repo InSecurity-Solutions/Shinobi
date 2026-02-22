@@ -513,7 +513,7 @@ module.exports = (s,config,lang) => {
         return streamFlags.join(' ')
     }
     const buildJpegApiOutput = function(e){
-        if(e.details.snap === '1'){
+        if(config.liveJpegApiEnabled && e.details.snap === '1'){
             const isCudaEnabled = hasCudaEnabled(e)
             const videoFlags = []
             const videoFilters = []
