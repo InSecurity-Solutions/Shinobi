@@ -179,80 +179,7 @@ function beginProcessing(){
         if(e.mid && !e.id){e.id = e.mid}
         return fileBinDirectory + e.ke + '/' + e.id + '/'
     }
-    //filters set by the user in their dashboard
     //deleting old videos is part of the filter - config.cron.deleteOld
-    const checkFilterRules = function(v){
-        return new Promise((resolve,reject) => {
-            //filters
-            v.d.filters = v.d.filters ? v.d.filters : {}
-            debugLog('Checking Basic Filters...')
-            var keys = Object.keys(v.d.filters)
-            if(keys.length>0){
-                keys.forEach(function(m,current){
-                    // b = filter
-                    var b = v.d.filters[m];
-                    debugLog(b)
-                    if(b.enabled==="1"){
-                        const whereQuery = [
-                            ['ke','=',v.ke],
-                            ['status','!=',"0"],
-                            ['archive','!=',`1`],
-                        ]
-                        b.where.forEach(function(condition){
-                            if(condition.p1 === 'ke'){condition.p3 = v.ke}
-                            whereQuery.push([condition.p1,condition.p2 || '=',condition.p3])
-                        })
-                        knexQuery({
-                            action: "select",
-                            columns: "*",
-                            table: "Videos",
-                            where: whereQuery,
-                            orderBy: [b.sort_by,b.sort_by_direction.toLowerCase()],
-                            limit: b.limit
-                        },(err,r) => {
-                             if(r && r[0]){
-                                if(r.length > 0 || config.debugLog === true){
-                                    postMessage({f:'filterMatch',msg:r.length+' SQL rows match "'+m+'"',ke:v.ke,time:'moment()'})
-                                }
-                                b.cx={
-                                    f:'filters',
-                                    name:b.name,
-                                    videos:r,
-                                    time:'moment()',
-                                    ke:v.ke,
-                                    id:b.id
-                                };
-                                if(b.archive==="1"){
-                                    postMessage({f:'filters',ff:'archive',videos:r,time:'moment()',ke:v.ke,id:b.id});
-                                }else if(b.delete==="1"){
-                                    postMessage({f:'filters',ff:'delete',videos:r,time:'moment()',ke:v.ke,id:b.id});
-                                }
-                                if(b.email==="1"){
-                                    b.cx.ff='email';
-                                    b.cx.delete=b.delete;
-                                    b.cx.mail=v.mail;
-                                    b.cx.execute=b.execute;
-                                    b.cx.query=b.sql;
-                                    postMessage(b.cx);
-                                }
-                                if(b.execute&&b.execute!==""){
-                                    postMessage({f:'filters',ff:'execute',execute:b.execute,time:'moment()'});
-                                }
-                            }
-                        })
-
-                    }
-                    if(current===keys.length-1){
-                        //last filter
-                        resolve()
-                    }
-                })
-            }else{
-                //no filters
-                resolve()
-            }
-        })
-    }
     const deleteVideosByDays = async (v,days,addedQueries) => {
         const groupKey = v.ke;
         const whereQuery = [
@@ -282,7 +209,7 @@ function beginProcessing(){
                     setDiskUsedForGroup(groupKey,-fileSizeMB,null,row)
                     sendToWebSocket({
                         f: 'video_delete',
-                        filename: filename + '.' + row.ext,
+                        filename: filename,
                         mid: row.mid,
                         ke: row.ke,
                         time: row.time,
@@ -351,63 +278,6 @@ function beginProcessing(){
                 })
             }
         }
-    }
-    //database rows with no videos in the filesystem
-    const deleteRowsWithNoVideo = function(v){
-        return new Promise((resolve,reject) => {
-            if(
-                config.cron.deleteNoVideo===true&&(
-                    config.cron.deleteNoVideoRecursion===true||
-                    (config.cron.deleteNoVideoRecursion===false&&!alreadyDeletedRowsWithNoVideosOnStart[v.ke])
-                )
-            ){
-                alreadyDeletedRowsWithNoVideosOnStart[v.ke]=true;
-                knexQuery({
-                    action: "select",
-                    columns: "*",
-                    table: "Videos",
-                    where: [
-                        ['ke','=',v.ke],
-                        ['status','!=','0'],
-                        ['archive','!=',`1`],
-                        ['time','<', sqlDate('10 MINUTE')],
-                    ]
-                }, async (err,evs) => {
-                    if(evs && evs[0]){
-                        const videosToDelete = [];
-                        for(ev of evs){
-                            var filename
-                            var details
-                            try{
-                                details = JSON.parse(ev.details)
-                            }catch(err){
-                                if(details instanceof Object){
-                                    details = ev.details
-                                }else{
-                                    details = {}
-                                }
-                            }
-                            var dir = getVideoDirectory(ev)
-                            filename = formattedTime(ev.time)+'.'+ev.ext
-                            try{
-                                var fileExists = await fs.promises.stat(dir+filename)
-                            }catch(err){
-                                deleteVideo(ev)
-                                sendToWebSocket({f:'video_delete',filename:filename+'.'+ev.ext,mid:ev.mid,ke:ev.ke,time:ev.time,end: formattedTime(new Date,'YYYY-MM-DD HH:mm:ss')},'GRP_'+ev.ke);
-                            }
-                        };
-                        if(videosToDelete.length > 0 || config.debugLog === true){
-                            postMessage({f:'deleteNoVideo',msg:videosToDelete.length+' SQL rows with no file deleted',ke:v.ke,time:'moment()'})
-                        }
-                    }
-                    setTimeout(function(){
-                        resolve()
-                    },3000)
-                })
-            }else{
-                resolve()
-            }
-        })
     }
     //info about what the application is doing
     const deleteOldLogs = function(v){
@@ -629,10 +499,11 @@ function beginProcessing(){
         const cloudDiskUse = await getAllCloudVideoMaxDays(user);
         const groupKey = user.ke;
         let affectedRows = 0;
-        for(storageType in cloudDiskUse){
-            var maxDays = cloudDiskUse[storageType].maxDays
+        let lastErr = null;   // track errors across iterations
+        for(const storageType in cloudDiskUse){   // also fix implicit global (see W2)
+            const maxDays = cloudDiskUse[storageType].maxDays
             if(maxDays){
-                const { err, rows: videos } = await s.knexQueryPromise({
+                const { err, rows: videos } = await knexQueryPromise({
                     action: "select",
                     columns: "*",
                     table: "Cloud Videos",
@@ -643,28 +514,22 @@ function beginProcessing(){
                         ['time','<', sqlDate(maxDays+' DAY')],
                     ]
                 });
-                if(videos.length > 0){
+                if(err){ lastErr = err; continue; }
+                if(videos && videos.length > 0){
                     affectedRows += videos.length;
-                    for(video of videos){
-                        s.setCloudDiskUsedForGroup(groupKey,{
-                            amount : -(video.size/1048576),
-                            storageType : storageType
-                        })
-                        s.deleteVideoFromCloudExtensionsRunner({ke: groupKey},storageType,video)
+                    for(const video of videos){   // also fix implicit global (see W2)
+                        postMessage({f:'s.setCloudDiskUsedForGroup', ke: groupKey, amount: -(video.size/1048576), storageType})
+                        postMessage({f:'s.deleteVideoFromCloudExtensionsRunner', ke: groupKey, storageType, video})
                     }
                 }
             }
         }
-        return {
-            ok: !err,
-            err,
-            affectedRows,
-        }
+        return { ok: !lastErr, err: lastErr, affectedRows }
     }
     const deleteOldCloudVideos = async (v) => {
         // v = group, admin user
         if(config.cron.deleteOld === true){
-            const { affectedRows } = await deleteCloudVideosByDays(v,cloudDiskUse)
+            const { affectedRows } = await deleteCloudVideosByDays(v)
             if(affectedRows > 0 || config.debugLog === true){
                 postMessage({
                     f: 'deleteOldCloudVideos',
@@ -705,10 +570,6 @@ function beginProcessing(){
                 debugLog('--- deleteOldAlarms Complete')
                 await deleteOldEventCounts(v)
                 debugLog('--- deleteOldEventCounts Complete')
-                await checkFilterRules(v)
-                debugLog('--- checkFilterRules Complete')
-                // await deleteRowsWithNoVideo(v)
-                // debugLog('--- deleteRowsWithNoVideo Complete')
                 debugLog('--- Running Post Extenders')
                 onCronGroupProcessed(v)
                 onCronGroupProcessedAwaited(v)
@@ -756,6 +617,6 @@ function beginProcessing(){
             }
         })
     }
-    setIntervalForCron()
     doCronJobs()
+    setIntervalForCron()
 }

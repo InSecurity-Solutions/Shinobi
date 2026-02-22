@@ -5,9 +5,10 @@ module.exports = (s,config,lang) => {
         legacyFilterEvents
     } = require('./events/utils.js')(s,config,lang)
     if(config.doCronAsWorker===undefined)config.doCronAsWorker = true;
+    let workerProcess = null
     const startWorker = () => {
         const pathToWorkerScript = __dirname + `/cron/worker.js`
-        const workerProcess = new Worker(pathToWorkerScript,{
+        workerProcess = new Worker(pathToWorkerScript,{
             workerData: config
         })
         workerProcess.on('message',function(data){
@@ -38,7 +39,7 @@ module.exports = (s,config,lang) => {
                     s.deleteVideo(data.file)
                 break;
                 case's.deleteCloudVideo':
-                    s.deleteVideo(data.file)
+                    s.deleteVideoFromCloud(data.file, data.cloudType)
                 break;
                 case's.deleteFileBinEntry':
                     s.deleteFileBinEntry(data.file)
@@ -77,7 +78,7 @@ module.exports = (s,config,lang) => {
                     })
                 break;
                 case's.setDiskUsedForGroup':
-                   function doOnMain(){
+                   const doOnMain = () => {
                        s.setDiskUsedForGroup(data.ke,data.size,data.target || undefined)
                    }
                    if(data.videoRow){
@@ -99,11 +100,14 @@ module.exports = (s,config,lang) => {
                 break;
             }
         })
-        setTimeout(() => {
-            workerProcess.postMessage({
-                f: 'init',
-            })
-        },2000)
+        workerProcess.on('error', (err) => {
+            s.systemLog('CRON Worker error:', err)
+        })
+        workerProcess.on('exit', (code) => {
+            s.systemLog(`CRON Worker exited with code ${code}. Restarting in 5s...`)
+            setTimeout(startWorker, 5000)   // auto-restart
+        })
+        setTimeout(() => { workerProcess.postMessage({f:'init'}) }, 2000)
         return workerProcess
     }
     if(config.doCronAsWorker === true)startWorker()
