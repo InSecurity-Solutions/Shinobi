@@ -53,7 +53,7 @@
     "pushover-notifications": "^1.2.2",
     "sat": "^0.7.1",
     "shinobi-backblaze-b2": "^1.7.1",
-    "shinobi-mp4frag": "^0.7.1",
+    "shinobi-mp4frag": "^0.7.2",
     "shinobi-node-moving-things-tracker": "^0.9.5",
     "shinobi-onvif": "0.2.2",
     "shinobi-sound-detection": "^0.1.13",
