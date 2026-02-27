@@ -183,8 +183,8 @@ module.exports = (s,config,lang) => {
                         activeMonitor.mp4frag[channel].reset()
                         activeMonitor.mp4frag[channel].destroy()
                         activeMonitor.mp4frag[channel] = null
+                        delete(activeMonitor.mp4frag[channel])
                     })
-                    delete(activeMonitor.mp4frag[channel])
                 })
             }
             if(activeMonitor.mp4fragCacheResetter){
