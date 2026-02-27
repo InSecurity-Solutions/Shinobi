@@ -177,13 +177,13 @@ module.exports = (s,config,lang) => {
             if(activeMonitor.mp4frag){
                 var mp4FragChannels = Object.keys(activeMonitor.mp4frag)
                 mp4FragChannels.forEach(function(channel){
-                    const instance = activeMonitor.mp4frag[channel]
-                    if(!instance) return
-                    try{ activeMonitor.spawn.stdio.forEach(function(stdio){ try{ stdio.unpipe(instance) }catch(e){} }) }catch(e){}
-                    instance.reset()
-                    instance.removeAllListeners()
-                    instance.destroy()
-                    activeMonitor.mp4frag[channel] = null
+                    activeMonitor.mp4frag[channel].resetCache()
+                    activeMonitor.mp4frag[channel].removeAllListeners()
+                    activeMonitor.mp4frag[channel].once('unpipe', () => {
+                        activeMonitor.mp4frag[channel].reset()
+                        activeMonitor.mp4frag[channel].destroy()
+                        activeMonitor.mp4frag[channel] = null
+                    })
                     delete(activeMonitor.mp4frag[channel])
                 })
             }
@@ -479,9 +479,7 @@ module.exports = (s,config,lang) => {
         if(!activeMonitor.mp4fragCacheResetter)activeMonitor.mp4fragCacheResetter = {}
         clearInterval(activeMonitor.mp4fragCacheResetter[channel])
         activeMonitor.mp4fragCacheResetter[channel] = setInterval(function(){
-            if(activeMonitor.mp4frag && activeMonitor.mp4frag[channel]){
-                activeMonitor.mp4frag[channel].clearCache()
-            }
+            activeMonitor.mp4frag[channel].softReset()
         },60000)
     }
     function attachStreamChannelHandlers(options){
@@ -497,13 +495,12 @@ module.exports = (s,config,lang) => {
        switch(fields.stream_type){
            case'mp4':
                if(activeMonitor.mp4frag[pipeNumber]){
-                   try{ ffmpegProcess.stdio[pipeNumber].unpipe(activeMonitor.mp4frag[pipeNumber]) }catch(err){}
-                   activeMonitor.mp4frag[pipeNumber].reset()
+                   activeMonitor.mp4frag[pipeNumber].resetCache()
                    activeMonitor.mp4frag[pipeNumber].removeAllListeners()
                    activeMonitor.mp4frag[pipeNumber].destroy()
                    activeMonitor.mp4frag[pipeNumber] = null
                }
-               if(!activeMonitor.mp4frag[pipeNumber])activeMonitor.mp4frag[pipeNumber] = new Mp4Frag();
+               if(!activeMonitor.mp4frag[pipeNumber])activeMonitor.mp4frag[pipeNumber] = new Mp4Frag({ segmentCount: 2 });
                ffmpegProcess.stdio[pipeNumber].pipe(activeMonitor.mp4frag[pipeNumber],{ end: false })
                setupMp4FragCacheResetter(activeMonitor,pipeNumber,ffmpegProcess.stdio[pipeNumber])
            break;
@@ -1343,13 +1340,12 @@ module.exports = (s,config,lang) => {
        switch(streamType){
            case'mp4':
                if(activeMonitor.mp4frag['MAIN']){
-                   try{ activeMonitor.spawn.stdio[1].unpipe(activeMonitor.mp4frag['MAIN']) }catch(err){}
-                   activeMonitor.mp4frag['MAIN'].reset()
+                   activeMonitor.mp4frag['MAIN'].resetCache()
                    activeMonitor.mp4frag['MAIN'].removeAllListeners()
                    activeMonitor.mp4frag['MAIN'].destroy()
                    activeMonitor.mp4frag['MAIN'] = null
                }
-               if(!activeMonitor.mp4frag['MAIN'])activeMonitor.mp4frag['MAIN'] = new Mp4Frag()
+               if(!activeMonitor.mp4frag['MAIN'])activeMonitor.mp4frag['MAIN'] = new Mp4Frag({ segmentCount: 2 })
                activeMonitor.mp4frag['MAIN'].on('error',function(error){
                    s.userLog(e,{type:lang['Mp4Frag'],msg:{error:error}})
                })
