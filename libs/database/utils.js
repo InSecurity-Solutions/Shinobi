@@ -89,6 +89,7 @@ module.exports = function(s,config){
         if(config.debugLogVerbose && config.debugLog === true){
             s.debugLog('STACK TRACE, NOT AN ',new Error())
         }
+        console.error(new Date())
         console.error(err)
         // CANNOT USE `dbQuery.toString()` because it breaks the query
         console.error(options)
