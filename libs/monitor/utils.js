@@ -40,6 +40,7 @@ module.exports = (s,config,lang) => {
         selectNodeForOperation,
         bindMonitorToChildNode
     } = require('../childNode/utils.js')(s,config,lang)
+    s.mp4FragMemoryFreed = {}
     const isMasterNode = (
         (
             config.childNodes.enabled === true &&
@@ -185,13 +186,6 @@ module.exports = (s,config,lang) => {
                         activeMonitor.mp4frag[channel] = null
                         delete(activeMonitor.mp4frag[channel])
                     })
-                })
-            }
-            if(activeMonitor.mp4fragCacheResetter){
-                var mp4FragChannels = Object.keys(activeMonitor.mp4fragCacheResetter)
-                mp4FragChannels.forEach(function(channel){
-                    clearInterval(activeMonitor.mp4fragCacheResetter[channel])
-                    delete(activeMonitor.mp4fragCacheResetter[channel])
                 })
             }
             try{
@@ -475,18 +469,14 @@ module.exports = (s,config,lang) => {
         }
         return response
     }
-    function setupMp4FragCacheResetter(activeMonitor,channel,stdio){
-        if(!activeMonitor.mp4fragCacheResetter)activeMonitor.mp4fragCacheResetter = {}
-        clearInterval(activeMonitor.mp4fragCacheResetter[channel])
-        activeMonitor.mp4fragCacheResetter[channel] = setInterval(function(){
-            activeMonitor.mp4frag[channel].softReset()
-        },60000)
-    }
     function attachStreamChannelHandlers(options){
         const fields = options.fields
         const number = options.number
         const ffmpegProcess = options.ffmpegProcess
+        const groupKey = options.ke
+        const monitorId = options.mid
         const activeMonitor = s.group[options.ke].activeMonitors[options.mid]
+        const monitorConfig = s.group[options.ke].rawMonitorConfigurations[options.mid]
         const pipeNumber = number + config.pipeAddition;
         if(!activeMonitor.emitterChannel[pipeNumber]){
             activeMonitor.emitterChannel[pipeNumber] = new events.EventEmitter().setMaxListeners(0);
@@ -500,9 +490,16 @@ module.exports = (s,config,lang) => {
                    activeMonitor.mp4frag[pipeNumber].destroy()
                    activeMonitor.mp4frag[pipeNumber] = null
                }
-               if(!activeMonitor.mp4frag[pipeNumber])activeMonitor.mp4frag[pipeNumber] = new Mp4Frag({ segmentCount: 2 });
+               if(!activeMonitor.mp4frag[pipeNumber]){
+                   const debugOutputPrefix = `${groupKey}, ${monitorId}, ${monitorConfig.name}, pipe: ${pipeNumber}`;
+                   activeMonitor.mp4frag[pipeNumber] = new Mp4Frag({ segmentCount: 2, cacheInterval: 60000, debug: config.debugMp4Frag || false, debugOutputPrefix });
+                   if(config.debugMp4Frag){
+                       activeMonitor.mp4frag[pipeNumber].on('memoryfreed',function(freed){
+                           s.mp4FragMemoryFreed[debugOutputPrefix] = [freed, new Date()]
+                       })
+                   }
+               }
                ffmpegProcess.stdio[pipeNumber].pipe(activeMonitor.mp4frag[pipeNumber],{ end: false })
-               setupMp4FragCacheResetter(activeMonitor,pipeNumber,ffmpegProcess.stdio[pipeNumber])
            break;
            case'mjpeg':
                frameToStreamAdded = function (d) {
@@ -1228,6 +1225,7 @@ module.exports = (s,config,lang) => {
         const groupKey = e.ke
         const monitorId = e.mid || e.id
         const activeMonitor = getActiveMonitor(groupKey,monitorId)
+        const monitorConfig = s.group[groupKey].rawMonitorConfigurations[monitorId]
         const detectorEnabled = e.details.detector === '1'
         activeMonitor.spawn.stdio[5].on('data',function(data){
             resetStreamCheck(e)
@@ -1345,12 +1343,19 @@ module.exports = (s,config,lang) => {
                    activeMonitor.mp4frag['MAIN'].destroy()
                    activeMonitor.mp4frag['MAIN'] = null
                }
-               if(!activeMonitor.mp4frag['MAIN'])activeMonitor.mp4frag['MAIN'] = new Mp4Frag({ segmentCount: 2 })
+               if(!activeMonitor.mp4frag['MAIN']){
+                   const debugOutputPrefix = `${groupKey}, ${monitorId}, ${monitorConfig.name}, pipe: MAIN`;
+                   activeMonitor.mp4frag['MAIN'] = new Mp4Frag({ segmentCount: 2, cacheInterval: 60000, debug: config.debugMp4Frag || false, debugOutputPrefix });
+                   if(config.debugMp4Frag){
+                       activeMonitor.mp4frag['MAIN'].on('memoryfreed',function(freed){
+                           s.mp4FragMemoryFreed[debugOutputPrefix] = [freed, new Date()]
+                       })
+                   }
+               }
                activeMonitor.mp4frag['MAIN'].on('error',function(error){
                    s.userLog(e,{type:lang['Mp4Frag'],msg:{error:error}})
                })
                activeMonitor.spawn.stdio[1].pipe(activeMonitor.mp4frag['MAIN'],{ end: false })
-               setupMp4FragCacheResetter(activeMonitor,'MAIN', activeMonitor.spawn.stdio[1])
            break;
            case'flv':
                frameToStreamPrimary = function(d){

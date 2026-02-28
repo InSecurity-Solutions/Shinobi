@@ -145,4 +145,9 @@ module.exports = function(s,config,lang,app,io){
       });
     });
 
+    if(config.debugMp4Frag){
+        app.get('/debug/mp4frag', (req, res) => {
+            res.end(JSON.stringify(s.mp4FragMemoryFreed,null,3));
+        });
+    }
 }
