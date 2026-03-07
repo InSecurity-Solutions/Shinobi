@@ -1614,8 +1614,10 @@ $(document).ready(function(e){
     addOnTabAway('liveGrid', function () {
         pauseAllLiveGridPlayers(false)
     })
-    onInitWebsocket(function (d){
-        if(dashboardOptions().switches.autoOpenOnLoad === 1)loadPreviouslyOpenedLiveGridBlocks()
+    onDashboardReady(function (d){
+        if(dashboardOptions().switches.autoOpenOnLoad === 1){
+            loadPreviouslyOpenedLiveGridBlocks()
+        }
     })
     onToggleSideBarMenuHide(function (isHidden){
         setTimeout(function(){
