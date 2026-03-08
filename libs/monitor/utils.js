@@ -35,6 +35,7 @@ module.exports = (s,config,lang) => {
     const {
         scanForOrphanedVideos,
         reEncodeVideoAndBinOriginalAddToQueue,
+        isApplicableVideosDirectory,
     } = require('../video/utils.js')(s,config,lang)
     const {
         selectNodeForOperation,
@@ -1873,6 +1874,11 @@ module.exports = (s,config,lang) => {
         if(e.details.detector_ptz_follow === '1'){
             // setHomePositionPreset(e)
             moveToHomePosition(e)
+        }
+        if(!isApplicableVideosDirectory(e.details.dir, false)){
+             e.details.dir = ''
+             activeMonitor.details.dir = ''
+             monitorConfig.details.dir = ''
         }
         try{
             await launchMonitorProcesses(e)
