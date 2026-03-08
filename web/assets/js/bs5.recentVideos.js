@@ -127,7 +127,7 @@ $(document).ready(function(){
         drawMonitorListToSelector(monitorList.find('optgroup'))
         refreshRecentVideosOnAgree()
     })
-    onInitWebsocket(function(){
+    onDashboardReady(function(){
         openTab('initial');
         setTimeout(function(){
             if(tabTree.name === 'initial'){

@@ -142,8 +142,6 @@ $(document).ready(function(){
     addOnTabAway('monitorMap', function () {
         unloadMap()
     })
-    onInitWebsocket(function (d){
-    })
     onWebSocketEvent(function (d){
         switch(d.f){
             case'monitor_edit':
