@@ -2,7 +2,8 @@ var fs = require('fs');
 module.exports = function(s,config,lang){
     //directories
     function isValidPath(givenPath){
-        return /^(\/?[a-z0-9A-Z\-_. ]+)*\/?$/.test(givenPath)
+        if(!givenPath)return false;
+        return /^(\/?[a-z0-9A-Z\-_. ]+)*\/?$/.test(givenPath.replace('__DIR__',s.mainDirectory))
     }
     s.group = {}
     const defaultWindowsTempPath = 'C:/Windows/Temp';
@@ -11,7 +12,7 @@ module.exports = function(s,config,lang){
     if(!config.windowsTempDir&&s.isWin===true){config.windowsTempDir=defaultWindowsTempPath}
     if(!config.defaultMjpeg){config.defaultMjpeg=s.mainDirectory+'/web/libs/img/bg.jpg'}
     //default stream folder check
-    if(!config.streamDir){
+    if(!config.streamDir || !isValidPath(config.streamDir)){
         if(s.isWin === false){
             config.streamDir = '/dev/shm'
         }else{
@@ -29,12 +30,13 @@ module.exports = function(s,config,lang){
     }
     if(!config.videosDir || !isValidPath(config.videosDir)){config.videosDir = defaultVideosPath}
     if(!config.binDir || !isValidPath(config.binDir)){config.binDir = defaultFileBinPath}
-    if(!config.addStorage){config.addStorage = []}
-    s.dir={
+    if(!config.addStorage || !(config.addStorage instanceof Array)){config.addStorage = []}
+    const addStorage = config.addStorage.filter(item => isValidPath(item.path))
+    s.dir = {
         videos: s.checkCorrectPathEnding(config.videosDir),
         streams: s.checkCorrectPathEnding(config.streamDir),
         fileBin: s.checkCorrectPathEnding(config.binDir),
-        addStorage: config.addStorage,
+        addStorage,
         languages: s.location.languages+'/'
     };
     //streams dir

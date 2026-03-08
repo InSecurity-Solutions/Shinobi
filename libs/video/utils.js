@@ -1014,7 +1014,7 @@ module.exports = (s,config,lang) => {
     function isApplicableVideosDirectory(givenDirectory, addStorageOnly){
         if(!addStorageOnly && (givenDirectory === '' || !givenDirectory))return true
         let canDo = false;
-        const addStorageLocations = (config.addStorage || []).map(item => item.path);
+        const addStorageLocations = (s.dir.addStorage).map(item => item.path);
         for(aLocation of addStorageLocations){
             if(givenDirectory === aLocation.replace('__DIR__', s.mainDirectory)){
                 canDo = true
