@@ -7,6 +7,7 @@ module.exports = function(s,config,lang){
     } = require('./childNode/childUtils.js')(s,config,lang)
     const {
         postProcessCompletedMp4Video,
+        isApplicableVideosDirectory,
     } = require('./video/utils.js')(s,config,lang)
     /**
      * Gets the video directory of the supplied video or monitor database row.
@@ -17,10 +18,11 @@ module.exports = function(s,config,lang){
         if(e.mid&&!e.id){e.id=e.mid};
         s.checkDetails(e)
         if(e.details&&e.details.dir&&e.details.dir!==''){
-            return s.checkCorrectPathEnding(e.details.dir)+e.ke+'/'+e.id+'/'
-        }else{
-            return s.dir.videos+e.ke+'/'+e.id+'/';
+            if(isApplicableVideosDirectory(e.details.dir, true)){
+                return s.checkCorrectPathEnding(e.details.dir)+e.ke+'/'+e.id+'/'
+            }
         }
+        return s.dir.videos+e.ke+'/'+e.id+'/'
     }
     /**
      * Creates available API based URLs for streaming
