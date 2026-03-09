@@ -5,7 +5,7 @@ $(document).ready(function(){
     function getServers(){
         return new Promise((resolve) => {
             $.get(superApiPrefix + $user.sessionKey + '/failoverKeys/list',function(data){
-                resolve(data.failoverServers)
+                resolve(data.failoverConnectionKeys)
             })
         })
     }
@@ -31,7 +31,7 @@ $(document).ready(function(){
         var notExist = $(`[data-key="${failoverServer}"]`).length === 0
         if(notExist)theList.append(`<tr class="server-row" data-key="${failoverServer}">
             <td>${failoverServer}</td>
-            <td><a class="btn btn-sm btn-danger delete"><i class="fa fa-trash-o"></i></a></td>
+            <td class="text-end"><a class="btn btn-sm btn-danger delete"><i class="fa fa-trash-o"></i></a></td>
         </tr>`)
     }
     async function drawServers(){

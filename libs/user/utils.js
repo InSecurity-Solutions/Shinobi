@@ -1,5 +1,30 @@
 var fs = require('fs');
 module.exports = (s,config,lang) => {
+    function getDefaultUserDetails(options = {}){
+        return {
+            "factorAuth":"0",
+            "size": options.diskLimit || options.size || '',
+            "days":"",
+            "event_days":"",
+            "log_days":"",
+            "max_camera": options.cameraLimit || options.max_camera || '',
+            "permissions":"all",
+            "edit_size":"1",
+            "edit_days":"1",
+            "edit_event_days":"1",
+            "edit_log_days":"1",
+            "use_admin":"1",
+            "use_aws_s3":"1",
+            "use_whcs":"1",
+            "use_sftp":"1",
+            "use_webdav":"1",
+            "use_discordbot":"1",
+            "use_ldap":"1",
+            "aws_use_global":"0",
+            "b2_use_global":"0",
+            "webdav_use_global":"0"
+        }
+    }
     const deleteSetOfVideos = function(options,callback){
         const groupKey = options.groupKey
         const err = options.err
@@ -496,29 +521,7 @@ module.exports = (s,config,lang) => {
     }
     function createAdminUser(user){
         return new Promise((resolve,reject) => {
-            const detailsColumn = Object.assign({
-                "factorAuth":"0",
-                "size": user.diskLimit || user.size || '',
-                "days":"",
-                "event_days":"",
-                "log_days":"",
-                "max_camera": user.cameraLimit || user.max_camera || '',
-                "permissions":"all",
-                "edit_size":"1",
-                "edit_days":"1",
-                "edit_event_days":"1",
-                "edit_log_days":"1",
-                "use_admin":"1",
-                "use_aws_s3":"1",
-                "use_whcs":"1",
-                "use_sftp":"1",
-                "use_webdav":"1",
-                "use_discordbot":"1",
-                "use_ldap":"1",
-                "aws_use_global":"0",
-                "b2_use_global":"0",
-                "webdav_use_global":"0"
-            },s.parseJSON(user.details) || {});
+            const detailsColumn = Object.assign(getDefaultUserDetails(user),s.parseJSON(user.details) || {});
             const insertQuery = {
                 ke: user.ke || s.gid(7),
                 uid: user.uid || s.gid(6),
@@ -559,19 +562,77 @@ module.exports = (s,config,lang) => {
             return null;
         }
     }
+    async function legacyCreateAdminUser(form, existanceCheckBy = 'mail'){
+        const response = { ok: false }
+        const { rows: users } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Users",
+            limit: 1,
+            where: [
+                [existanceCheckBy,'=',form[existanceCheckBy]]
+            ]
+        });
+        if(users[0]){
+            response.msg = lang['Already exists'];
+        }else{
+            form.uid = s.gid()
+            if(!form.ke){
+                form.ke = s.gid()
+            }else{
+                form.ke = form.ke.replace(/[`~!@#$%^&*()_|+\-=?;:'",.<>\{\}\[\]\\\/]/gi, '').trim()
+            }
+            if(!s.group[form.ke]){
+                response.ok = true
+                //check if "details" is object
+                if(form.details instanceof Object){
+                    form.details = JSON.stringify(Object.assign(getDefaultUserDetails(), form.details))
+                }else{
+                    try{
+                        form.details = JSON.parse(form.details)
+                        form.details = Object.assign(getDefaultUserDetails(), form.details)
+                    }catch(err){
+                        response.error = err.toString()
+                        form.details = getDefaultUserDetails()
+                    }
+                    form.details = JSON.stringify(form.details)
+                }
+                //write user to db
+                await s.knexQueryPromise({
+                    action: "insert",
+                    table: "Users",
+                    insert: {
+                        ke: form.ke,
+                        uid: form.uid,
+                        mail: form.mail,
+                        pass: s.createHash(form.pass),
+                        details: form.details
+                    }
+                });
+                s.tx({f:'add_account',details:form.details,ke:form.ke,uid:form.uid,mail:form.mail},'$')
+                response.user = Object.assign({},form)
+                //init user
+                s.loadGroup(form)
+            }else{
+                response.msg = lang["Group with this key exists already"]
+            }
+        }
+        return response
+    }
     return {
         getAdminUser,
-        deleteSetOfVideos: deleteSetOfVideos,
-        deleteSetOfTimelapseFrames: deleteSetOfTimelapseFrames,
-        deleteSetOfFileBinFiles: deleteSetOfFileBinFiles,
-        deleteAddStorageVideos: deleteAddStorageVideos,
-        deleteMainVideos: deleteMainVideos,
-        deleteTimelapseFrames: deleteTimelapseFrames,
+        deleteSetOfVideos,
+        deleteSetOfTimelapseFrames,
+        deleteSetOfFileBinFiles,
+        deleteAddStorageVideos,
+        deleteMainVideos,
+        deleteTimelapseFrames,
         deleteAddStorageTimelapseFrames,
-        deleteFileBinFiles: deleteFileBinFiles,
-        deleteCloudVideos: deleteCloudVideos,
-        deleteCloudTimelapseFrames: deleteCloudTimelapseFrames,
-        resetAllStorageCounters: resetAllStorageCounters,
-        createAdminUser: createAdminUser,
+        deleteFileBinFiles,
+        deleteCloudVideos,
+        deleteCloudTimelapseFrames,
+        resetAllStorageCounters,
+        createAdminUser,
+        legacyCreateAdminUser,
     }
 }

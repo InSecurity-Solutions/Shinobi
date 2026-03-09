@@ -1,12 +1,8 @@
 module.exports = (s,app,config,lang) => {
     if(!config.isFailover){
         const {
-            getMonitors,
-            getWriteStream,
-            insertVideoChunk,
             connectToFailover,
-            getFailoverConnection,
-            closeFailoverConnection,
+            runOnFailoverConnections,
             connectFailoverServers,
             getFailoverServers,
             addFailoverServer,
@@ -14,6 +10,16 @@ module.exports = (s,app,config,lang) => {
         } = require('./utilsNormal.js')(s,app,config,lang)
         s.onLoadedUsersAtStartup(() => {
             connectFailoverServers()
+        })
+        s.onMonitorSave((monitorConfig) => {
+            runOnFailoverConnections((host, connectionToFailover) => {
+                updateCachedMonitor(connectionToFailover, monitorConfig)
+            })
+        })
+        s.onMonitorDelete((monitorConfig) => {
+            runOnFailoverConnections((host, connectionToFailover) => {
+                updateCachedMonitor(connectionToFailover, monitorConfig, true)
+            })
         })
         /**
         * API : Superuser : Get Failover Server Settings

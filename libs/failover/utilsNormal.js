@@ -27,11 +27,26 @@ module.exports = (s,app,config,lang) => {
         return monitors
     }
     async function updateCachedMonitor(connectionToFailover, monitor, deleteMonitor){
-        if(deleteMonitor){
-            connectionToFailover.send({ f: 'deleteCachedMonitor', monitor });
-        }else if(monitor){
-            connectionToFailover.send({ f: 'updateCachedMonitor', monitor });
+        if(monitor){
+            if(deleteMonitor){
+                connectionToFailover.send({ f: 'deleteCachedMonitor', monitor });
+            }else{
+                connectionToFailover.send({ f: 'updateCachedMonitor', monitor });
+            }
         }
+    }
+    async function getUsers(){
+        const { rows: users } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Users"
+        });
+        return users || []
+    }
+    async function importUsers(connectionToFailover){
+        const monitors = await getUsers();
+        connectionToFailover.send({ f: 'importUsers', users });
+        return users
     }
     function getWriteStream(filePath){
         let writeStream = writeStreams[filePath]
@@ -81,14 +96,19 @@ module.exports = (s,app,config,lang) => {
     }
     function connectToFailover({ host, key }){
         const parsedIp = parseNewConnectionAddress(host)
-        const clientConnection = createWebSocketClient(parsedIp)
+        const clientConnection = createWebSocketClient(parsedIp,{})
         clientConnection.on('open', () => {
             clientConnection.send({
                 key,
             })
         })
-        clientConnection.on('message', (data) => {
+        clientConnection.on('message', async (data) => {
             switch(data.f){
+                case'init':
+                    await importUsers(clientConnection)
+                    await cacheMonitors(clientConnection)
+                    clientConnection.send({ f: 'init_complete' })
+                break;
                 case'insertVideoChunk':
                     insertVideoChunk(data.video, data.data)
                 break;
@@ -98,6 +118,15 @@ module.exports = (s,app,config,lang) => {
             }
         })
         failoverServerConnections[host] = clientConnection
+    }
+    function getFailoverConnections(){
+        return failoverServerConnections
+    }
+    function runOnFailoverConnections(callback){
+        for(host in failoverServerConnections){
+            const serverConnection = failoverServerConnections[host]
+            callback(host, serverConnection)
+        }
     }
     function getFailoverConnection(host){
         return failoverServerConnections[host]
@@ -177,6 +206,8 @@ module.exports = (s,app,config,lang) => {
         updateCachedMonitor,
         insertVideoChunk,
         connectToFailover,
+        runOnFailoverConnections,
+        getFailoverConnections,
         getFailoverConnection,
         connectFailoverServers,
         getFailoverServers,

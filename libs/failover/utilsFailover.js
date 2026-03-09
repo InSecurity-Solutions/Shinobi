@@ -10,6 +10,9 @@ module.exports = (s,app,config,lang) => {
         deleteMonitor,
     } = require('../monitor/utils.js')(s,config,lang)
     const {
+        legacyCreateAdminUser,
+    } = require('../user/utils.js')(s,config,lang)
+    const {
         parseJSON,
         stringJSON,
     } = require('../basic/utils.js')(process.cwd(),config)
@@ -128,13 +131,27 @@ module.exports = (s,app,config,lang) => {
         }
         return response
     }
+    async function importUsers(users){
+        for(user of users){
+            await legacyCreateAdminUser(user, 'ke')
+        }
+    }
+    function updateCachedMonitor(cachedMonitors, monitor, deleteMonitor){
+        const { ke: groupKey, mid: monitorId } = monitor;
+        const monitorCacheIndex = cachedMonitors.findIndex(row => row.ke === groupKey && row.mid === monitorId)
+        if(deleteMonitor){
+            cachedMonitors.splice(monitorCacheIndex, 1)
+        }else{
+            cachedMonitors[monitorCacheIndex] = monitor
+        }
+    }
     return {
         importMonitors,
         deleteMonitors,
         transmitVideosFromMonitors,
-        beginVideoTransmission,
         getFailoverServerKeys,
         addFailoverServerKey,
         removeFailoverServerKey,
+        importUsers,
     }
 }

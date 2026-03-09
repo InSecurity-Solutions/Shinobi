@@ -2,6 +2,7 @@ const { createWebSocketServer } = require('../basic/websocketTools.js')
 module.exports = (s,app,config,lang) => {
     if(config.isFailover){
         const {
+            importUsers,
             importMonitors,
             deleteMonitors,
             downloadVideosFromMonitors,
@@ -42,10 +43,7 @@ module.exports = (s,app,config,lang) => {
                     peerConnectKey = data.key
                     client.on('message', onAuthenticatedData)
                     client.on('close', onAuthenticatedExit)
-                    if(lostConnections[peerConnectKey]){
-                        lostConnections[peerConnectKey] = false
-                        beginVideoTransmission()
-                    }
+                    client.send({ f: 'init' })
                 }else{
                     client.terminate()
                 }
@@ -61,8 +59,24 @@ module.exports = (s,app,config,lang) => {
                     case'exit':
                         gracefulExitRequested[peerConnectKey] = true
                     break;
+                    case'init_complete':
+                        console.log('Initialized as Failover for ', peerConnectKey)
+                        if(lostConnections[peerConnectKey]){
+                            lostConnections[peerConnectKey] = false
+                            beginVideoTransmission()
+                        }
+                    break;
+                    case'importUsers':
+                        importUsers(data.users)
+                    break;
                     case'cacheMonitors':
                         cachedMonitors[peerConnectKey] = data.monitors
+                    break;
+                    case'updateCachedMonitor':
+                        updateCachedMonitor(cachedMonitors[peerConnectKey], data.monitor)
+                    break;
+                    case'deleteCachedMonitor':
+                        updateCachedMonitor(cachedMonitors[peerConnectKey], data.monitor, true)
                     break;
                     case'importMonitors':
                         importMonitors(data.monitors)
