@@ -5,3 +5,4 @@ cd $DIR/../
 npm i pm2@latest -g
 rm -rf node_modules
 npm i
+pm2 update
