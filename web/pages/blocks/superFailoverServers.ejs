@@ -17,11 +17,12 @@
                             <%- lang['Failover Servers'] %>
                         </div>
                         <div class="card-body">
+                            <div class="text-center mb-3"><%- lang.failoverServersDescription %></div>
                             <div class="form-group">
                                 <input placeholder="<%-lang['Server URL']%>" class="form-control btn btn-dark text-left text-white" type="text" name="failoverServer" value="" placeholder="ws://127.0.0.1:8663">
                             </div>
                             <div class="form-group">
-                                <input placeholder="<%-lang['P2P API Key']%>" class="form-control btn btn-dark text-left text-white" type="text" name="peerConnectKey" value="" placeholder="API Key from https://licenses.shinobi.video">
+                                <input placeholder="<%-lang['Server Key']%>" class="form-control btn btn-dark text-left text-white" type="text" name="peerConnectKey" value="" placeholder="API Key from https://licenses.shinobi.video">
                             </div>
                             <div class="btn-group d-flex flex-row">
                                 <a href="#" class="submit flex-grow-1 btn btn-success"><i class="fa fa-check"></i> <%- lang.Save %></a>
