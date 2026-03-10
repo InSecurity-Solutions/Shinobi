@@ -114,10 +114,12 @@ module.exports = function(s,config){
         return Math.floor((Math.random() * x) + 1);
     };
     s.gid=function(x){
-        if(!x){x=10};var t = "";var p = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-        for( var i=0; i < x; i++ )
-            t += p.charAt(Math.floor(Math.random() * p.length));
-        return t;
+        if (!x) { x = 10; }
+        const bytes = Math.ceil(x * 3 / 4);
+        return crypto.randomBytes(bytes)
+            .toString('base64')
+            .replace(/[+/=]/g, '')
+            .slice(0, x);
     };
     s.nid=function(x){
         if(!x){x=6};var t = "";var p = "0123456789";
