@@ -1,10 +1,9 @@
 var fs = require('fs');
 module.exports = function(s,config,lang){
     //directories
-    function isValidPath(givenPath){
-        if(!givenPath)return false;
-        return /^(\/?[a-z0-9A-Z\-_. ]+)*\/?$/.test(givenPath.replace('__DIR__',s.mainDirectory))
-    }
+    const {
+        isValidPath,
+    } = require('./basic/utils.js')(process.cwd(),config)
     s.group = {}
     const defaultWindowsTempPath = 'C:/Windows/Temp';
     const defaultVideosPath = s.mainDirectory+'/videos/';
