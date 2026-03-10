@@ -52,7 +52,7 @@ module.exports = (s,config,lang,app,io) => {
             const response = { ok: false }
             if(sourceTarget && localPath){
                 try{
-                    if(!isValidPath(localPath) || !isValidPath(sourceTarget)){
+                    if(!isValidPath(localPath) || !isValidPath(sourceTarget, '//')){
                         response.error = lang['Invalid Data']
                     }else{
                         const createDirResponse = await createMountPoint(localPath)
