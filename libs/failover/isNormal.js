@@ -65,7 +65,6 @@ module.exports = (s,app,config,lang) => {
                 s.closeJsonResponse(res,response)
             },res,req)
         })
-        console.log('Connect to Failover Servers...')
         connectFailoverServers()
     }
 }
