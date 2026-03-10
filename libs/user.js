@@ -183,6 +183,11 @@ module.exports = function(s,config,lang){
             theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
         }
     }
+    s.unloadGroupApps = function(user){
+        s.unloadGroupAppExtensions.forEach(function(extender){
+            extender(user)
+        })
+    }
     s.loadGroupApps = function(e){
         // e = user
         if(!s.group[e.ke].init){

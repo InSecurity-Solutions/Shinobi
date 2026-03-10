@@ -14,7 +14,9 @@ module.exports = function(s,config,lang,app){
          checkSubscription
      } = require('./checker/actCheck.js')(s,config)
      const {
-         legacyCreateAdminUser
+         legacyCreateAdminUser,
+         legacyEditAdminUser,
+         legacyDeleteUser,
      } = require('./user/utils.js')(s,config,lang)
     /**
     * API : Superuser : Get Logs
@@ -277,7 +279,7 @@ module.exports = function(s,config,lang,app){
             if(form){
                 if(form.mail !== '' && form.pass !== ''){
                     if(form.pass === form.password_again || form.pass === form.pass_again){
-                        const createResponse = await legacyCreateAdminUser(form, 'mail')
+                        const createResponse = await legacyCreateAdminUser(form, 'mail', true)
                         endData.ok = createResponse.ok
                         endData.msg = createResponse.msg
                     }else{
@@ -296,157 +298,34 @@ module.exports = function(s,config,lang,app){
     * API : Superuser : Edit Admin account (Account to manage cameras)
     */
     app.all(config.webPaths.superApiPrefix+':auth/accounts/editAdmin', function (req,res){
-        s.superAuth(req.params,function(resp){
-            var endData = {
+        s.superAuth(req.params, async function(resp){
+            var response = {
                 ok : false
-            }
-            var close = function(){
-                s.closeJsonResponse(res,endData)
             }
             var form = s.getPostData(req)
             if(form){
                 var account = s.getPostData(req,'account')
-                s.knexQuery({
-                    action: "select",
-                    columns: "*",
-                    table: "Users",
-                    where: [
-                        ['mail','=',account.mail]
-                    ]
-                },(err,r) => {
-                    if(r && r[0]){
-                        r = r[0]
-                        var details = JSON.parse(r.details)
-                        if(form.pass && form.pass !== ''){
-                           if(form.pass === form.password_again || form.pass_again){
-                               form.pass = s.createHash(form.pass);
-                           }else{
-                               endData.msg = lang["Passwords Don't Match"]
-                               close()
-                               return
-                           }
-                        }else{
-                            delete(form.pass);
-                        }
-                        delete(form.password_again);
-                        delete(form.pass_again);
-                        delete(form.ke);
-                        form.details = s.stringJSON(Object.assign(details,s.parseJSON(form.details)))
-                        s.knexQuery({
-                            action: "update",
-                            table: "Users",
-                            update: form,
-                            where: [
-                                ['mail','=',account.mail],
-                            ]
-                        },(err,r) => {
-                            if(err){
-                                console.log(err)
-                                endData.error = err
-                                endData.msg = lang.AccountEditText1
-                            }else{
-                                endData.ok = true
-                                s.tx({f:'edit_account',form:form,ke:account.ke,uid:account.uid},'$')
-                                delete(s.group[account.ke].init);
-                                s.loadGroupApps(account)
-                            }
-                            close()
-                        })
-                    }else{
-                        endData.msg = lang['User Not Found']
-                        close()
-                    }
-                })
+                response = await legacyEditAdminUser(account, form, 'mail', true)
             }else{
-                endData.msg = lang.postDataBroken
-                close()
+                response.msg = lang.postDataBroken
             }
+            s.closeJsonResponse(res,response)
         },res,req)
     })
     /**
     * API : Superuser : Delete Admin account (Account to manage cameras)
     */
     app.all(config.webPaths.superApiPrefix+':auth/accounts/deleteAdmin', function (req,res){
-        s.superAuth(req.params,function(resp){
-            var endData = {
-                ok : true
-            }
-            var close = function(){
-                s.closeJsonResponse(res,endData)
-            }
+        s.superAuth(req.params, async function(resp){
             var account = s.getPostData(req,'account')
-            s.knexQuery({
-                action: "delete",
-                table: "Users",
-                where: {
-                    ke: account.ke,
-                    uid: account.uid,
-                    mail: account.mail,
-                }
-            })
-            s.knexQuery({
-                action: "delete",
-                table: "API",
-                where:  {
-                    ke: account.ke,
-                    uid: account.uid,
-                }
-            })
-            if(s.getPostData(req,'deleteSubAccounts',false) === '1'){
-                s.knexQuery({
-                    action: "delete",
-                    table: "Users",
-                    where:  {
-                        ke: account.ke,
-                    }
-                })
-            }
-            if(s.getPostData(req,'deleteMonitors',false) == '1'){
-                s.knexQuery({
-                    action: "select",
-                    columns: "*",
-                    table: "Monitors",
-                    where:  {
-                        ke: account.ke,
-                    }
-                },(err,monitors) => {
-                    if(monitors && monitors[0]){
-                        monitors.forEach(function(monitor){
-                            s.camera('stop',monitor)
-                        })
-                        s.knexQuery({
-                            action: "delete",
-                            table: "Monitors",
-                            where:  {
-                                ke: account.ke,
-                            }
-                        })
-                    }
-                })
-            }
-            if(s.getPostData(req,'deleteVideos',false) == '1'){
-                s.knexQuery({
-                    action: "delete",
-                    table: "Videos",
-                    where:  {
-                        ke: account.ke,
-                    }
-                })
-                fs.rm(s.dir.videos+account.ke,function(err){
-                    s.debugLog(err)
-                })
-            }
-            if(s.getPostData(req,'deleteEvents',false) == '1'){
-                s.knexQuery({
-                    action: "delete",
-                    table: "Events",
-                    where:  {
-                        ke: account.ke,
-                    }
-                })
-            }
-            s.tx({f:'delete_account',ke:account.ke,uid:account.uid,mail:account.mail},'$')
-            close()
+            const response = await legacyDeleteUser({
+                account,
+                deleteSubAccounts: s.getPostData(req,'deleteSubAccounts',false) === '1',
+                deleteMonitors: s.getPostData(req,'deleteMonitors',false) === '1',
+                deleteVideos: s.getPostData(req,'deleteVideos',false) === '1',
+                deleteEvents: s.getPostData(req,'deleteEvents',false) === '1',
+            });
+            s.closeJsonResponse(res,response)
         },res,req)
     })
     /**

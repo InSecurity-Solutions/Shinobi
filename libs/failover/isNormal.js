@@ -7,10 +7,9 @@ module.exports = (s,app,config,lang) => {
             getFailoverServers,
             addFailoverServer,
             removeFailoverServer,
+            updateCachedMonitor,
+            updateCachedUser,
         } = require('./utilsNormal.js')(s,app,config,lang)
-        s.onLoadedUsersAtStartup(() => {
-            connectFailoverServers()
-        })
         s.onMonitorSave((monitorConfig) => {
             runOnFailoverConnections((host, connectionToFailover) => {
                 updateCachedMonitor(connectionToFailover, monitorConfig)
@@ -19,6 +18,16 @@ module.exports = (s,app,config,lang) => {
         s.onMonitorDelete((monitorConfig) => {
             runOnFailoverConnections((host, connectionToFailover) => {
                 updateCachedMonitor(connectionToFailover, monitorConfig, true)
+            })
+        })
+        s.onAccountSave((groupLoadedInMemory, userDetails, userDatabaseRow) => {
+            runOnFailoverConnections((host, connectionToFailover) => {
+                updateCachedUser(connectionToFailover, userDatabaseRow)
+            })
+        })
+        s.onAccountDelete((account) => {
+            runOnFailoverConnections((host, connectionToFailover) => {
+                updateCachedUser(connectionToFailover, account, true)
             })
         })
         /**
@@ -39,7 +48,7 @@ module.exports = (s,app,config,lang) => {
                 const failoverServer = req.body.failoverServer;
                 const peerConnectKey = req.body.peerConnectKey;
                 const response = await addFailoverServer(failoverServer, peerConnectKey)
-                await connectToFailover(failoverServer, peerConnectKey)
+                await connectToFailover({ host: failoverServer, key: peerConnectKey })
                 s.closeJsonResponse(res,response)
             },res,req)
         })
@@ -56,5 +65,7 @@ module.exports = (s,app,config,lang) => {
                 s.closeJsonResponse(res,response)
             },res,req)
         })
+        console.log('Connect to Failover Servers...')
+        connectFailoverServers()
     }
 }

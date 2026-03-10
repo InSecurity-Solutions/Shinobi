@@ -70,6 +70,9 @@ module.exports = function(s,config){
     // [0] groupLoadedInMemory : Object of group initiated in memory.
     // [1] userDetails : Additional data about the user. If Admin user it will have group data.
     // [2] userDatabaseRow : Object of User database row.
+    createExtension(`onAccountDelete`)
+    // [0] account : Object of group initiated in memory.
+    // [1] optionsUsed : deleteSubAccounts, deleteMonitors, stopMonitors, deleteVideos, deleteEvents, systemAction.
     createExtension(`beforeAccountSave`)
     // [0] infoObject : form (complete post of user data to be update), formDetails (form posted details), userDetails (details in database before save)
     createExtension(`onTwoFactorAuthCodeNotification`)

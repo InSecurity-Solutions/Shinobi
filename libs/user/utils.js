@@ -1,5 +1,8 @@
 var fs = require('fs');
 module.exports = (s,config,lang) => {
+    const {
+        deleteMonitor,
+    } = require('../monitor/utils.js')(s,config,lang)
     function getDefaultUserDetails(options = {}){
         return {
             "factorAuth":"0",
@@ -562,7 +565,7 @@ module.exports = (s,config,lang) => {
             return null;
         }
     }
-    async function legacyCreateAdminUser(form, existanceCheckBy = 'mail'){
+    async function legacyCreateAdminUser(form, existanceCheckBy = 'mail', doPasswordHash = true){
         const response = { ok: false }
         const { rows: users } = await s.knexQueryPromise({
             action: "select",
@@ -605,7 +608,7 @@ module.exports = (s,config,lang) => {
                         ke: form.ke,
                         uid: form.uid,
                         mail: form.mail,
-                        pass: s.createHash(form.pass),
+                        pass: doPasswordHash ? s.createHash(form.pass) : form.pass,
                         details: form.details
                     }
                 });
@@ -613,9 +616,177 @@ module.exports = (s,config,lang) => {
                 response.user = Object.assign({},form)
                 //init user
                 s.loadGroup(form)
+                s.loadGroupApps(form)
             }else{
                 response.msg = lang["Group with this key exists already"]
             }
+        }
+        return response
+    }
+    async function legacyEditAdminUser(account, form, existanceCheckBy = 'mail', doPasswordHash = true){
+        // account = target account (mail, uid, ke)
+        // form = changes to be made
+        const response = { ok: false }
+        const { rows: users } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Users",
+            limit: 1,
+            where: [
+                [existanceCheckBy,'=',account[existanceCheckBy]]
+            ]
+        });
+        const user = users[0]
+        if(user){
+            var details = JSON.parse(user.details)
+            if(form.pass && form.pass !== ''){
+               if(form.pass === form.password_again || form.pass_again){
+                   form.pass = doPasswordHash ? s.createHash(form.pass) : form.pass;
+               }else{
+                   response.code = 'PASSWORD_MISMATCH'
+                   response.msg = lang["Passwords Don't Match"]
+                   return response
+               }
+            }else{
+                delete(form.pass);
+            }
+            delete(form.password_again);
+            delete(form.pass_again);
+            delete(form.ke);
+            form.details = s.stringJSON(Object.assign(details,s.parseJSON(form.details)))
+            const { err } = await s.knexQueryPromise({
+                action: "update",
+                table: "Users",
+                update: form,
+                where: [
+                    ['mail','=',account.mail],
+                ]
+            });
+            if(err){
+                console.log(err)
+                response.code = 'UPDATE_ERROR'
+                response.error = err
+                response.msg = lang.AccountEditText1
+            }else{
+                response.ok = true
+                s.tx({f:'edit_account',form:form,ke:account.ke,uid:account.uid},'$')
+                s.unloadGroupApps(account)
+                delete(s.group[account.ke].init);
+                s.loadGroupApps(account)
+            }
+        }else{
+            response.code = 'NOT_FOUND'
+            response.msg = lang['User Not Found']
+        }
+        return response
+    }
+    async function legacyDeleteUser({
+        account,
+        deleteSubAccounts,
+        deleteMonitors,
+        stopMonitors = true,
+        deleteVideos,
+        deleteEvents,
+        systemAction,
+    }){
+        const response = { ok: true }
+        try{
+            await s.knexQueryPromise({
+                action: "delete",
+                table: "Users",
+                where: {
+                    ke: account.ke,
+                    uid: account.uid,
+                    mail: account.mail,
+                }
+            })
+            await s.knexQueryPromise({
+                action: "delete",
+                table: "API",
+                where:  {
+                    ke: account.ke,
+                    uid: account.uid,
+                }
+            })
+            if(deleteSubAccounts){
+                await s.knexQueryPromise({
+                    action: "delete",
+                    table: "Users",
+                    where:  {
+                        ke: account.ke,
+                    }
+                })
+            }
+            if(deleteMonitors || stopMonitors){
+                const { rows: monitors } = await s.knexQueryPromise({
+                    action: "select",
+                    columns: "*",
+                    table: "Monitors",
+                    where:  {
+                        ke: account.ke,
+                    }
+                });
+                if(monitors && monitors[0]){
+                    if(deleteMonitors){
+                        monitors.forEach(function({ ke: groupKey, mid: monitorId }){
+                            deleteMonitor({
+                                ke: groupKey,
+                                mid: monitorId,
+                                user: systemAction ? '$SYSTEM' : account.uid,
+                                deleteFiles: true,
+                            })
+                        })
+                    }else if(stopMonitors){
+                        monitors.forEach(function(monitor){
+                            s.camera('stop',monitor)
+                        })
+                    }
+                }
+            }
+            if(deleteVideos){
+                await s.knexQueryPromise({
+                    action: "delete",
+                    table: "Videos",
+                    where:  {
+                        ke: account.ke,
+                    }
+                })
+                fs.rm(s.dir.videos+account.ke,function(err){
+                    s.debugLog(err)
+                })
+            }
+            if(deleteEvents){
+                await s.knexQueryPromise({
+                    action: "delete",
+                    table: "Events",
+                    where:  {
+                        ke: account.ke,
+                    }
+                })
+            }
+            s.unloadGroupApps(account);
+            s.runExtensionsForArray('onAccountDelete', null, [
+                account,
+                {
+                    deleteSubAccounts,
+                    deleteMonitors,
+                    stopMonitors,
+                    deleteVideos,
+                    deleteEvents,
+                    systemAction,
+                }
+            ]);
+            // delete(s.group[account.ke])
+            s.tx({
+                f: 'delete_account',
+                ke: account.ke,
+                uid: account.uid,
+                mail: account.mail
+            },'$')
+        }catch(err){
+            console.log(err)
+            response.ok = true
+            response.err = err.toString()
         }
         return response
     }
@@ -634,5 +805,7 @@ module.exports = (s,config,lang) => {
         resetAllStorageCounters,
         createAdminUser,
         legacyCreateAdminUser,
+        legacyEditAdminUser,
+        legacyDeleteUser,
     }
 }

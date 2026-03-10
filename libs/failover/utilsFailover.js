@@ -1,7 +1,7 @@
 const path = require('path')
 const bson = require('bson')
-const { createReadStream, createWriteStream } = require('fs')
 const fs = require('fs').promises
+const { createReadStream, createWriteStream } = require('fs')
 module.exports = (s,app,config,lang) => {
     const {
         getVideoFilePath,
@@ -11,6 +11,8 @@ module.exports = (s,app,config,lang) => {
     } = require('../monitor/utils.js')(s,config,lang)
     const {
         legacyCreateAdminUser,
+        legacyEditAdminUser,
+        legacyDeleteUser,
     } = require('../user/utils.js')(s,config,lang)
     const {
         parseJSON,
@@ -20,6 +22,9 @@ module.exports = (s,app,config,lang) => {
         modifyConfiguration,
         getConfiguration
     } = require('../system/utils.js')(config)
+    function sendMessage(client, data){
+        client.send(bson.serialize(data))
+    }
     async function importMonitors(monitors){
         for(const monitor of monitors){
             const details = parseJSON(monitor.details)
@@ -39,6 +44,39 @@ module.exports = (s,app,config,lang) => {
             })
         }
     }
+    async function stopMonitorQueues(monitors){
+        const groupKeys = [...new Set(Object.values(monitors).map(monitor => monitor.ke))]
+        for(const groupKey of groupKeys){
+            try{
+                s.group[groupKey].startMonitorInQueue.kill()
+            }catch(err){
+                console.log(err)
+            }
+        }
+    }
+    async function stopMonitors(monitors, deleteFiles){
+        for(const monitor of monitors){
+            await s.camera('stop',monitor)
+        }
+    }
+    async function importUsers(users){
+        for(user of users){
+            await legacyCreateAdminUser(user, 'ke', false)
+        }
+    }
+    async function deleteUsers(users, deleteFiles){
+        for(const user of users){
+            await legacyDeleteUser({
+                account: user,
+                deleteSubAccounts: true,
+                deleteMonitors: false,
+                stopMonitors: false,
+                deleteVideos: false,
+                deleteEvents: false,
+                systemAction: true,
+            })
+        }
+    }
     function uploadVideo(video, connectionToNormal){
         return new Promise((resolve) => {
             const filePath = getVideoFilePath(video);
@@ -47,7 +85,7 @@ module.exports = (s,app,config,lang) => {
             const videoStream = createReadStream(filePath, { highWaterMark: 20 });
             videoStream
             .on('data',function(data){
-                connectionToNormal.send({ f: 'insertVideoChunk', video, data, chunkNumber });
+                sendMessage(connectionToNormal,{ f: 'insertVideoChunk', video, data, chunkNumber });
                 ++chunkNumber
             })
             .on('error',function(err){
@@ -56,7 +94,7 @@ module.exports = (s,app,config,lang) => {
                 response.err = err
             })
             .on('close',function(){
-                connectionToNormal.send({ f: 'insertVideoComplete', video, response, filePath })
+                sendMessage(connectionToNormal,{ f: 'insertVideoComplete', video, response, filePath })
                 resolve(response)
             })
         })
@@ -97,6 +135,33 @@ module.exports = (s,app,config,lang) => {
         }
         return responses
     }
+    async function transmitEventsFromMonitors(monitors, connectionToNormal, deleteAfterUpload){
+        const response = { ok: true }
+        for(const monitor of monitors){
+            const { mid: monitorId, ke: groupKey } = monitor;
+            const { rows: events } = await s.knexQueryPromise({
+                action: "select",
+                columns: "*",
+                table: "Events",
+                where: {
+                    ke: groupKey,
+                    mid: monitorId,
+                }
+            });
+            if(deleteAfterUpload){
+                await s.knexQueryPromise({
+                    action: "delete",
+                    table: "Events",
+                    where: {
+                        ke: groupKey,
+                        mid: monitorId,
+                    }
+                });
+            }
+            sendMessage(connectionToNormal,{ f: 'insertEvents', events })
+        }
+        return response
+    }
     function getFailoverServerKeys(){
         const response = { ok: true }
         response.failoverConnectionKeys = config.failoverConnectionKeys || {};
@@ -131,11 +196,6 @@ module.exports = (s,app,config,lang) => {
         }
         return response
     }
-    async function importUsers(users){
-        for(user of users){
-            await legacyCreateAdminUser(user, 'ke')
-        }
-    }
     function updateCachedMonitor(cachedMonitors, monitor, deleteMonitor){
         const { ke: groupKey, mid: monitorId } = monitor;
         const monitorCacheIndex = cachedMonitors.findIndex(row => row.ke === groupKey && row.mid === monitorId)
@@ -145,13 +205,29 @@ module.exports = (s,app,config,lang) => {
             cachedMonitors[monitorCacheIndex] = monitor
         }
     }
+    function updateCachedUser(cachedUsers, user, deleteUser){
+        const { ke: groupKey, uid: userId } = user;
+        const userCacheIndex = cachedUsers.findIndex(row => row.ke === groupKey && row.mid === userId)
+        if(deleteUser){
+            cachedUsers.splice(userCacheIndex, 1)
+        }else{
+            cachedUsers[userCacheIndex] = user
+        }
+    }
     return {
+        importUsers,
+        deleteUsers,
         importMonitors,
+        stopMonitors,
+        stopMonitorQueues,
         deleteMonitors,
+        updateCachedMonitor,
+        updateCachedUser,
         transmitVideosFromMonitors,
+        transmitEventsFromMonitors,
         getFailoverServerKeys,
         addFailoverServerKey,
         removeFailoverServerKey,
-        importUsers,
+        sendMessage,
     }
 }

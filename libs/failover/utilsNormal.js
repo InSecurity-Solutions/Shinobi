@@ -6,6 +6,7 @@ const { createWebSocketClient } = require('../basic/websocketTools.js')
 module.exports = (s,app,config,lang) => {
     const failoverServerConnections = {}
     const writeStreams = {}
+    const reconnectTimeouts = {}
     const {
         getVideoFilePath,
     } = require('./utils.js')(s,app,config,lang)
@@ -23,15 +24,15 @@ module.exports = (s,app,config,lang) => {
     }
     async function cacheMonitors(connectionToFailover){
         const monitors = await getMonitors();
-        connectionToFailover.send({ f: 'cacheMonitors', monitors });
+        sendMessage(connectionToFailover,{ f: 'cacheMonitors', monitors });
         return monitors
     }
     async function updateCachedMonitor(connectionToFailover, monitor, deleteMonitor){
         if(monitor){
             if(deleteMonitor){
-                connectionToFailover.send({ f: 'deleteCachedMonitor', monitor });
+                sendMessage(connectionToFailover,{ f: 'deleteCachedMonitor', monitor });
             }else{
-                connectionToFailover.send({ f: 'updateCachedMonitor', monitor });
+                sendMessage(connectionToFailover,{ f: 'updateCachedMonitor', monitor });
             }
         }
     }
@@ -43,11 +44,25 @@ module.exports = (s,app,config,lang) => {
         });
         return users || []
     }
-    async function importUsers(connectionToFailover){
-        const monitors = await getUsers();
-        connectionToFailover.send({ f: 'importUsers', users });
+    async function cacheUsers(connectionToFailover){
+        const users = await getUsers();
+        sendMessage(connectionToFailover,{ f: 'cacheUsers', users });
         return users
     }
+    async function updateCachedUser(connectionToFailover, user, deleteUser){
+        if(user){
+            if(deleteMonitor){
+                sendMessage(connectionToFailover,{ f: 'deleteCachedUser', user });
+            }else{
+                sendMessage(connectionToFailover,{ f: 'updateCachedUser', user });
+            }
+        }
+    }
+    // async function importUsers(connectionToFailover){
+    //     const users = await getUsers();
+    //     sendMessage(connectionToFailover,{ f: 'importUsers', users });
+    //     return users
+    // }
     function getWriteStream(filePath){
         let writeStream = writeStreams[filePath]
         if(!writeStream){
@@ -94,20 +109,54 @@ module.exports = (s,app,config,lang) => {
         }
         writeStream.write(chunk)
     }
+    function sendMessage(clientConnection,data){
+        clientConnection.send(bson.serialize(data))
+    }
+    async function insertEvents(events){
+        for(anEvent of events){
+            await s.knexQueryPromise({
+                action: "insert",
+                table: "Events",
+                insert: anEvent
+            });
+        }
+    }
     function connectToFailover({ host, key }){
+        clearTimeout(reconnectTimeouts[host])
         const parsedIp = parseNewConnectionAddress(host)
-        const clientConnection = createWebSocketClient(parsedIp,{})
+        console.log('Attempting Connection to Failover at ', parsedIp)
+        const clientConnection = createWebSocketClient(parsedIp)
+        function reconnectOnFailure(){
+            console.log('Failover Connection Failed, Trying again...', host)
+            try{
+                failoverServerConnections[host].terminate()
+            }catch(err){}
+            delete(failoverServerConnections[host])
+            clearTimeout(reconnectTimeouts[host])
+            reconnectTimeouts[host] = setTimeout(function(){
+                connectToFailover({ host, key })
+            },10000)
+        }
+        clientConnection.onclose = reconnectOnFailure
         clientConnection.on('open', () => {
-            clientConnection.send({
-                key,
-            })
+            console.log('Connected to Failover, Attempting Authentication... ', host)
+            sendMessage(clientConnection, { key })
         })
-        clientConnection.on('message', async (data) => {
+        clientConnection.on('error', (data) => {
+            console.log('Failover Connection Error : ', data)
+        })
+        clientConnection.on('message', async (message) => {
+            const data = bson.deserialize(Buffer.from(message))
             switch(data.f){
                 case'init':
-                    await importUsers(clientConnection)
+                    console.log('Initializing Failover at ', host)
+                    await cacheUsers(clientConnection)
                     await cacheMonitors(clientConnection)
-                    clientConnection.send({ f: 'init_complete' })
+                    sendMessage(clientConnection, { f: 'init_complete' })
+                    console.log('Initialized Failover at ', host)
+                break;
+                case'insertEvents':
+                    insertEvents(data.events)
                 break;
                 case'insertVideoChunk':
                     insertVideoChunk(data.video, data.data)
@@ -134,28 +183,36 @@ module.exports = (s,app,config,lang) => {
     function closeFailoverConnection(host){
         if(failoverServerConnections[host]){
             return new Promise(function(resolve){
-                failoverServerConnections[host].send({ f: 'exit' })
-                failoverServerConnections[host].onclose = (event) => {
-                    delete(failoverServerConnections[host])
+                try{
+                    sendMessage(failoverServerConnections[host],{ f: 'exit' })
+                    failoverServerConnections[host].onclose = (event) => {
+                        delete(failoverServerConnections[host])
+                        resolve()
+                    }
+                    failoverServerConnections[host].terminate()
+                }catch(err){
+                    console.log(err)
                     resolve()
                 }
-                failoverServerConnections[host].terminate()
             })
         }
     }
     async function connectFailoverServers(){
         if(config.failoverServers){
+            console.log('Attempting to Connect to Failover Servers')
             for(host in config.failoverServers){
+                console.log('Failover Server : ',host)
                 const key = config.failoverServers[host];
                 await closeFailoverConnection(host)
-                connectToFailover(host, key)
+                connectToFailover({ host, key })
             }
         }
     }
     function parseNewConnectionAddress(serverIp){
         let parsedIp = `${serverIp}`
         if(parsedIp.indexOf('://') === -1)parsedIp = `ws://${parsedIp}`
-        if(parsedIp.split(':').length === 2)parsedIp = `ws://${parsedIp}:8663`
+        // if(parsedIp.split(':').length === 2)parsedIp = `${parsedIp}:8080`
+        if(!parsedIp.endsWith('/failover'))parsedIp += `/failover`
         return parsedIp;
     }
     function getFailoverServers(){
@@ -203,7 +260,9 @@ module.exports = (s,app,config,lang) => {
         getMonitors,
         getWriteStream,
         cacheMonitors,
+        cacheUsers,
         updateCachedMonitor,
+        updateCachedUser,
         insertVideoChunk,
         connectToFailover,
         runOnFailoverConnections,

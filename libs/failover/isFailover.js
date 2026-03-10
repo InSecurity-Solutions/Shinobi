@@ -1,20 +1,50 @@
+const bson = require('bson')
 const { createWebSocketServer } = require('../basic/websocketTools.js')
 module.exports = (s,app,config,lang) => {
     if(config.isFailover){
         const {
             importUsers,
             importMonitors,
+            deleteUsers,
+            stopMonitors,
+            stopMonitorQueues,
             deleteMonitors,
             downloadVideosFromMonitors,
             getFailoverServerKeys,
             addFailoverServerKey,
             removeFailoverServerKey,
+            sendMessage,
+            transmitVideosFromMonitors,
+            transmitEventsFromMonitors,
         } = require('./utilsFailover.js')(s,app,config,lang)
         const lostConnections = {}
+        const reconnectedLostServerActionTimeouts = {}
+        const lostServerActionTimeouts = {}
         const gracefulExitRequested = {}
         const cachedMonitors = {}
+        const cachedMonitorsIndex = {}
+        const cachedUsers = {}
         const videosTransmitting = {}
+        const normalServerConnections = {}
         const theWebSocket = createWebSocketServer()
+        function runOnNormalServerConnections(callback){
+            for(peerConnectKey in normalServerConnections){
+                const serverConnection = normalServerConnections[peerConnectKey]
+                callback(peerConnectKey, serverConnection)
+            }
+        }
+        function reconnectedLostServerActionTimeout(peerConnectKey,callback){
+            clearTimeout(reconnectedLostServerActionTimeouts[peerConnectKey])
+            reconnectedLostServerActionTimeouts[peerConnectKey] = setTimeout(function(){
+                callback()
+            },10000)
+        }
+        function lostServerActionTimeout(peerConnectKey,callback){
+            clearTimeout(lostServerActionTimeouts[peerConnectKey])
+            lostServerActionTimeouts[peerConnectKey] = setTimeout(function(){
+                callback()
+            },10000)
+        }
         function setClientKillTimerIfNotAuthenticatedInTime(client){
             client.killTimer = setTimeout(function(){
                 client.terminate()
@@ -22,6 +52,17 @@ module.exports = (s,app,config,lang) => {
         }
         function clearKillTimer(client){
             clearTimeout(client.killTimer)
+        }
+        function setMonitorInCacheIndex(peerConnectKey,groupKey,monitorId,modifierBoolean){
+            if(!cachedMonitorsIndex[peerConnectKey])cachedMonitorsIndex[peerConnectKey] = {}
+            if(modifierBoolean !== undefined){
+                if(!modifierBoolean){
+                    delete(cachedMonitorsIndex[peerConnectKey][`${groupKey}${monitorId}`])
+                }else{
+                    cachedMonitorsIndex[peerConnectKey][`${groupKey}${monitorId}`] = true
+                }
+            }
+            return cachedMonitorsIndex[peerConnectKey][`${groupKey}${monitorId}`]
         }
         theWebSocket.on('connection',(client) => {
             let peerConnectKey = ''
@@ -31,39 +72,65 @@ module.exports = (s,app,config,lang) => {
                 var response = []
                 if(!videosTransmitting[peerConnectKey]){
                     videosTransmitting[peerConnectKey] = true
-                    response = await transmitVideosFromMonitors(data.monitors, client, true)
+                    response = await transmitVideosFromMonitors(cachedMonitors[peerConnectKey] || [], client, true)
                     videosTransmitting[peerConnectKey] = false
                 }
-                connectionToNormal.send({ f: 'transmitVideosFromMonitorsResponse', response })
+                sendMessage(client, { f: 'transmitVideosFromMonitorsResponse', response })
+            }
+            async function beginEventTransmission(){
+                var response = { ok: true }
+                if(!videosTransmitting[peerConnectKey]){
+                    await transmitEventsFromMonitors(cachedMonitors[peerConnectKey] || [], client, true)
+                }
+                sendMessage(client, { f: 'transmitEventsFromMonitorsResponse', response })
             }
             function onAuthenticate(data){
+                const { key } = bson.deserialize(Buffer.from(data))
                 clearKillTimer(client)
                 client.removeListener('message', onAuthenticate);
-                if(Object.keys(config.failoverConnectionKeys).includes(data.key)){
-                    peerConnectKey = data.key
+                if(Object.keys(config.failoverConnectionKeys).includes(key)){
+                    clearTimeout(lostServerActionTimeouts[peerConnectKey])
+                    peerConnectKey = `${key}`
+                    console.log('Authenticated as Failover for ', peerConnectKey)
                     client.on('message', onAuthenticatedData)
                     client.on('close', onAuthenticatedExit)
-                    client.send({ f: 'init' })
+                    sendMessage(client, { f: 'init' })
+                    console.log('Initializing as Failover for ', peerConnectKey)
                 }else{
+                    console.log('Failed Authentication as Failover for ', key)
                     client.terminate()
                 }
             }
-            function onAuthenticatedExit(){
+            async function onAuthenticatedExit(){
                 if(!gracefulExitRequested[peerConnectKey]){
-                    importMonitors(cachedMonitors[peerConnectKey] || [])
-                    lostConnections[peerConnectKey] = true
+                    lostServerActionTimeout(peerConnectKey, async () => {
+                        console.log('Failover : Setting up lost Server configurations ', peerConnectKey)
+                        await importUsers(cachedUsers[peerConnectKey] || [])
+                        await importMonitors(cachedMonitors[peerConnectKey] || [])
+                        lostConnections[peerConnectKey] = true
+                    })
                 }
             }
-            function onAuthenticatedData(data){
+            function onAuthenticatedData(message){
+                const data = bson.deserialize(Buffer.from(message))
                 switch(data.f){
                     case'exit':
+                        console.log('Failover : Requested Graceful Exit ', peerConnectKey)
                         gracefulExitRequested[peerConnectKey] = true
                     break;
                     case'init_complete':
                         console.log('Initialized as Failover for ', peerConnectKey)
                         if(lostConnections[peerConnectKey]){
                             lostConnections[peerConnectKey] = false
-                            beginVideoTransmission()
+                            reconnectedLostServerActionTimeout(peerConnectKey, async () => {
+                                console.log('Failover : Reconnected to ', peerConnectKey)
+                                await stopMonitorQueues(cachedMonitors[peerConnectKey] || [])
+                                await stopMonitors(cachedMonitors[peerConnectKey] || [])
+                                await beginVideoTransmission()
+                                await beginEventTransmission()
+                                await deleteMonitors(cachedMonitors[peerConnectKey] || [])
+                                await deleteUsers(cachedUsers[peerConnectKey] || [])
+                            })
                         }
                     break;
                     case'importUsers':
@@ -73,16 +140,30 @@ module.exports = (s,app,config,lang) => {
                         cachedMonitors[peerConnectKey] = data.monitors
                     break;
                     case'updateCachedMonitor':
+                        setMonitorInCacheIndex(peerConnectKey,data.monitor.ke,data.monitor.mid,true)
                         updateCachedMonitor(cachedMonitors[peerConnectKey], data.monitor)
                     break;
                     case'deleteCachedMonitor':
+                        setMonitorInCacheIndex(peerConnectKey,data.monitor.ke,data.monitor.mid,false)
                         updateCachedMonitor(cachedMonitors[peerConnectKey], data.monitor, true)
+                    break;
+                    case'cacheUsers':
+                        cachedUsers[peerConnectKey] = data.users
+                    break;
+                    case'updateCachedUser':
+                        updateCachedUser(cachedUsers[peerConnectKey], data.user)
+                    break;
+                    case'deleteCachedUser':
+                        updateCachedUser(cachedUsers[peerConnectKey], data.user, true)
                     break;
                     case'importMonitors':
                         importMonitors(data.monitors)
                     break;
                     case'deleteMonitors':
                         deleteMonitors(data.monitors, false)
+                    break;
+                    case'deleteUsers':
+                        deleteUsers(data.users, false)
                     break;
                     default:
                         console.log(`No Failover Handler!`)
@@ -93,9 +174,15 @@ module.exports = (s,app,config,lang) => {
             }
             client.on('message', onAuthenticate)
             client.on('close', () => {
+                if(gracefulExitRequested[peerConnectKey]){
+                    console.log('Failover : Gracefully Disconnected ', peerConnectKey)
+                }else{
+                    console.log('Failover : Lost Connection for ', peerConnectKey)
+                }
                 clearTimeout(client.killTimer)
                 client.removeAllListeners()
             })
+            normalServerConnections[peerConnectKey] = client
         })
         s.onHttpRequestUpgrade('/failover',(request, socket, head) => {
             theWebSocket.handleUpgrade(request, socket, head, function done(ws) {
@@ -132,6 +219,17 @@ module.exports = (s,app,config,lang) => {
                 const response = await removeFailoverServerKey(failoverServer)
                 s.closeJsonResponse(res,response)
             },res,req)
+        })
+
+        s.onMonitorSave((monitorConfig) => {
+            runOnNormalServerConnections((peerConnectKey, connectionToNormal) => {
+                if(setMonitorInCacheIndex(peerConnectKey,monitorConfig.ke,monitorConfig.mid))updateCachedMonitor(cachedMonitors[peerConnectKey], monitorConfig)
+            })
+        })
+        s.onMonitorDelete((monitorConfig) => {
+            runOnNormalServerConnections((peerConnectKey, connectionToNormal) => {
+                if(setMonitorInCacheIndex(peerConnectKey,monitorConfig.ke,monitorConfig.mid))updateCachedMonitor(cachedMonitors[peerConnectKey], monitorConfig, true)
+            })
         })
     }
 }
