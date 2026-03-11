@@ -24,11 +24,18 @@ module.exports = function(s,config,lang,app,io){
                 client.on('message', onAuthenticatedData)
                 delete(s.dataPortTokens[data]);
             }else{
+                client.removeListener('message', onAuthenticate)  // <-- add this
                 client.terminate()
             }
         }
         function onAuthenticatedData(jsonData){
-            const data = JSON.parse(jsonData);
+            let data
+            try{
+                data = JSON.parse(jsonData)
+            }catch(err){
+                s.debugLog('dataPort: malformed JSON from client', err)
+                return
+            }
             switch(data.f){
                 case'trigger':
                     triggerEvent(data)
@@ -52,9 +59,7 @@ module.exports = function(s,config,lang,app,io){
         client.on('message', onAuthenticate)
         client.on('close', () => {
             clearTimeout(client.killTimer)
-        })
-        client.on('disconnect', () => {
-            clearTimeout(client.killTimer)
+            client.removeAllListeners() 
         })
     })
     s.onHttpRequestUpgrade('/dataPort',(request, socket, head) => {

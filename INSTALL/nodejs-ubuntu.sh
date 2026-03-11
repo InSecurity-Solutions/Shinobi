@@ -2,7 +2,7 @@
 
 # Get the Ubuntu version
 UBUNTU_VERSION=$(lsb_release -rs)
-NODE_MAJOR=18
+NODE_MAJOR=20
 
 # Check if Ubuntu version is 18.04
 if [ "$UBUNTU_VERSION" = "18.04" ]; then

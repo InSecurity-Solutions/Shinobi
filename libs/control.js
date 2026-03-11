@@ -14,11 +14,15 @@ module.exports = function(s,config,lang,app,io){
             case'startMove':
                 startMove(data).then((response) => {
                     s.debugLog(response)
+                }).catch((err) => {
+                    s.debugLog('startMove error', err)
                 })
             break;
             case'stopMove':
                 stopMove(data).then((response) => {
                     s.debugLog(response)
+                }).catch((err) => {
+                    s.debugLog('startMove error', err)
                 })
             break;
             case'control':

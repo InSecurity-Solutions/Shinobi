@@ -89,6 +89,7 @@ module.exports = function(s,config){
         if(config.debugLogVerbose && config.debugLog === true){
             s.debugLog('STACK TRACE, NOT AN ',new Error())
         }
+        console.error(new Date())
         console.error(err)
         // CANNOT USE `dbQuery.toString()` because it breaks the query
         console.error(options)
@@ -417,7 +418,13 @@ module.exports = function(s,config){
     const knexQueryPromise = (options) => {
         return new Promise((resolve,reject) => {
             knexQuery(options, (err,rows) => {
-                if(err && err.code === 'ECONNRESET'){
+                if(
+                    err &&
+                    (
+                        err.code === 'ECONNRESET' ||
+                        err.code === 'ECONNREFUSED'
+                    )
+                ){
                     console.error('SQL ECONNRESET : Trying Request Again!', new Date())
                     setTimeout(async function(){
                         resolve(await knexQueryPromise(options))

@@ -33,6 +33,7 @@ module.exports = (s,config,lang) => {
         }
     }
     const deactivateClientPlugin = (modulePlugName) => {
+        if(!s.connectedPlugins[modulePlugName]) return
         s.connectedPlugins[modulePlugName].plugged = false
         s.tx({f:'plugin_engine_unplugged',plug:modulePlugName},'CPU')
         s.tx({f:'detector_unplugged',plug:modulePlugName},'CPU')

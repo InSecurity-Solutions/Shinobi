@@ -1,8 +1,9 @@
 module.exports = (s,config,lang) => {
     const fs = require('fs');
+    const fsPromises = require('fs').promises;
     const URL = require('url');
     const events = require('events');
-    const Mp4Frag = require('mp4frag');
+    const Mp4Frag = require('shinobi-mp4frag');
     const treekill = require('tree-kill');
     const exec = require('child_process').exec;
     const spawn = require('child_process').spawn;
@@ -34,11 +35,13 @@ module.exports = (s,config,lang) => {
     const {
         scanForOrphanedVideos,
         reEncodeVideoAndBinOriginalAddToQueue,
+        isApplicableVideosDirectory,
     } = require('../video/utils.js')(s,config,lang)
     const {
         selectNodeForOperation,
         bindMonitorToChildNode
     } = require('../childNode/utils.js')(s,config,lang)
+    s.mp4FragMemoryFreed = {}
     const isMasterNode = (
         (
             config.childNodes.enabled === true &&
@@ -173,6 +176,19 @@ module.exports = (s,config,lang) => {
             // if(activeMonitor.onChildNodeExit){
             //     activeMonitor.onChildNodeExit()
             // }
+            if(activeMonitor.mp4frag){
+                var mp4FragChannels = Object.keys(activeMonitor.mp4frag)
+                mp4FragChannels.forEach(function(channel){
+                    activeMonitor.mp4frag[channel].resetCache()
+                    activeMonitor.mp4frag[channel].removeAllListeners()
+                    activeMonitor.mp4frag[channel].once('unpipe', () => {
+                        activeMonitor.mp4frag[channel].reset()
+                        activeMonitor.mp4frag[channel].destroy()
+                        activeMonitor.mp4frag[channel] = null
+                        delete(activeMonitor.mp4frag[channel])
+                    })
+                })
+            }
             try{
                 activeMonitor.spawn.stdio.forEach(function(stdio){
                   try{
@@ -184,12 +200,19 @@ module.exports = (s,config,lang) => {
             }catch(err){
                 // s.debugLog(err)
             }
-            if(activeMonitor.mp4frag){
-                var mp4FragChannels = Object.keys(activeMonitor.mp4frag)
-                mp4FragChannels.forEach(function(channel){
-                    activeMonitor.mp4frag[channel].removeAllListeners()
-                    delete(activeMonitor.mp4frag[channel])
-                })
+            try{
+                if(activeMonitor.emitterChannel){
+                    Object.keys(activeMonitor.emitterChannel).forEach(function(channel){
+                        activeMonitor.emitterChannel[channel].removeAllListeners()
+                        delete(activeMonitor.emitterChannel[channel])
+                    })
+                }
+                if(activeMonitor.emitter){
+                    activeMonitor.emitter.removeAllListeners()
+                    delete(activeMonitor.emitter)
+                }
+            }catch(err){
+                s.debugLog(err)
             }
             if(config.childNodes.enabled === true && config.childNodes.mode === 'child' && config.childNodes.host){
                 s.cx({f:'clearCameraFromActiveList',ke:groupKey,id:e.id})
@@ -398,16 +421,14 @@ module.exports = (s,config,lang) => {
             });
 
             subStreamProcess.on('close',(data) => {
+                subStreamProcess.removeAllListeners()  // <-- add this
                 if(!activeMonitor.allowDestroySubstream){
-                    subStreamProcess.stderr.on('data',(data) => {
-                        s.userLog({
-                            ke: groupKey,
-                            mid: monitorId,
-                        },
-                        {
-                            type: lang["Substream Process"],
-                            msg: lang["Process Crashed for Monitor"],
-                        })
+                    s.userLog({
+                        ke: groupKey,
+                        mid: monitorId,
+                    },{
+                        type: lang["Substream Process"],
+                        msg: lang["Process Crashed for Monitor"],
                     })
                     setTimeout(() => {
                         spawnSubstreamProcess(e)
@@ -453,7 +474,10 @@ module.exports = (s,config,lang) => {
         const fields = options.fields
         const number = options.number
         const ffmpegProcess = options.ffmpegProcess
+        const groupKey = options.ke
+        const monitorId = options.mid
         const activeMonitor = s.group[options.ke].activeMonitors[options.mid]
+        const monitorConfig = s.group[options.ke].rawMonitorConfigurations[options.mid]
         const pipeNumber = number + config.pipeAddition;
         if(!activeMonitor.emitterChannel[pipeNumber]){
             activeMonitor.emitterChannel[pipeNumber] = new events.EventEmitter().setMaxListeners(0);
@@ -461,8 +485,21 @@ module.exports = (s,config,lang) => {
        let frameToStreamAdded
        switch(fields.stream_type){
            case'mp4':
-               delete(activeMonitor.mp4frag[pipeNumber])
-               if(!activeMonitor.mp4frag[pipeNumber])activeMonitor.mp4frag[pipeNumber] = new Mp4Frag();
+               if(activeMonitor.mp4frag[pipeNumber]){
+                   activeMonitor.mp4frag[pipeNumber].resetCache()
+                   activeMonitor.mp4frag[pipeNumber].removeAllListeners()
+                   activeMonitor.mp4frag[pipeNumber].destroy()
+                   activeMonitor.mp4frag[pipeNumber] = null
+               }
+               if(!activeMonitor.mp4frag[pipeNumber]){
+                   const debugOutputPrefix = `${groupKey}, ${monitorId}, ${monitorConfig.name}, pipe: ${pipeNumber}`;
+                   activeMonitor.mp4frag[pipeNumber] = new Mp4Frag({ segmentCount: 2, cacheInterval: 60000, debug: config.debugMp4Frag || false, debugOutputPrefix });
+                   if(config.debugMp4Frag){
+                       activeMonitor.mp4frag[pipeNumber].on('memoryfreed',function(freed){
+                           s.mp4FragMemoryFreed[debugOutputPrefix] = [freed, new Date()]
+                       })
+                   }
+               }
                ffmpegProcess.stdio[pipeNumber].pipe(activeMonitor.mp4frag[pipeNumber],{ end: false })
            break;
            case'mjpeg':
@@ -538,6 +575,7 @@ module.exports = (s,config,lang) => {
             clearTimeout(streamViewerCountTimeouts[req.originalUrl])
             streamViewerCountTimeouts[req.originalUrl] = setTimeout(() => {
                 setActiveViewer(groupKey,monitorId,connectionId,false)
+                delete streamViewerCountTimeouts[timeoutKey]
             },5000)
         }else{
             s.debugLog(`User is Logged in, Don't add to viewer count`);
@@ -861,6 +899,7 @@ module.exports = (s,config,lang) => {
             clearTimeout(streamViewerCountTimeouts[uniqueId])
             streamViewerCountTimeouts[uniqueId] = setTimeout(() => {
                 monitorRemoveViewer(e,cn)
+                delete streamViewerCountTimeouts[uniqueId]
             },e.monitorTimeout)
         }
     }
@@ -1187,13 +1226,14 @@ module.exports = (s,config,lang) => {
         const groupKey = e.ke
         const monitorId = e.mid || e.id
         const activeMonitor = getActiveMonitor(groupKey,monitorId)
+        const monitorConfig = s.group[groupKey].rawMonitorConfigurations[monitorId]
         const detectorEnabled = e.details.detector === '1'
         activeMonitor.spawn.stdio[5].on('data',function(data){
             resetStreamCheck(e)
         })
         //emitter for mjpeg
         if(!e.details.stream_mjpeg_clients||e.details.stream_mjpeg_clients===''||isNaN(e.details.stream_mjpeg_clients)===false){e.details.stream_mjpeg_clients=20;}else{e.details.stream_mjpeg_clients=parseInt(e.details.stream_mjpeg_clients)}
-        activeMonitor.emitter = new events.EventEmitter().setMaxListeners(e.details.stream_mjpeg_clients);
+        activeMonitor.emitter = (new events.EventEmitter()).setMaxListeners(e.details.stream_mjpeg_clients);
         if(detectorEnabled && e.details.detector_audio === '1'){
             if(activeMonitor.audioDetector){
               activeMonitor.audioDetector.stop()
@@ -1236,15 +1276,17 @@ module.exports = (s,config,lang) => {
         }
         if(e.details.record_timelapse === '1'){
             var timelapseRecordingDirectory = s.getTimelapseFrameDirectory(e)
-            activeMonitor.spawn.stdio[7].on('data', function(data){
+            activeMonitor.spawn.stdio[7].on('data', async function(data){
                 try{
                     var fileStream = activeMonitor.recordTimelapseWriter
                     if(!fileStream){
                         var currentDate = s.formattedTime(null,'YYYY-MM-DD')
                         var filename = s.formattedTime() + '.jpg'
                         var location = timelapseRecordingDirectory + currentDate + '/'
-                        if(!fs.existsSync(location)){
-                            fs.mkdirSync(location)
+                        try{
+                            await fsPromises.mkdir(location)
+                        }catch(err){
+                            s.debugLog(err)
                         }
                         fileStream = fs.createWriteStream(location + filename)
                         fileStream.on('error', err => s.debugLog(err))
@@ -1296,8 +1338,21 @@ module.exports = (s,config,lang) => {
        const streamType = e.details.stream_type;
        switch(streamType){
            case'mp4':
-               delete(activeMonitor.mp4frag['MAIN'])
-               if(!activeMonitor.mp4frag['MAIN'])activeMonitor.mp4frag['MAIN'] = new Mp4Frag()
+               if(activeMonitor.mp4frag['MAIN']){
+                   activeMonitor.mp4frag['MAIN'].resetCache()
+                   activeMonitor.mp4frag['MAIN'].removeAllListeners()
+                   activeMonitor.mp4frag['MAIN'].destroy()
+                   activeMonitor.mp4frag['MAIN'] = null
+               }
+               if(!activeMonitor.mp4frag['MAIN']){
+                   const debugOutputPrefix = `${groupKey}, ${monitorId}, ${monitorConfig.name}, pipe: MAIN`;
+                   activeMonitor.mp4frag['MAIN'] = new Mp4Frag({ segmentCount: 2, cacheInterval: 60000, debug: config.debugMp4Frag || false, debugOutputPrefix });
+                   if(config.debugMp4Frag){
+                       activeMonitor.mp4frag['MAIN'].on('memoryfreed',function(freed){
+                           s.mp4FragMemoryFreed[debugOutputPrefix] = [freed, new Date()]
+                       })
+                   }
+               }
                activeMonitor.mp4frag['MAIN'].on('error',function(error){
                    s.userLog(e,{type:lang['Mp4Frag'],msg:{error:error}})
                })
@@ -1408,9 +1463,8 @@ module.exports = (s,config,lang) => {
     async function doFatalErrorCatch(e,d){
         const groupKey = e.ke
         const monitorId = e.mid || e.id
-        const activeMonitor = getActiveMonitor(groupKey,monitorId)
+        let activeMonitor = getActiveMonitor(groupKey,monitorId)
         if(activeMonitor.isStarted === true){
-            const activeMonitor = getActiveMonitor(groupKey,monitorId)
             activeMonitor.isStarted = false
             await cameraDestroy(e)
             activeMonitor.isStarted = true
@@ -1538,13 +1592,13 @@ module.exports = (s,config,lang) => {
         const theGroup = s.group[groupKey]
         const activeMonitor = theGroup.activeMonitors[monitorId]
         const monitorConfig = theGroup.rawMonitorConfigurations[monitorId]
-        const isMacOS = s.platform !== 'darwin';
+        const isMacOS = s.platform === 'darwin';
         const isWatchOnly = monitorConfig.mode === 'start'
         const isRecord = monitorConfig.mode === 'record'
         const isWatchOnlyOrRecord = isWatchOnly || isRecord;
         const streamTypeIsJPEG = e.details.stream_type === 'jpeg'
         const streamTypeIsHLS = e.details.stream_type === 'hls'
-        const jpegApiEnabled = e.details.snap === '1'
+        const jpegApiEnabled = config.liveJpegApiEnabled && e.details.snap === '1'
         const typeIsDashcam = e.type === 'dashcam' || e.type === 'socket'
         const typeIsMjpeg = e.type === 'mjpeg'
         const typeIsH264 = e.type === 'h264'
@@ -1820,6 +1874,11 @@ module.exports = (s,config,lang) => {
         if(e.details.detector_ptz_follow === '1'){
             // setHomePositionPreset(e)
             moveToHomePosition(e)
+        }
+        if(!isApplicableVideosDirectory(e.details.dir, false)){
+             e.details.dir = ''
+             activeMonitor.details.dir = ''
+             monitorConfig.details.dir = ''
         }
         try{
             await launchMonitorProcesses(e)

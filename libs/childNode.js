@@ -55,7 +55,14 @@ module.exports = function(s,config,lang,app,io){
             s.debugLog('Child Node Connection!',new Date(),ipAddress)
             client.id = connectionId;
             function onAuthenticate(d){
-                const data = JSON.parse(d);
+                let data
+                try{
+                    data = JSON.parse(d)
+                }catch(err){
+                    s.debugLog('childNode: bad JSON in handshake', err)
+                    client.terminate()
+                    return
+                }
                 const childNodeKeyAccepted = config.childNodes.key.indexOf(data.socketKey) > -1;
                 if(!client.shinobiChildAlreadyRegistered && data.f === 'init' && childNodeKeyAccepted){
                     initiateDataConnection(client,req,data,connectionId);
@@ -67,7 +74,8 @@ module.exports = function(s,config,lang,app,io){
                     })
                 }else{
                     s.debugLog('Child Node Force Disconnected!',new Date(),ipAddress)
-                    client.disconnect()
+                    client.removeListener('message', onAuthenticate)
+                    client.terminate()
                 }
             }
             client.on('message',onAuthenticate)
@@ -89,9 +97,13 @@ module.exports = function(s,config,lang,app,io){
                         case'timelapseFrame':
                             initiateTimelapseFrameWriteFromChildNode(client,data.options,data.connectionId)
                         break;
+                        default:
+                            client.terminate()
+                        break;
                     }
                 }else{
-                    client.destroy()
+                    client.removeListener('message', onAuthenticate)
+                    client.terminate()
                 }
             }
             client.on('message',onAuthenticate)
@@ -132,7 +144,9 @@ module.exports = function(s,config,lang,app,io){
         }
         createChildNodeConnection()
         function sendDataToMasterNode(data){
-            childIO.send(JSON.stringify(data))
+            if(childIO && childIO.readyState === childIO.OPEN){
+                childIO.send(JSON.stringify(data))
+            }
         }
         s.cx = sendDataToMasterNode;
         // replace internal functions with bridges to master node

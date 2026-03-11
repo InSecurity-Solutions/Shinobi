@@ -105,4 +105,8 @@ require('./libs/ffmpeg.js')(s,config,lang, async () => {
     require('./libs/cron.js')(s,config,lang)
     //video browser functions
     require('./libs/videoBrowser.js')(s,config,lang,app,io)
+    if(config.debugHeap){
+        //debugger
+        require('./libs/system/debugger.js')(s,config,lang,app,io)
+    }
 })

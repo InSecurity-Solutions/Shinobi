@@ -44,7 +44,7 @@ module.exports = (s,config,lang) => {
           (ipl >> 8 & 255) + '.' +
           (ipl & 255) );
     }
-    const runOnvifScanner = (options,foundCameraCallback) => {
+    const runOnvifScanner = async (options,foundCameraCallback) => {
         var ip = options.ip.replace(/ /g,'')
         var ports = options.port.replace(/ /g,'')
         if(options.ip === ''){
@@ -112,86 +112,90 @@ module.exports = (s,config,lang) => {
             })
         })
         var responseList = []
-        hitList.forEach(async (camera) => {
-            try{
-                var device = new onvif.OnvifDevice(camera)
-                var info = await device.init()
-                var date = await device.services.device.getSystemDateAndTime()
-                var stream = await device.services.media.getStreamUri({
-                    ProfileToken : device.current_profile.token,
-                    Protocol : 'RTSP'
-                })
+        const BATCH_SIZE = 20
+        for(let i = 0; i < hitList.length; i += BATCH_SIZE){
+            const batch = hitList.slice(i, i + BATCH_SIZE)
+            await Promise.all(batch.map(async (camera) => {
+                try{
+                    var device = new onvif.OnvifDevice(camera)
+                    var info = await device.init()
+                    var date = await device.services.device.getSystemDateAndTime()
+                    var stream = await device.services.media.getStreamUri({
+                        ProfileToken : device.current_profile.token,
+                        Protocol : 'RTSP'
+                    })
 
-                var cameraResponse = {
-                    ip: camera.ip,
-                    port: camera.port,
-                    info: info,
-                    date: date,
-                    uri: stream.data.GetStreamUriResponse.MediaUri.Uri
-                }
-                try{
-                    const camPtzConfigs = (await device.services.ptz.getConfigurations()).data.GetConfigurationsResponse
-                    if(
-                        camPtzConfigs.PTZConfiguration &&
-                        (
-                            camPtzConfigs.PTZConfiguration.PanTiltLimits ||
-                            camPtzConfigs.PTZConfiguration.ZoomLimits
-                        )
-                    ){
-                        cameraResponse.isPTZ = true
-                    }
-                }catch(err){
-                    s.debugLog(err)
-                }
-                responseList.push(cameraResponse)
-                var imageSnap
-                try{
-                    const snapUri = addCredentialsToUrl({
-                        username: onvifUsername,
-                        password: onvifPassword,
-                        url: (await device.services.media.getSnapshotUri({
-                            ProfileToken : device.current_profile.token,
-                        })).data.GetSnapshotUriResponse.MediaUri.Uri,
-                    });
-                    imageSnap = (await getBuffer(snapUri)).toString('base64');
-                }catch(err){
-                    s.debugLog(err)
-                }
-                if(foundCameraCallback)foundCameraCallback(Object.assign(cameraResponse,{f: 'onvif', snapShot: imageSnap}))
-            }catch(err){
-                const searchError = (find) => {
-                    return stringContains(find,err.message,true)
-                }
-                var foundDevice = false
-                var errorMessage = ''
-                switch(true){
-                    //ONVIF camera found but denied access
-                    case searchError('400'): //Bad Request - Sender not Authorized
-                        foundDevice = true
-                        errorMessage = lang.ONVIFErr400
-                    break;
-                    case searchError('405'): //Method Not Allowed
-                        foundDevice = true
-                        errorMessage = lang.ONVIFErr405
-                    break;
-                    //Webserver exists but undetermined if IP Camera
-                    case searchError('404'): //Not Found
-                        foundDevice = true
-                        errorMessage = lang.ONVIFErr404
-                    break;
-                }
-                if(foundDevice && foundCameraCallback){
-                    foundCameraCallback({
-                        f: 'onvif',
-                        ff: 'failed_capture',
+                    var cameraResponse = {
                         ip: camera.ip,
                         port: camera.port,
-                        error: errorMessage
-                    })
+                        info: info,
+                        date: date,
+                        uri: stream.data.GetStreamUriResponse.MediaUri.Uri
+                    }
+                    try{
+                        const camPtzConfigs = (await device.services.ptz.getConfigurations()).data.GetConfigurationsResponse
+                        if(
+                            camPtzConfigs.PTZConfiguration &&
+                            (
+                                camPtzConfigs.PTZConfiguration.PanTiltLimits ||
+                                camPtzConfigs.PTZConfiguration.ZoomLimits
+                            )
+                        ){
+                            cameraResponse.isPTZ = true
+                        }
+                    }catch(err){
+                        s.debugLog(err)
+                    }
+                    responseList.push(cameraResponse)
+                    var imageSnap
+                    try{
+                        const snapUri = addCredentialsToUrl({
+                            username: onvifUsername,
+                            password: onvifPassword,
+                            url: (await device.services.media.getSnapshotUri({
+                                ProfileToken : device.current_profile.token,
+                            })).data.GetSnapshotUriResponse.MediaUri.Uri,
+                        });
+                        imageSnap = (await getBuffer(snapUri)).toString('base64');
+                    }catch(err){
+                        s.debugLog(err)
+                    }
+                    if(foundCameraCallback)foundCameraCallback(Object.assign(cameraResponse,{f: 'onvif', snapShot: imageSnap}))
+                }catch(err){
+                    const searchError = (find) => {
+                        return stringContains(find,err.message,true)
+                    }
+                    var foundDevice = false
+                    var errorMessage = ''
+                    switch(true){
+                        //ONVIF camera found but denied access
+                        case searchError('400'): //Bad Request - Sender not Authorized
+                            foundDevice = true
+                            errorMessage = lang.ONVIFErr400
+                        break;
+                        case searchError('405'): //Method Not Allowed
+                            foundDevice = true
+                            errorMessage = lang.ONVIFErr405
+                        break;
+                        //Webserver exists but undetermined if IP Camera
+                        case searchError('404'): //Not Found
+                            foundDevice = true
+                            errorMessage = lang.ONVIFErr404
+                        break;
+                    }
+                    if(foundDevice && foundCameraCallback){
+                        foundCameraCallback({
+                            f: 'onvif',
+                            ff: 'failed_capture',
+                            ip: camera.ip,
+                            port: camera.port,
+                            error: errorMessage
+                        })
+                    }
+                    if(config.debugLogVerbose)s.debugLog(err);
                 }
-                if(config.debugLogVerbose)s.debugLog(err);
-            }
-        })
+            }))
+        }
         return responseList
     }
     return {

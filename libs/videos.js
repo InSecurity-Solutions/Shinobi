@@ -7,6 +7,7 @@ module.exports = function(s,config,lang){
     } = require('./childNode/childUtils.js')(s,config,lang)
     const {
         postProcessCompletedMp4Video,
+        isApplicableVideosDirectory,
     } = require('./video/utils.js')(s,config,lang)
     /**
      * Gets the video directory of the supplied video or monitor database row.
@@ -17,10 +18,11 @@ module.exports = function(s,config,lang){
         if(e.mid&&!e.id){e.id=e.mid};
         s.checkDetails(e)
         if(e.details&&e.details.dir&&e.details.dir!==''){
-            return s.checkCorrectPathEnding(e.details.dir)+e.ke+'/'+e.id+'/'
-        }else{
-            return s.dir.videos+e.ke+'/'+e.id+'/';
+            if(isApplicableVideosDirectory(e.details.dir, true)){
+                return s.checkCorrectPathEnding(e.details.dir)+e.ke+'/'+e.id+'/'
+            }
         }
+        return s.dir.videos+e.ke+'/'+e.id+'/'
     }
     /**
      * Creates available API based URLs for streaming
@@ -194,8 +196,8 @@ module.exports = function(s,config,lang){
                     })
                 })
             }
+            s.group[e.ke].activeMonitors[e.mid].detector_motion_count = []
         }
-        s.group[e.ke].activeMonitors[e.mid].detector_motion_count = []
     }
     s.deleteVideo = function(e){
         return new Promise((resolve) => {
@@ -424,6 +426,8 @@ module.exports = function(s,config,lang){
                                             fileComplete()
                                         }
                                     })
+                                }else{
+                                    fileComplete()
                                 }
                             })
                         }
@@ -466,20 +470,12 @@ module.exports = function(s,config,lang){
             req.headerWrite['content-disposition']='attachment; filename="'+req.query.downloadName+'"';
         }
         res.writeHead(req.writeCode,req.headerWrite);
-        res.on('finish', () => {
-           file.close();
-        });
-
         res.on('close', () => {
-           file.close();
+            try{ file.destroy() }catch(e){}
         });
-
-        res.on('disconnect', () => {
-           file.close();
-        });
-
-        file.on('close',function(){
-            res.end()
+        file.on('error', (err) => {
+            s.debugLog('streamMp4FileOverHttp file error', err)
+            try{ res.end() }catch(e){}
         });
         file.pipe(res)
         return file

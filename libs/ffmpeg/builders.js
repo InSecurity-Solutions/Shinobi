@@ -193,9 +193,9 @@ module.exports = (s,config,lang) => {
         //`e` is the monitor object
         //`x` is an object used to contain temporary values.
         const channelStreamDirectory = !isNaN(parseInt(number)) ? `${e.sdir || s.getStreamsDirectory(e)}channel${number}/` : e.sdir
-        if(channelStreamDirectory !== e.sdir && !fs.existsSync(channelStreamDirectory)){
+        if(channelStreamDirectory !== e.sdir){
             try {
-                fs.mkdirSync(channelStreamDirectory)
+                fs.mkdirSync(channelStreamDirectory, { recursive: true })
             }catch(err){
                 // s.debugLog(err)
             }
@@ -498,15 +498,22 @@ module.exports = (s,config,lang) => {
                 streamFlags.push(e.details.custom_output)
             }
             if(streamChannels){
+                const usedPipeNumbers = new Set()
                 streamChannels.forEach(function(v,n){
-                    streamFlags.push(createStreamChannel(e,n + config.pipeAddition,v))
+                    const pipeNumber = n + config.pipeAddition
+                    if(usedPipeNumbers.has(pipeNumber)){
+                        s.debugLog(`Duplicate pipe number ${pipeNumber} for stream channel ${n}, skipping.`)
+                        return
+                    }
+                    usedPipeNumbers.add(pipeNumber)
+                    streamFlags.push(createStreamChannel(e,pipeNumber,v))
                 })
             }
         }
         return streamFlags.join(' ')
     }
     const buildJpegApiOutput = function(e){
-        if(e.details.snap === '1'){
+        if(config.liveJpegApiEnabled && e.details.snap === '1'){
             const isCudaEnabled = hasCudaEnabled(e)
             const videoFlags = []
             const videoFilters = []

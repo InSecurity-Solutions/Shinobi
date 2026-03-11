@@ -91,6 +91,11 @@ module.exports = function(s,config,lang,app,io){
     s.getClientIp = function(req){
         return req.headers['cf-connecting-ip']||req.headers["CF-Connecting-IP"]||req.headers["'x-forwarded-for"]||req.connection.remoteAddress;
     }
+    proxy.on('error', function(err, req, res) {
+        try {
+            res.status(502).end('Bad Gateway')
+        } catch(e) {}
+    })
     ////Pages
     app.enable('trust proxy');
     if(config.webPaths.home !== '/'){
@@ -289,10 +294,11 @@ module.exports = function(s,config,lang,app,io){
                 }
             }
             ++s.failedLoginAttempts[failIdentifier].failCount
-            if(!s.failedLoginAttempts[failIdentifier].ips[req.ip]){
-                s.failedLoginAttempts[failIdentifier].ips[req.ip] = 0
+            const ipMap = s.failedLoginAttempts[failIdentifier].ips
+            if(Object.keys(ipMap).length < 500){  // cap unique IPs tracked per identifier
+                if(!ipMap[req.ip]) ipMap[req.ip] = 0
+                ++ipMap[req.ip]
             }
-            ++s.failedLoginAttempts[failIdentifier].ips[req.ip]
             clearTimeout(s.failedLoginAttempts[failIdentifier].timeout)
             s.failedLoginAttempts[failIdentifier].timeout = setTimeout(function(){
                 delete(s.failedLoginAttempts[failIdentifier])
@@ -709,6 +715,11 @@ module.exports = function(s,config,lang,app,io){
         s.auth(req.params,async (user) => {
             const groupKey = req.params.ke
             const monitorId = req.params.id
+            if(!s.group[groupKey] || s.group[groupKey].rawMonitorConfigurations[monitorId]){
+                response.msg = 'Not Ready'
+                s.closeJsonResponse(res,response);
+                return
+            }
             const {
                 monitorPermissions,
                 monitorRestrictions,
@@ -1241,30 +1252,29 @@ module.exports = function(s,config,lang,app,io){
                                     req.timeout=req.params.ff*1000
                                 break;
                             }
-                            s.group[r.ke].activeMonitors[r.mid].trigger_timer=setTimeout(async function(){
-                                delete(s.group[r.ke].activeMonitors[r.mid].trigger_timer)
+                            const timerKe = r.ke
+                            const timerMid = r.mid
+                            s.group[timerKe].activeMonitors[timerMid].trigger_timer = setTimeout(async function(){
+                                const liveMonitor = s.group[timerKe] && s.group[timerKe].activeMonitors[timerMid]
+                                if(!liveMonitor) return
+                                delete(liveMonitor.trigger_timer)
+                                const liveConfig = s.group[timerKe].rawMonitorConfigurations[timerMid]
+                                const restoreMode = liveMonitor.currentState && liveMonitor.currentState.mode
+                                if(!restoreMode) return
                                 s.knexQuery({
                                     action: "update",
                                     table: "Monitors",
-                                    update: {
-                                        mode: s.group[r.ke].activeMonitors[r.mid].currentState.mode
-                                    },
-                                    where: [
-                                        ['ke','=',r.ke],
-                                        ['mid','=',r.mid],
-                                    ]
+                                    update: { mode: restoreMode },
+                                    where: [['ke','=',timerKe],['mid','=',timerMid]]
                                 })
-                                r.neglectTriggerTimer=1;
-                                r.mode=s.group[r.ke].activeMonitors[r.mid].currentState.mode;
-                                r.fps=s.group[r.ke].activeMonitors[r.mid].currentState.fps;
-                                await s.camera('stop',s.cleanMonitorObject(r));
-                                if(s.group[r.ke].activeMonitors[r.mid].currentState.mode!=='stop'){
-                                    await s.camera(s.group[r.ke].activeMonitors[r.mid].currentState.mode,s.cleanMonitorObject(r));
+                                const monObj = s.cleanMonitorObject(Object.assign({}, liveConfig, { mode: restoreMode, id: timerMid }))
+                                await s.camera('stop', monObj)
+                                if(restoreMode !== 'stop'){
+                                    await s.camera(restoreMode, monObj)
                                 }
-                                s.group[r.ke].rawMonitorConfigurations[r.mid]=r;
-                                s.tx({f:'monitor_edit',mid:r.mid,ke:r.ke,mon:r},'GRP_'+r.ke);
-                                s.tx({f:'monitor_edit',mid:r.mid,ke:r.ke,mon:r},'STR_'+r.ke);
-                            },req.timeout);
+                                s.tx({f:'monitor_edit',mid:timerMid,ke:timerKe,mon:liveConfig},'GRP_'+timerKe)
+                                s.tx({f:'monitor_edit',mid:timerMid,ke:timerKe,mon:liveConfig},'STR_'+timerKe)
+                            }, req.timeout)
     //                        response.end_at=s.formattedTime(new Date,'YYYY-MM-DD HH:mm:ss').add(req.timeout,'milliseconds');
                         }
                      }else{
@@ -1334,6 +1344,12 @@ module.exports = function(s,config,lang,app,io){
                         fetch(r.href).then(actual => {
                             actual.headers.forEach((v, n) => res.setHeader(n, v));
                             actual.body.pipe(res);
+                            res.on('close', () => {
+                                try{ actual.body.destroy() }catch(e){}
+                            })
+                        }).catch(err => {
+                            console.error('Cloud video fetch error', err)
+                            res.status(502).end('Bad Gateway')
                         })
                     }
                 }else{
@@ -1379,6 +1395,7 @@ module.exports = function(s,config,lang,app,io){
                 clearTimeout(videoRowCacheTimeouts[cacheName])
                 videoRowCacheTimeouts[cacheName] = setTimeout(() => {
                     delete(videoRowCaches[cacheName])
+                    delete(videoRowCacheTimeouts[cacheName])  // <-- add this
                 },60000)
             }
             const sendVideo = (videoRow) => {
@@ -1948,8 +1965,9 @@ module.exports = function(s,config,lang,app,io){
                 }
             })
             res.connection.setTimeout(0);
+            const activeMonitor = s.group[groupKey] && s.group[groupKey].activeMonitors[monitorId]
             req.on('data', function(buffer){
-                s.group[groupKey].activeMonitors[monitorId].spawn.stdin.write(buffer)
+                try{ activeMonitor.spawn.stdin.write(buffer) }catch(e){}
             });
             req.on('end',function(){
                 s.userLog({
@@ -2106,9 +2124,6 @@ module.exports = function(s,config,lang,app,io){
     * Robots.txt
     */
     app.get('/robots.txt', function (req,res){
-        res.on('finish',function(){
-            res.end()
-        })
         fs.createReadStream(s.mainDirectory + '/web/pages/robots.txt').pipe(res)
     })
 }
