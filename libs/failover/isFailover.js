@@ -16,6 +16,7 @@ module.exports = (s,app,config,lang) => {
             sendMessage,
             transmitVideosFromMonitors,
             transmitEventsFromMonitors,
+            disableCloudUploaders,
         } = require('./utilsFailover.js')(s,app,config,lang)
         const lostConnections = {}
         const reconnectedLostServerActionTimeouts = {}
@@ -148,6 +149,9 @@ module.exports = (s,app,config,lang) => {
                         updateCachedMonitor(cachedMonitors[peerConnectKey], data.monitor, true)
                     break;
                     case'cacheUsers':
+                        for(user of data.users){
+                            disableCloudUploaders(user)
+                        }
                         cachedUsers[peerConnectKey] = data.users
                     break;
                     case'updateCachedUser':

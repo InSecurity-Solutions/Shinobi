@@ -211,7 +211,15 @@ module.exports = (s,app,config,lang) => {
         if(deleteUser){
             cachedUsers.splice(userCacheIndex, 1)
         }else{
+            disableCloudUploaders(user)
             cachedUsers[userCacheIndex] = user
+        }
+    }
+    function disableCloudUploaders(user){
+        const uploaders = s.definitions["Account Settings"].blocks["Uploaders"].info;
+        for(uploader of uploaders){
+            const uploaderEnabledToggleName = uploader.info.find(item => item.name.endsWith('_save')).name.replace('detail=','')
+            user.details[uploaderEnabledToggleName] = '0'
         }
     }
     return {
@@ -228,6 +236,7 @@ module.exports = (s,app,config,lang) => {
         getFailoverServerKeys,
         addFailoverServerKey,
         removeFailoverServerKey,
+        disableCloudUploaders,
         sendMessage,
     }
 }
