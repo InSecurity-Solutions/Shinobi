@@ -29,6 +29,7 @@ $(document).ready(function(e){
         // "4": 3,
         // "6": 2,
     }
+    var isSmallMobile = isMobile || window.innerWidth <= 812;
     //
     var onLiveStreamInitiateExtensions = []
     function onLiveStreamInitiate(callback){
@@ -329,7 +330,6 @@ $(document).ready(function(e){
             var dimensionsConverted = legend[`${monitorsPerRow}`] || legend["2"];
             var width = dimensionsConverted;
             var height = width;
-            var isSmallMobile = isMobile || window.innerWidth <= 812;
             var html = buildLiveGridBlock(monitorConfig)
             var monitorOrderEngaged = dashboardOptions().switches.monitorOrder === 1;
             var wasLiveGridLogStreamOpenBefore = isLiveGridLogStreamOpenBefore(monitorId)
@@ -689,11 +689,10 @@ $(document).ready(function(e){
         })
     }
     function monitorWatchOnLiveGrid(monitorId, watchOff){
-        return mainSocket.f({f:'monitor',ff:watchOff ? 'watch_off' : 'watch_on',id: monitorId})
-    }
-    function monitorWatchOnLiveGrid(monitorId, watchOff){
         return new Promise(function(resolve){
+            if(watchToggleCallback[monitorId])watchToggleCallback[monitorId]()
             watchToggleCallback[monitorId] = function(){
+                delete(watchToggleCallback[monitorId])
                 resolve()
             }
             mainSocket.f({f:'monitor',ff:watchOff ? 'watch_off' : 'watch_on',id: monitorId})
@@ -706,10 +705,17 @@ $(document).ready(function(e){
     }
     function callMonitorToLiveGrid(v, justTry){
         var watchedOn = dashboardOptions().watch_on || {}
-        if(justTry || watchedOn[v.ke] && watchedOn[v.ke][v.mid] === 1 && loadedMonitors[v.mid] && loadedMonitors[v.mid].mode !== 'stop'){
-            mainSocket.f({f:'monitor',ff:'watch_on',id:v.mid})
-            if(tabTree.name !== 'monitorSettings')openLiveGrid()
-            console.log('loaded',v.name)
+        const monitorId = v.mid
+        if(justTry || watchedOn[v.ke] && watchedOn[v.ke][monitorId] === 1 && loadedMonitors[monitorId] && loadedMonitors[monitorId].mode !== 'stop'){
+            return new Promise(function(resolve){
+                if(watchToggleCallback[monitorId])watchToggleCallback[monitorId]()
+                watchToggleCallback[monitorId] = function(){
+                    delete(watchToggleCallback[monitorId])
+                    resolve()
+                }
+                mainSocket.f({f:'monitor',ff:'watch_on',id:monitorId})
+                if(tabTree.name !== 'monitorSettings' && tabTree.name !== 'liveGrid')openLiveGrid()
+            })
         }
     }
     function callMonitorsToLiveGrid(monitors, justTry){
@@ -718,22 +724,19 @@ $(document).ready(function(e){
             callMonitorToLiveGrid(v, justTry)
         })
     }
-    function loadPreviouslyOpenedLiveGridBlocks(){
-        // $.getJSON(getApiPrefix(`monitor`),function(data){
-            $.each(loadedMonitors,function(n,v){
-                callMonitorToLiveGrid(v)
-            })
-            setTimeout(function(){
-                sortListMonitors()
-                // if(dashboardOptions().switches.jpegMode === 1){
-                //     mainSocket.f({
-                //         f: 'monitor',
-                //         ff: 'jpeg_on'
-                //     })
-                // }
-            },1000)
-            drawMonitorGroupList()
-        // })
+    async function loadPreviouslyOpenedLiveGridBlocks(){
+        for(monitorId in loadedMonitors){
+            const monitor = loadedMonitors[monitorId]
+            await callMonitorToLiveGrid(monitor)
+        }
+        setTimeout(function(){
+            sortListMonitors()
+        },1000)
+        drawMonitorGroupList()
+        const gridNumber = dashboardOptions().liveGridAutoPlaceSize || 3
+        autoPlaceCurrentMonitorItemsOnLiveGrid(gridNumber)
+        saveLiveGridBlockPositions()
+        onWindowResize()
     }
     function closeAllLiveGridPlayers(rememberClose){
         $.each(loadedMonitors,function(monitorId,monitor){
@@ -872,6 +875,7 @@ $(document).ready(function(e){
         theRef.height = theRef.streamElement.height()
     }
     function resetAllLiveGridDimensionsInMemory(monitorId){
+        isSmallMobile = isMobile || window.innerWidth <= 812;
         $.each(liveGridElements,function(monitorId,data){
             resetLiveGridDimensionsInMemory(monitorId)
         })
@@ -1600,9 +1604,6 @@ $(document).ready(function(e){
     initLiveGrid()
     addOnTabOpen('liveGrid', function () {
         loadPreviouslyOpenedLiveGridBlocks()
-        onWindowResizeTimeout(null, function(){
-            setPauseScrollTimeout(true)
-        })
     })
     addOnTabReopen('liveGrid', function () {
         pauseAllLiveGridPlayers(true)
