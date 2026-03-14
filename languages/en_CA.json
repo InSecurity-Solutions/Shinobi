@@ -2055,7 +2055,7 @@
    "Central Management" : "Central Management",
    "Failover Servers" : "Failover Servers",
    "Failover Keys" : "Failover Keys",
-   "failoverServersDescription" : "Connect to your failover servers here. You need to put the IP Address and Port of your failover Shinobi server here. Server Key must be created on the failover server.",
+   "failoverServersDescription" : "Connect to your failover servers here. You need to put the IP Address and Port of your failover Shinobi server here. Server Key must be created on the failover server. To set a Shinobi server as a Failover server you need to add <code>\"isFailover\": true,</code> to the conf.json and Restart the server.",
    "failoverKeysDescription" : "Add a unique identifier here. Your normal Shinobi server (non-failover) will use this key to connect. Each normal server must have their own key. You can put anything for the key.",
    "failoverServersSaved" : "Settings saved. Restarting connection to Failover Server(s).",
    "centralManagementNotEnabled" : "Management Server connectivity is not enabled. Activate your installation and add <code>\"enableMgmtConnect\": true</code> to your conf.json.",
