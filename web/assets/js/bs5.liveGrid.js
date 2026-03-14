@@ -22,6 +22,7 @@ $(document).ready(function(e){
     var fullscreenInUse = false;
     var maintainGrid = true
     var watchToggleCallback = {}
+    var currentOpenState = dashboardOptions().watch_on || {}
     var legend = {
         "1": 12,
         "2": 6,
@@ -677,6 +678,7 @@ $(document).ready(function(e){
                     setLiveGridOpenCount(-1)
                     delete(loadedLiveGrids[monitorId])
                     delete(liveGridElements[monitorId])
+                    saveLiveGridBlockOpenState(monitorId,$user.ke,0)
                 }
             }
         }catch(err){
@@ -704,12 +706,16 @@ $(document).ready(function(e){
         })
     }
     function callMonitorToLiveGrid(v, justTry){
-        var watchedOn = dashboardOptions().watch_on || {}
+        var watchedOn = currentOpenState
         const monitorId = v.mid
         if(justTry || watchedOn[v.ke] && watchedOn[v.ke][monitorId] === 1 && loadedMonitors[monitorId] && loadedMonitors[monitorId].mode !== 'stop'){
             return new Promise(function(resolve){
                 if(watchToggleCallback[monitorId])watchToggleCallback[monitorId]()
+                let clearCallback = setTimeout(function(){
+                    watchToggleCallback[monitorId]()
+                },2000)
                 watchToggleCallback[monitorId] = function(){
+                    clearTimeout(clearCallback)
                     delete(watchToggleCallback[monitorId])
                     resolve()
                 }
@@ -738,22 +744,23 @@ $(document).ready(function(e){
         saveLiveGridBlockPositions()
         onWindowResize()
     }
-    function closeAllLiveGridPlayers(rememberClose){
-        $.each(loadedMonitors,function(monitorId,monitor){
+    async function closeAllLiveGridPlayers(rememberClose){
+        for(monitorId in loadedMonitors){
+            const monitor = loadedMonitors[monitorId]
             if(loadedLiveGrids[monitorId]){
                 mainSocket.f({
                     f: 'monitor',
                     ff: 'watch_off',
-                    id: monitor.mid
+                    id: monitorId
                 })
                 setTimeout(function(){
                     saveLiveGridBlockOpenState(monitorId,$user.ke,0)
                 },1000)
             }
-        })
+        }
     }
     function saveLiveGridBlockOpenState(monitorId,groupKey,state){
-        var openBlocks = dashboardOptions().watch_on || {}
+        var openBlocks = currentOpenState
         openBlocks[groupKey] = openBlocks[groupKey] ? openBlocks[groupKey] : {}
         openBlocks[groupKey][monitorId] = state || 0
         dashboardOptions('watch_on',openBlocks)
@@ -1030,8 +1037,9 @@ $(document).ready(function(e){
             callback()
         },500)
     }
-    function openAllLiveGridPlayers(){
-        $.each(loadedMonitors,function(monitorId,monitor){
+    function openAllLiveGridPlayers(monitorsList){
+        const monitors = monitorsList || getLoadedMonitors(null, true);
+        $.each(monitors,function(monitorId,monitor){
             mainSocket.f({
                 f: 'monitor',
                 ff: 'watch_on',
@@ -1076,7 +1084,9 @@ $(document).ready(function(e){
         if(isMobile){
             closeAllLiveGridPlayers()
         }
-        await closeFirstForGridMaintain()
+        if(!liveGridElements[monitorId]){
+            await closeFirstForGridMaintain()
+        }
         mainSocket.f({
             f: 'monitor',
             ff: 'watch_on',
@@ -1643,7 +1653,6 @@ $(document).ready(function(e){
             break;
             case'monitor_watch_off':case'monitor_stopping':
                 var monitorId = d.mid || d.id
-                console.log('closeLiveGridPlayer',monitorId)
                 closeLiveGridPlayer(monitorId,(d.f === 'monitor_watch_off'))
                 if(watchToggleCallback[monitorId])watchToggleCallback[monitorId]()
             break;
