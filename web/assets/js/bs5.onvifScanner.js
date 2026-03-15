@@ -1,5 +1,6 @@
 $(document).ready(function(e){
     //onvif probe
+    var loadedResults = {}
     var loadedResultsByIp = {}
     var monitorEditorWindow = $('#tab-monitorSettings')
     var onvifScannerWindow = $('#tab-onvifScanner')
@@ -92,7 +93,6 @@ $(document).ready(function(e){
                 </div>
             `)
             onvifScannerWindow.find('._notfound').remove()
-            setAsLoading(false)
             drawFoundCamerasSubMenu()
         }else{
             if(!loadedResultsByIp[options.ip]){
