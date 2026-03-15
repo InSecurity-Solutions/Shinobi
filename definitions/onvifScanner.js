@@ -57,7 +57,12 @@ module.exports = (s,config,lang) => {
                                "fieldType": "btn",
                                "class": `btn-success scan-resume`,
                                "btnContent": `${lang['Resume']}`,
-                           }
+                           },
+                           {
+                               "fieldType": "btn",
+                               "class": `btn-default add-all`,
+                               "btnContent": `${lang['Add All']}`,
+                           },
                        ],
                     },
                     {
