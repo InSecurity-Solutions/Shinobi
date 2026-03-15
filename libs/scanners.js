@@ -4,13 +4,46 @@ module.exports = function(s,config,lang,app,io){
     } = require('./ffmpeg/utils.js')(s,config,lang)
     const {
         runOnvifScanner,
+        cancelScan,
+        pauseScan,
+        resumeScan,
+        getScanStatus,
     } = require('./scanners/utils.js')(s,config,lang)
     const onWebSocketConnection = async (cn) => {
-        const tx = function(z){if(!z.ke){z.ke=cn.ke;};cn.emit('f',z);}
+        const tx = function(z){
+            s.tx(z,`GRP_${cn.ke}`)
+        }
         cn.on('f',(d) => {
             switch(d.f){
                 case'onvif':
+                    d.scanId = cn.ke
                     runOnvifScanner(d,tx)
+                break;
+                case'onvif_scan_cancel':
+                    cancelScan(cn.ke, tx)
+                break;
+                case'onvif_scan_pause':
+                    if(pauseScan(cn.ke)){
+                        tx({ f: 'onvif_scan_pause' })
+                    }
+                break;
+                case'onvif_scan_resume':
+                    if(resumeScan(cn.ke)){
+                        tx({ f: 'onvif_scan_resume' })
+                    }
+                break;
+                case'onvif_scan_status':
+                    const scanStatus = getScanStatus(cn.ke);
+                    if(scanStatus){
+                        const {
+                            cancelled,
+                            paused,
+                            found
+                        } = scanStatus;
+                        tx({ f: 'onvif_scan_status', active: true, cancelled, paused, found })
+                    }else{
+                        tx({ f: 'onvif_scan_status', active: false })
+                    }
                 break;
             }
         })
