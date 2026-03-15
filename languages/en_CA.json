@@ -21,6 +21,7 @@
    "Geolocation": "Geolocation",
    "Configure": "Configure",
    "Scan": "Scan",
+   "Resume": "Resume",
    "See System Logs": "See System Logs",
    "Mount Manager": "Mount Manager",
    "mountManagerDescription": "Setup drive mounts here.",

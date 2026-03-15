@@ -44,9 +44,121 @@ module.exports = (s,config,lang) => {
           (ipl >> 8 & 255) + '.' +
           (ipl & 255) );
     }
-    const runOnvifScanner = async (options,foundCameraCallback) => {
+
+    // --- Scan state controller ---
+    // Holds the mutable state for a running scan session.
+    // A new controller is created each time runOnvifScanner() is called,
+    // so concurrent scans each have independent state.
+    const createScanController = () => {
+        let cancelled = false;   // true = stop permanently, discard progress
+        let paused = false;      // true = hold between batches, resume later
+        let resumeResolve = null;// resolve handle for the pause-gate promise
+
+        return {
+            // Cancel the scan entirely. Any in-flight batch finishes naturally,
+            // then the loop exits. Accumulated results are still returned.
+            cancel() {
+                cancelled = true;
+                // If we are currently paused, unblock so the loop can exit.
+                if (resumeResolve) {
+                    resumeResolve();
+                    resumeResolve = null;
+                }
+            },
+            // Pause between batches. The current batch finishes before halting.
+            pause() {
+                if (!cancelled) paused = true;
+            },
+            // Resume a paused scan.
+            resume() {
+                paused = false;
+                if (resumeResolve) {
+                    resumeResolve();
+                    resumeResolve = null;
+                }
+            },
+            get isCancelled() { return cancelled; },
+            get isPaused()    { return paused; },
+            // Called by the scan loop between batches to honour pause/cancel.
+            // Returns true when the loop should stop (cancelled).
+            async wait() {
+                if (cancelled) return true;
+                if (paused) {
+                    // Block until resume() or cancel() is called.
+                    await new Promise(resolve => { resumeResolve = resolve; });
+                }
+                return cancelled;
+            }
+        };
+    }
+
+    // Active controllers keyed by scanId so callers can control them later.
+    const activeScans = {};
+    const activeScansFound = {};
+
+    // Stop (cancel) a scan by id.
+    const cancelScan = (scanId, tx) => {
+        if (activeScans[scanId]) {
+            tx({ f: 'onvif_scan_cancel' })
+            activeScans[scanId].cancel();
+            tx({ f: 'onvif_scan_ended', foundNumber: activeScansFound[scanId].filter(item => !item.ff).length })
+            delete(activeScans[scanId])
+            delete(activeScansFound[scanId])
+            return true
+        }
+        return false
+    };
+
+    // Pause a scan by id.
+    const pauseScan = (scanId) => {
+        if (activeScans[scanId]) {
+            activeScans[scanId].pause();
+            return true
+        }
+        return false
+    };
+
+    // Resume a paused scan by id.
+    const resumeScan = (scanId) => {
+        if (activeScans[scanId]) {
+            activeScans[scanId].resume();
+            return true
+        }
+        return false
+    };
+
+    // Returns a snapshot of all active scan ids and their current state.
+    const getScanStatus = (scanId) => {
+        if (scanId) {
+            const ctrl = activeScans[scanId];
+            if (!ctrl) return null;
+            return { scanId, cancelled: ctrl.isCancelled, paused: ctrl.isPaused, found: activeScansFound[scanId] };
+        }
+        return Object.keys(activeScans).map(id => ({
+            scanId: id,
+            cancelled: activeScans[id].isCancelled,
+            paused: activeScans[id].isPaused,
+            found: activeScansFound[id]
+        }));
+    };
+
+    const runOnvifScanner = async (options, tx) => {
+        // Attach a unique id to this scan so the caller can control it.
+        const scanId = options.scanId || `scan_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+        if(activeScans[scanId]){
+            tx({ f: 'onvif_scan_started_before' })
+            return
+        }
+        tx({ f: 'onvif_scan_started' })
+        const controller = createScanController();
+        activeScans[scanId] = controller;
+        activeScansFound[scanId] = [];
         var ip = options.ip.replace(/ /g,'')
         var ports = options.port.replace(/ /g,'')
+        function callback(result){
+            activeScansFound[scanId].push(result);
+            if(tx)tx(result)
+        }
         if(options.ip === ''){
             var interfaces = os.networkInterfaces()
             var addresses = []
@@ -114,6 +226,10 @@ module.exports = (s,config,lang) => {
         var responseList = []
         const BATCH_SIZE = 20
         for(let i = 0; i < hitList.length; i += BATCH_SIZE){
+            // Honour pause/cancel before starting each new batch.
+            const shouldStop = await controller.wait();
+            if (shouldStop) break;
+
             const batch = hitList.slice(i, i + BATCH_SIZE)
             await Promise.all(batch.map(async (camera) => {
                 try{
@@ -160,7 +276,7 @@ module.exports = (s,config,lang) => {
                     }catch(err){
                         s.debugLog(err)
                     }
-                    if(foundCameraCallback)foundCameraCallback(Object.assign(cameraResponse,{f: 'onvif', snapShot: imageSnap}))
+                    callback(Object.assign(cameraResponse,{f: 'onvif', snapShot: imageSnap}))
                 }catch(err){
                     const searchError = (find) => {
                         return stringContains(find,err.message,true)
@@ -183,8 +299,8 @@ module.exports = (s,config,lang) => {
                             errorMessage = lang.ONVIFErr404
                         break;
                     }
-                    if(foundDevice && foundCameraCallback){
-                        foundCameraCallback({
+                    if(foundDevice){
+                        callback({
                             f: 'onvif',
                             ff: 'failed_capture',
                             ip: camera.ip,
@@ -196,11 +312,21 @@ module.exports = (s,config,lang) => {
                 }
             }))
         }
-        return responseList
+
+        // Clean up the controller once the scan is done.
+        tx({ f: 'onvif_scan_ended', foundNumber: responseList.length })
+        delete(activeScans[scanId]);
+        delete(activeScansFound[scanId]);
+        // Return the id alongside results so the caller always has it.
+        return { ok: true, scanId, results: responseList };
     }
     return {
-        ipRange: ipRange,
-        portRange: portRange,
-        runOnvifScanner: runOnvifScanner,
+        ipRange,
+        portRange,
+        runOnvifScanner,
+        cancelScan,
+        pauseScan,
+        resumeScan,
+        getScanStatus,
     }
 }
