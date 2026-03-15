@@ -162,6 +162,33 @@ module.exports = (s,app,config,lang) => {
         }
         return response
     }
+    async function transmitCloudUploadRecordsFromMonitors(monitors, connectionToNormal, deleteAfterUpload){
+        const response = { ok: true }
+        for(const monitor of monitors){
+            const { mid: monitorId, ke: groupKey } = monitor;
+            const { rows: videos } = await s.knexQueryPromise({
+                action: "select",
+                columns: "*",
+                table: "Cloud Videos",
+                where: {
+                    ke: groupKey,
+                    mid: monitorId,
+                }
+            });
+            if(deleteAfterUpload){
+                await s.knexQueryPromise({
+                    action: "delete",
+                    table: "Cloud Videos",
+                    where: {
+                        ke: groupKey,
+                        mid: monitorId,
+                    }
+                });
+            }
+            sendMessage(connectionToNormal,{ f: 'insertCloudVideos', videos })
+        }
+        return response
+    }
     function getFailoverServerKeys(){
         const response = { ok: true }
         response.failoverConnectionKeys = config.failoverConnectionKeys || {};
@@ -216,10 +243,12 @@ module.exports = (s,app,config,lang) => {
         }
     }
     function disableCloudUploaders(user){
-        const uploaders = s.definitions["Account Settings"].blocks["Uploaders"].info;
-        for(uploader of uploaders){
-            const uploaderEnabledToggleName = uploader.info.find(item => item.name.endsWith('_save')).name.replace('detail=','')
-            user.details[uploaderEnabledToggleName] = '0'
+        if(!config.failoverAllowCloudUploaders){
+            const uploaders = s.definitions["Account Settings"].blocks["Uploaders"].info;
+            for(uploader of uploaders){
+                const uploaderEnabledToggleName = uploader.info.find(item => item.name.endsWith('_save')).name.replace('detail=','')
+                user.details[uploaderEnabledToggleName] = '0'
+            }
         }
     }
     return {
@@ -233,6 +262,7 @@ module.exports = (s,app,config,lang) => {
         updateCachedUser,
         transmitVideosFromMonitors,
         transmitEventsFromMonitors,
+        transmitCloudUploadRecordsFromMonitors,
         getFailoverServerKeys,
         addFailoverServerKey,
         removeFailoverServerKey,

@@ -121,6 +121,15 @@ module.exports = (s,app,config,lang) => {
             });
         }
     }
+    async function insertCloudVideos(events){
+        for(anEvent of events){
+            await s.knexQueryPromise({
+                action: "insert",
+                table: "Cloud Videos",
+                insert: anEvent
+            });
+        }
+    }
     function connectToFailover({ host, key }){
         clearTimeout(reconnectTimeouts[host])
         const parsedIp = parseNewConnectionAddress(host)
@@ -157,6 +166,9 @@ module.exports = (s,app,config,lang) => {
                 break;
                 case'insertEvents':
                     insertEvents(data.events)
+                break;
+                case'insertCloudVideos':
+                    insertCloudVideos(data.videos)
                 break;
                 case'insertVideoChunk':
                     insertVideoChunk(data.video, data.data)

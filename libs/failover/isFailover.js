@@ -16,6 +16,7 @@ module.exports = (s,app,config,lang) => {
             sendMessage,
             transmitVideosFromMonitors,
             transmitEventsFromMonitors,
+            transmitCloudUploadRecordsFromMonitors,
             disableCloudUploaders,
         } = require('./utilsFailover.js')(s,app,config,lang)
         const lostConnections = {}
@@ -26,7 +27,10 @@ module.exports = (s,app,config,lang) => {
         const cachedMonitorsIndex = {}
         const cachedUsers = {}
         const videosTransmitting = {}
+        const eventsTransmitting = {}
+        const cloudRecordsTransmitting = {}
         const normalServerConnections = {}
+        const allowCloudUploads = config.failoverAllowCloudUploaders;
         const theWebSocket = createWebSocketServer()
         function runOnNormalServerConnections(callback){
             for(peerConnectKey in normalServerConnections){
@@ -80,10 +84,21 @@ module.exports = (s,app,config,lang) => {
             }
             async function beginEventTransmission(){
                 var response = { ok: true }
-                if(!videosTransmitting[peerConnectKey]){
+                if(!eventsTransmitting[peerConnectKey]){
+                    eventsTransmitting[peerConnectKey] = true
                     await transmitEventsFromMonitors(cachedMonitors[peerConnectKey] || [], client, true)
+                    eventsTransmitting[peerConnectKey] = false
                 }
                 sendMessage(client, { f: 'transmitEventsFromMonitorsResponse', response })
+            }
+            async function beginCloudUploadRecordsTransmission(){
+                var response = { ok: true }
+                if(allowCloudUploads && !cloudRecordsTransmitting[peerConnectKey]){
+                    cloudRecordsTransmitting[peerConnectKey] = true
+                    await transmitCloudUploadRecordsFromMonitors(cachedMonitors[peerConnectKey] || [], client, true)
+                    cloudRecordsTransmitting[peerConnectKey] = false
+                }
+                sendMessage(client, { f: 'transmitCloudUploadRecordsFromMonitorsResponse', response })
             }
             function onAuthenticate(data){
                 const { key } = bson.deserialize(Buffer.from(data))
@@ -129,6 +144,7 @@ module.exports = (s,app,config,lang) => {
                                 await stopMonitors(cachedMonitors[peerConnectKey] || [])
                                 await beginVideoTransmission()
                                 await beginEventTransmission()
+                                await beginCloudUploadRecordsTransmission()
                                 await deleteMonitors(cachedMonitors[peerConnectKey] || [])
                                 await deleteUsers(cachedUsers[peerConnectKey] || [])
                             })
