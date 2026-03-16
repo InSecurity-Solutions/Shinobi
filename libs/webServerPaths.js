@@ -234,7 +234,7 @@ module.exports = function(s,config,lang,app,io){
             }
         }
         // brute check
-        if(s.failedLoginAttempts[req.body.mail] && s.failedLoginAttempts[req.body.mail].failCount >= 5){
+        if(s.failedLoginAttempts[req.ip] && s.failedLoginAttempts[req.ip].failCount >= 5){
             if(req.query.json=='true'){
                 res.end(s.prettyPrint({ok:false}))
             }else{
@@ -250,9 +250,9 @@ module.exports = function(s,config,lang,app,io){
         }
         //
         const renderPage = function(focus,data){
-            if(s.failedLoginAttempts[req.body.mail]){
-                clearTimeout(s.failedLoginAttempts[req.body.mail].timeout)
-                delete(s.failedLoginAttempts[req.body.mail])
+            if(s.failedLoginAttempts[req.ip]){
+                clearTimeout(s.failedLoginAttempts[req.ip].timeout)
+                delete(s.failedLoginAttempts[req.ip])
             }
             if(
                 focus !== config.renderPaths.index
@@ -275,7 +275,7 @@ module.exports = function(s,config,lang,app,io){
                 s.renderPage(req,res,focus,data)
             }
         }
-        const failedAuthentication = function(board,failIdentifier,failMessage){
+        const failedAuthentication = function(board,failIdentifier,failMessage,emailAddress){
             // brute protector
             if(!failIdentifier){
                 s.renderPage(req,res,config.renderPaths.index,{
@@ -289,16 +289,10 @@ module.exports = function(s,config,lang,app,io){
             }
             if(!s.failedLoginAttempts[failIdentifier]){
                 s.failedLoginAttempts[failIdentifier] = {
-                    failCount : 0,
-                    ips : {}
+                    failCount : 0
                 }
             }
             ++s.failedLoginAttempts[failIdentifier].failCount
-            const ipMap = s.failedLoginAttempts[failIdentifier].ips
-            if(Object.keys(ipMap).length < 500){  // cap unique IPs tracked per identifier
-                if(!ipMap[req.ip]) ipMap[req.ip] = 0
-                ++ipMap[req.ip]
-            }
             clearTimeout(s.failedLoginAttempts[failIdentifier].timeout)
             s.failedLoginAttempts[failIdentifier].timeout = setTimeout(function(){
                 delete(s.failedLoginAttempts[failIdentifier])
@@ -324,7 +318,7 @@ module.exports = function(s,config,lang,app,io){
                 type: lang['Authentication Failed'],
                 msg: {
                     for: board,
-                    mail: failIdentifier,
+                    mail: emailAddress,
                     ip: req.ip
                 }
             }
@@ -336,7 +330,7 @@ module.exports = function(s,config,lang,app,io){
                     columns: "ke,uid,details",
                     table: "Users",
                     where: [
-                        ['mail','=',failIdentifier],
+                        ['mail','=',emailAddress],
                     ]
                 },(err,r) => {
                     if(r && r[0]){
@@ -428,7 +422,7 @@ module.exports = function(s,config,lang,app,io){
                     details: user.details
                 })
             }else{
-                return failedAuthentication(req.body.function,req.body.mail,alternateLoginResponse.msg)
+                return failedAuthentication(req.body.function,req.ip,alternateLoginResponse.msg,req.body.mail)
             }
         }else if(req.body.mail && req.body.pass){
             async function regularLogin(){
@@ -479,7 +473,7 @@ module.exports = function(s,config,lang,app,io){
                         details: user.details
                     })
                 }else{
-                    failedAuthentication(req.body.function,req.body.mail)
+                    failedAuthentication(req.body.function,req.ip,null,req.body.mail)
                 }
             }
             if(req.body.function === 'super' && !config.superUserLoginDisabled){
@@ -494,7 +488,7 @@ module.exports = function(s,config,lang,app,io){
                         currentVersion: s.currentVersion,
                     })
                 }else{
-                    failedAuthentication(req.body.function,req.body.mail)
+                    failedAuthentication(req.body.function,req.ip,null,req.body.mail)
                 }
             }else{
                 regularLogin()
@@ -515,24 +509,24 @@ module.exports = function(s,config,lang,app,io){
             if(twoFactorVerificationResponse.ok){
                 checkRoute(twoFactorVerificationResponse.pageTarget,twoFactorVerificationResponse.info)
             }else{
-                failedAuthentication(lang['2-Factor Authentication'],factorAuthObject.info.mail)
+                failedAuthentication(lang['2-Factor Authentication'],req.ip,null,factorAuthObject.info.mail)
             }
         }else{
-            failedAuthentication(lang['2-Factor Authentication'],req.body.mail)
+            failedAuthentication(lang['2-Factor Authentication'],req.ip,null,req.body.mail)
         }
     })
-    /**
-    * API : Brute Protection Lock Reset by API
-    */
-    app.get([config.webPaths.apiPrefix+':auth/resetBruteProtection/:ke'], function (req,res){
-        s.auth(req.params,function(user){
-            if(s.failedLoginAttempts[user.mail]){
-                clearTimeout(s.failedLoginAttempts[user.mail].timeout)
-                delete(s.failedLoginAttempts[user.mail])
-            }
-            res.end(s.prettyPrint({ok:true}))
-        })
-    })
+    // /**
+    // * API : Brute Protection Lock Reset by API
+    // */
+    // app.get([config.webPaths.apiPrefix+':auth/resetBruteProtection/:ke'], function (req,res){
+    //     s.auth(req.params,function(user){
+    //         if(s.failedLoginAttempts[user.mail]){
+    //             clearTimeout(s.failedLoginAttempts[user.mail].timeout)
+    //             delete(s.failedLoginAttempts[user.mail])
+    //         }
+    //         res.end(s.prettyPrint({ok:true}))
+    //     })
+    // })
     /**
     * API : Get TV Channels (Monitor Streams) json
      */
