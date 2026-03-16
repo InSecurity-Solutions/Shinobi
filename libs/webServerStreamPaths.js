@@ -157,6 +157,7 @@ module.exports = function(s,config,lang,app){
             res.end()
         }else{
             s.auth(req.params,function(user){
+                const ip = s.getClientIp(req)
                 const monitorId = req.params.id
                 if(cantLiveStreamPermission(user,monitorId,'watch_stream')){
                     s.closeJsonResponse(res,{ok: false, msg: lang['Not Authorized']});
@@ -201,7 +202,6 @@ module.exports = function(s,config,lang,app){
                                 res.end();
                                 return;
                             }
-                            var ip = s.getClientIp(req)
                             s.camera('watch_on',{
                                 id : req.params.id,
                                 ke : req.params.ke
