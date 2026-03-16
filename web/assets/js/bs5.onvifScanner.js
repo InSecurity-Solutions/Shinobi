@@ -31,10 +31,8 @@ $(document).ready(function(e){
     }
     var setAsLoading = function(appearance){
         if(appearance){
-            onvifScannerWindow.find('._loading').show()
             onvifScannerWindow.find('[type="submit"]').prop('disabled',true)
         }else{
-            onvifScannerWindow.find('._loading').hide()
             onvifScannerWindow.find('[type="submit"]').prop('disabled',false)
         }
     }

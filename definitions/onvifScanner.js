@@ -73,7 +73,7 @@ module.exports = (s,config,lang) => {
                                "fieldType": "btn",
                                "forForm": true,
                                "class": `btn-success`,
-                               "btnContent": `${lang['Search']}<span class="_loading" style="display:none"> &nbsp; <i class="fa fa-pulse fa-spinner"></i></span>`,
+                               "btnContent": `${lang['Search']}`,
                            },
                            {
                                "fieldType": "btn",
