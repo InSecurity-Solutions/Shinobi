@@ -4,10 +4,13 @@ $(document).ready(function(e){
     var loadedResultsByIp = {}
     var monitorEditorWindow = $('#tab-monitorSettings')
     var onvifScannerWindow = $('#tab-onvifScanner')
+    var onvifScannerProgress = $('#onvifScanner-progress')
+    var onvifScannerProgressBar = onvifScannerProgress.find('.progress-bar')
+    var onvifScannerProgressText = onvifScannerProgress.find('.progress-text')
     var onvifScannerResultPane = onvifScannerWindow.find('.onvif_result')
     var onvifScannerErrorResultPane = onvifScannerWindow.find('.onvif_result_error')
     var scanForm = onvifScannerWindow.find('form');
-    var sideMenuList = $(`#side-menu-link-onvifScanner  ul`)
+    var sideMenuList = $(`#side-menu-link-onvifScanner ul`)
     function addCredentialsToUri(uri,username,password){
         let newUri = `${uri}`
         const uriParts = newUri.split('://')
@@ -218,6 +221,10 @@ $(document).ready(function(e){
         switch(d.f){
             case'onvif':
                 drawProbeResult(d)
+            break;
+            case'onvif_scan_progress':
+                onvifScannerProgressBar.css('width',`${d.percent}%`)
+                onvifScannerProgressText.text(`${d.processedItems} / ${d.totalItems}, ${d.percent}%`)
             break;
             case'onvif_scan_status':
                 if(d.active){

@@ -34,6 +34,13 @@ module.exports = (s,config,lang) => {
                        "fieldType": "password",
                     },
                     {
+                       "fieldType": "div",
+                       "class": "view-running view-paused mb-3",
+                       "divContent": `<div id="onvifScanner-progress" style="height:1rem" class="progress" role="progressbar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                            <div class="progress-bar" style="width: 0%"><span class="progress-text"></span></div>
+                        </div>`,
+                    },
+                    {
                        "fieldType": "btn-group",
                        "class": "view-running",
                        "btns": [

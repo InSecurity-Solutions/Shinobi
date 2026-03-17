@@ -142,8 +142,7 @@ module.exports = (s,config,lang) => {
         }));
     };
 
-    const runOnvifScanner = async (options, tx) => {
-        // Attach a unique id to this scan so the caller can control it.
+    const runOnvifScanner = async (options, tx, onProgress) => {
         const scanId = options.scanId || `scan_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         if(activeScans[scanId]){
             tx({ f: 'onvif_scan_started_before' })
@@ -224,9 +223,10 @@ module.exports = (s,config,lang) => {
             })
         })
         var responseList = []
+        const totalItems = hitList.length
+        var processedItems = 0
         const BATCH_SIZE = 20
         for(let i = 0; i < hitList.length; i += BATCH_SIZE){
-            // Honour pause/cancel before starting each new batch.
             const shouldStop = await controller.wait();
             if (shouldStop) break;
 
@@ -240,7 +240,6 @@ module.exports = (s,config,lang) => {
                         ProfileToken : device.current_profile.token,
                         Protocol : 'RTSP'
                     })
-
                     var cameraResponse = {
                         ip: camera.ip,
                         port: camera.port,
@@ -284,17 +283,15 @@ module.exports = (s,config,lang) => {
                     var foundDevice = false
                     var errorMessage = ''
                     switch(true){
-                        //ONVIF camera found but denied access
-                        case searchError('400'): //Bad Request - Sender not Authorized
+                        case searchError('400'):
                             foundDevice = true
                             errorMessage = lang.ONVIFErr400
                         break;
-                        case searchError('405'): //Method Not Allowed
+                        case searchError('405'):
                             foundDevice = true
                             errorMessage = lang.ONVIFErr405
                         break;
-                        //Webserver exists but undetermined if IP Camera
-                        case searchError('404'): //Not Found
+                        case searchError('404'):
                             foundDevice = true
                             errorMessage = lang.ONVIFErr404
                         break;
@@ -311,13 +308,17 @@ module.exports = (s,config,lang) => {
                     if(config.debugLogVerbose)s.debugLog(err);
                 }
             }))
+
+            processedItems = Math.min(i + BATCH_SIZE, totalItems)
+            const percent = totalItems > 0
+                ? Math.round((processedItems / totalItems) * 100)
+                : 100
+            if(onProgress) onProgress(percent, processedItems, totalItems)
         }
 
-        // Clean up the controller once the scan is done.
         tx({ f: 'onvif_scan_ended', foundNumber: responseList.length })
         delete(activeScans[scanId]);
         delete(activeScansFound[scanId]);
-        // Return the id alongside results so the caller always has it.
         return { ok: true, scanId, results: responseList };
     }
     return {

@@ -17,7 +17,9 @@ module.exports = function(s,config,lang,app,io){
             switch(d.f){
                 case'onvif':
                     d.scanId = cn.ke
-                    runOnvifScanner(d,tx)
+                    runOnvifScanner(d,tx, (percent, processedItems, totalItems) => {
+                        tx({ f: 'onvif_scan_progress', percent, processedItems, totalItems })
+                    })
                 break;
                 case'onvif_scan_cancel':
                     cancelScan(cn.ke, tx)
