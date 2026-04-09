@@ -121,12 +121,12 @@ class CentralConnection {
     };
   }
 
-  async getConnectionDetails() {
+  async getConnectionDetails(targetUser) {
     return new Promise((resolve) => {
       this.internalEvents.once('connectDetails', (data) => {
         resolve(data);
       });
-      parentPort.postMessage({ f: 'connectDetailsRequest' });
+      parentPort.postMessage({ f: 'connectDetailsRequest', mail: targetUser });
     });
   }
 
@@ -183,15 +183,16 @@ class CentralConnection {
   }
 
   async authenticateConnection() {
-    const connectDetails = await this.getConnectionDetails();
     const configData = JSON.parse(await fs.readFile(EXPECTED_CONFIG_PATH, 'utf8'));
+    const mgmtTargetUser = configData.mgmtTargetUser
+    const connectDetails = await this.getConnectionDetails(mgmtTargetUser);
 
     this.sendDataToTunnel({
-      isShinobi: !!this.config.passwordType,
-      peerConnectKey: this.peerConnectKey,
-      connectDetails,
-      ipAddresses: this.getServerIPAddresses(),
-      config: configData,
+        isShinobi: !!this.config.passwordType,
+        peerConnectKey: this.peerConnectKey,
+        connectDetails,
+        ipAddresses: this.getServerIPAddresses(),
+        config: configData,
     });
 
     this.setupHeartbeat();

@@ -148,7 +148,8 @@ module.exports = (s,config,lang) => {
                     s.connectedMgmtServers[serverIp].sshWorker = sshWorker;
                 break;
                 case'connectDetailsRequest':
-                    getConnectionDetails().then((connectDetails) => {
+                    var mail = data.mail
+                    getConnectionDetails(mail).then((connectDetails) => {
                         worker.postMessage({ f: 'connectDetails', connectDetails })
                     }).catch((error) => {
                         console.error('FAILED TO GET connectDetails', serverIp, error)
