@@ -69,7 +69,9 @@ module.exports = (s,app,config,lang) => {
             }
             return cachedMonitorsIndex[peerConnectKey][`${groupKey}${monitorId}`]
         }
-        theWebSocket.on('connection',(client) => {
+        theWebSocket.on('connection',(client, req) => {
+            const ip = req.socket.remoteAddress;
+            client._ipAddress = ip;
             let peerConnectKey = ''
             // client.send(someDataToSendAsStringOrBinary)
             setClientKillTimerIfNotAuthenticatedInTime(client)
@@ -237,6 +239,22 @@ module.exports = (s,app,config,lang) => {
             s.superAuth(req.params,async (resp) => {
                 const failoverServer = req.body.failoverServer;
                 const response = await removeFailoverServerKey(failoverServer)
+                s.closeJsonResponse(res,response)
+            },res,req)
+        })
+
+        /**
+        * API : Get Connected Servers
+        */
+        app.get(config.webPaths.superApiPrefix+':auth/failoverServersConnected', async function (req,res){
+            s.superAuth(req.params,async (resp) => {
+                const response = { servers: {}, ok: true }
+                const foundServers = {}
+                for(peerConnectKey in normalServerConnections){
+                    const serverClient = normalServerConnections[peerConnectKey]
+                    foundServers[serverClient._ipAddress] = peerConnectKey
+                    response.servers = foundServers
+                }
                 s.closeJsonResponse(res,response)
             },res,req)
         })
