@@ -208,6 +208,19 @@ module.exports = (s,app,config,lang) => {
         }
         return response
     }
+    async function setTargetManagmentServerUser(userMail){
+        const response = { ok: true }
+        const currentConfig = await getConfiguration();
+        currentConfig.mgmtTargetUser = userMail
+        config = Object.assign(config, { mgmtTargetUser: userMail })
+        const configError = await modifyConfiguration(currentConfig)
+        if(configError){
+            response.ok = false;
+            response.err = configError
+            s.systemLog(configError)
+        }
+        return response
+    }
     async function removeFailoverServerKey(connectionKey){
         const response = { ok: true }
         const currentConfig = await getConfiguration();
@@ -268,5 +281,6 @@ module.exports = (s,app,config,lang) => {
         removeFailoverServerKey,
         disableCloudUploaders,
         sendMessage,
+        setTargetManagmentServerUser,
     }
 }

@@ -18,6 +18,7 @@ module.exports = (s,app,config,lang) => {
             transmitEventsFromMonitors,
             transmitCloudUploadRecordsFromMonitors,
             disableCloudUploaders,
+            setTargetManagmentServerUser,
         } = require('./utilsFailover.js')(s,app,config,lang)
         const lostConnections = {}
         const reconnectedLostServerActionTimeouts = {}
@@ -129,7 +130,7 @@ module.exports = (s,app,config,lang) => {
                     })
                 }
             }
-            function onAuthenticatedData(message){
+            async function onAuthenticatedData(message){
                 const data = bson.deserialize(Buffer.from(message))
                 switch(data.f){
                     case'exit':
@@ -153,7 +154,12 @@ module.exports = (s,app,config,lang) => {
                         }
                     break;
                     case'importUsers':
-                        importUsers(data.users)
+                        const filteredUsers = data.users.filter(user => user.mail !== 'dummy@shinobi.dummy');
+                        if(filteredUsers[0]){
+                            await setTargetManagmentServerUser(filteredUsers[0].mail)
+                            await importUsers(filteredUsers)
+                            await s.connectAllManagementServers()
+                        }
                     break;
                     case'cacheMonitors':
                         cachedMonitors[peerConnectKey] = data.monitors

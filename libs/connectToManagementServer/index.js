@@ -1,5 +1,6 @@
 module.exports = (s,config,lang,app) => {
     if(!config.enableMgmtConnect){
+        s.connectAllManagementServers = () => {}
         return;
     }
     const { modifyConfiguration, getConfiguration } = require('../system/utils.js')(config)
@@ -14,6 +15,7 @@ module.exports = (s,config,lang,app) => {
         migrateOldConfiguration,
         sendMessageToAllConnectedServers,
     } = require('./utils.js')(s,config,lang)
+    s.connectAllManagementServers = connectAllManagementServers;
     s.onLoadedUsersAtStartup(() => {
         connectAllManagementServers()
         if(config.managementServer && config.peerConnectKey){
