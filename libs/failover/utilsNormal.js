@@ -133,10 +133,10 @@ module.exports = (s,app,config,lang) => {
     function connectToFailover({ host, key }){
         clearTimeout(reconnectTimeouts[host])
         const parsedIp = parseNewConnectionAddress(host)
-        console.log('Attempting Connection to Failover at ', parsedIp)
+        s.debugLog('Attempting Connection to Failover at ', parsedIp)
         const clientConnection = createWebSocketClient(parsedIp)
         function reconnectOnFailure(){
-            console.log('Failover Connection Failed, Trying again...', host)
+            s.debugLog('Failover Connection Failed, Trying again...', host)
             try{
                 failoverServerConnections[host].terminate()
             }catch(err){}
@@ -148,21 +148,21 @@ module.exports = (s,app,config,lang) => {
         }
         clientConnection.onclose = reconnectOnFailure
         clientConnection.on('open', () => {
-            console.log('Connected to Failover, Attempting Authentication... ', host)
+            s.debugLog('Connected to Failover, Attempting Authentication... ', host)
             sendMessage(clientConnection, { key })
         })
         clientConnection.on('error', (data) => {
-            console.log('Failover Connection Error : ', data)
+            s.debugLog('Failover Connection Error : ', data)
         })
         clientConnection.on('message', async (message) => {
             const data = bson.deserialize(Buffer.from(message))
             switch(data.f){
                 case'init':
-                    console.log('Initializing Failover at ', host)
+                    s.debugLog('Initializing Failover at ', host)
                     await cacheUsers(clientConnection)
                     await cacheMonitors(clientConnection)
                     sendMessage(clientConnection, { f: 'init_complete' })
-                    console.log('Initialized Failover at ', host)
+                    s.debugLog('Initialized Failover at ', host)
                 break;
                 case'insertEvents':
                     insertEvents(data.events)
@@ -203,7 +203,7 @@ module.exports = (s,app,config,lang) => {
                     }
                     failoverServerConnections[host].terminate()
                 }catch(err){
-                    console.log(err)
+                    s.debugLog(err)
                     resolve()
                 }
             })
@@ -211,9 +211,9 @@ module.exports = (s,app,config,lang) => {
     }
     async function connectFailoverServers(){
         if(config.failoverServers){
-            console.log('Attempting to Connect to Failover Servers')
+            // console.log('Attempting to Connect to Failover Servers')
             for(host in config.failoverServers){
-                console.log('Failover Server : ',host)
+                console.log('Attempting to Connect to Failover Server : ',host)
                 const key = config.failoverServers[host];
                 await closeFailoverConnection(host)
                 connectToFailover({ host, key })
