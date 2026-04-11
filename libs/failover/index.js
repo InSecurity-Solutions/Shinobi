@@ -6,6 +6,6 @@ module.exports = (s,app,config,lang) => {
             }else{
                 require('./isNormal.js')(s,app,config,lang)
             }
-        }        
+        }
     })
 }

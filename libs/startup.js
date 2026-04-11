@@ -365,7 +365,7 @@ module.exports = function(s,config,lang,io){
                 where: [
                     ['details','NOT LIKE','%"sub"%']
                 ]
-            },function(err,users) {
+            }, async function(err,users) {
                 if(users && users[0]){
                     users.forEach(function(user){
                         checkedAdminUsers[user.ke] = user
@@ -403,6 +403,7 @@ module.exports = function(s,config,lang,io){
                         })
                     })
                 }else{
+                    await s.runExtensionsForArrayAwaited('onLoadedUsersAtStartup', null, [])
                     s.processReady()
                 }
             })
