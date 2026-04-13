@@ -1,6 +1,6 @@
 const bson = require('bson')
 const { createWebSocketServer } = require('../basic/websocketTools.js')
-module.exports = (s,app,config,lang) => {
+module.exports = async (s,app,config,lang) => {
     if(config.isFailover){
         const {
             importUsers,
@@ -19,20 +19,45 @@ module.exports = (s,app,config,lang) => {
             transmitCloudUploadRecordsFromMonitors,
             disableCloudUploaders,
             setTargetManagmentServerUser,
+            saveCurrentState,
+            loadCurrentState,
         } = require('./utilsFailover.js')(s,app,config,lang)
-        const lostConnections = {}
         const reconnectedLostServerActionTimeouts = {}
         const lostServerActionTimeouts = {}
-        const gracefulExitRequested = {}
-        const cachedMonitors = {}
-        const cachedMonitorsIndex = {}
-        const cachedUsers = {}
         const videosTransmitting = {}
         const eventsTransmitting = {}
         const cloudRecordsTransmitting = {}
         const normalServerConnections = {}
         const allowCloudUploads = config.failoverAllowCloudUploaders;
+        async function loadFailoverState(){
+            const data = await loadCurrentState()
+            if(data.lostServerActionTimeoutsIndex.length > 0){
+                for(indexItem of data.lostServerActionTimeoutsIndex){
+                    setLostServerActionTimeout(indexItem)
+                }
+            }
+            return data
+        }
+        const {
+            cachedMonitors = {},
+            cachedMonitorsIndex = {},
+            cachedUsers = {},
+            lostConnections = {},
+            gracefulExitRequested = {},
+        } = await loadFailoverState();
         const theWebSocket = createWebSocketServer()
+        // const theWebSocketForFailovers = createWebSocketServer()
+        function saveFailoverState(){
+            return saveCurrentState({
+                time: new Date(),
+                cachedMonitors,
+                cachedMonitorsIndex,
+                cachedUsers,
+                lostConnections,
+                gracefulExitRequested,
+                lostServerActionTimeoutsIndex: Object.keys(lostServerActionTimeouts)
+            })
+        }
         function runOnNormalServerConnections(callback){
             for(peerConnectKey in normalServerConnections){
                 const serverConnection = normalServerConnections[peerConnectKey]
@@ -50,6 +75,20 @@ module.exports = (s,app,config,lang) => {
             lostServerActionTimeouts[peerConnectKey] = setTimeout(function(){
                 callback()
             },10000)
+        }
+        function setLostServerActionTimeout(peerConnectKey){
+            lostServerActionTimeout(peerConnectKey, async () => {
+                console.log('Failover : Setting up lost Server configurations ', peerConnectKey)
+                const filteredUsers = (cachedUsers[peerConnectKey] || []).filter(user => user.mail !== 'dummy@shinobi.dummy');
+                if(filteredUsers[0]){
+                    await setTargetManagmentServerUser(filteredUsers[0].mail)
+                    await importUsers(cachedUsers[peerConnectKey] || [])
+                    await importMonitors(cachedMonitors[peerConnectKey] || [])
+                    lostConnections[peerConnectKey] = true
+                    delete(lostServerActionTimeouts[peerConnectKey])
+                    await s.resetAllManagementServers()                    
+                }
+            })
         }
         function setClientKillTimerIfNotAuthenticatedInTime(client){
             client.killTimer = setTimeout(function(){
@@ -109,6 +148,7 @@ module.exports = (s,app,config,lang) => {
                 client.removeListener('message', onAuthenticate);
                 if(Object.keys(config.failoverConnectionKeys).includes(key)){
                     clearTimeout(lostServerActionTimeouts[peerConnectKey])
+                    delete(lostServerActionTimeouts[peerConnectKey])
                     peerConnectKey = `${key}`
                     console.log('Authenticated as Failover for ', peerConnectKey)
                     client.on('message', onAuthenticatedData)
@@ -122,12 +162,7 @@ module.exports = (s,app,config,lang) => {
             }
             async function onAuthenticatedExit(){
                 if(!gracefulExitRequested[peerConnectKey]){
-                    lostServerActionTimeout(peerConnectKey, async () => {
-                        console.log('Failover : Setting up lost Server configurations ', peerConnectKey)
-                        await importUsers(cachedUsers[peerConnectKey] || [])
-                        await importMonitors(cachedMonitors[peerConnectKey] || [])
-                        lostConnections[peerConnectKey] = true
-                    })
+                    setLostServerActionTimeout(peerConnectKey)
                 }
             }
             async function onAuthenticatedData(message){
@@ -153,36 +188,42 @@ module.exports = (s,app,config,lang) => {
                             })
                         }
                     break;
-                    case'importUsers':
-                        const filteredUsers = data.users.filter(user => user.mail !== 'dummy@shinobi.dummy');
-                        if(filteredUsers[0]){
-                            await setTargetManagmentServerUser(filteredUsers[0].mail)
-                            await importUsers(filteredUsers)
-                            await s.connectAllManagementServers()
-                        }
-                    break;
+                    // case'importUsers': // UNUSED
+                    //     const filteredUsers = data.users.filter(user => user.mail !== 'dummy@shinobi.dummy');
+                    //     if(filteredUsers[0]){
+                    //         await setTargetManagmentServerUser(filteredUsers[0].mail)
+                    //         await importUsers(filteredUsers)
+                    //         await s.resetAllManagementServers()
+                    //     }
+                    // break;
                     case'cacheMonitors':
                         cachedMonitors[peerConnectKey] = data.monitors
+                        await saveFailoverState()
                     break;
                     case'updateCachedMonitor':
                         setMonitorInCacheIndex(peerConnectKey,data.monitor.ke,data.monitor.mid,true)
                         updateCachedMonitor(cachedMonitors[peerConnectKey], data.monitor)
+                        await saveFailoverState()
                     break;
                     case'deleteCachedMonitor':
                         setMonitorInCacheIndex(peerConnectKey,data.monitor.ke,data.monitor.mid,false)
                         updateCachedMonitor(cachedMonitors[peerConnectKey], data.monitor, true)
+                        await saveFailoverState()
                     break;
                     case'cacheUsers':
                         for(user of data.users){
                             disableCloudUploaders(user)
                         }
                         cachedUsers[peerConnectKey] = data.users
+                        await saveFailoverState()
                     break;
                     case'updateCachedUser':
                         updateCachedUser(cachedUsers[peerConnectKey], data.user)
+                        await saveFailoverState()
                     break;
                     case'deleteCachedUser':
                         updateCachedUser(cachedUsers[peerConnectKey], data.user, true)
+                        await saveFailoverState()
                     break;
                     case'importMonitors':
                         importMonitors(data.monitors)
@@ -217,6 +258,11 @@ module.exports = (s,app,config,lang) => {
                 theWebSocket.emit('connection', ws, request)
             })
         })
+        // s.onHttpRequestUpgrade('/failoverToFailover',(request, socket, head) => {
+        //     theWebSocketForFailovers.handleUpgrade(request, socket, head, function done(ws) {
+        //         theWebSocketForFailovers.emit('connection', ws, request)
+        //     })
+        // })
         /**
         * API : Superuser : Get Failover Keys
         */
@@ -275,5 +321,8 @@ module.exports = (s,app,config,lang) => {
                 if(setMonitorInCacheIndex(peerConnectKey,monitorConfig.ke,monitorConfig.mid))updateCachedMonitor(cachedMonitors[peerConnectKey], monitorConfig, true)
             })
         })
+        s.onProcessExit(() => {
+            saveFailoverState()
+        });
     }
 }

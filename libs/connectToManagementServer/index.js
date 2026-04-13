@@ -16,7 +16,7 @@ module.exports = (s,config,lang,app) => {
         sendMessageToAllConnectedServers,
         resetAllManagementServers,
     } = require('./utils.js')(s,config,lang)
-    s.connectAllManagementServers = connectAllManagementServers;
+    s.resetAllManagementServers = resetAllManagementServers;
     s.onLoadedUsersAtStartup(() => {
         connectAllManagementServers()
         if(config.managementServer && config.peerConnectKey){

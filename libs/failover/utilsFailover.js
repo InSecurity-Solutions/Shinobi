@@ -22,6 +22,7 @@ module.exports = (s,app,config,lang) => {
         modifyConfiguration,
         getConfiguration
     } = require('../system/utils.js')(config)
+    const failoverStateFilePath = path.join(process.cwd(),'failoverState.json')
     function sendMessage(client, data){
         client.send(bson.serialize(data))
     }
@@ -264,6 +265,19 @@ module.exports = (s,app,config,lang) => {
             }
         }
     }
+    async function saveCurrentState(data){
+        await fs.writeFile(failoverStateFilePath, JSON.stringify(data))
+    }
+    async function loadCurrentState(){
+        const defaultObject = {
+            lostServerActionTimeoutsIndex: []
+        }
+        try{
+            return JSON.parse(await fs.readFile(failoverStateFilePath, 'utf8')) || defaultObject
+        }catch(err){
+            return defaultObject
+        }
+    }
     return {
         importUsers,
         deleteUsers,
@@ -282,5 +296,7 @@ module.exports = (s,app,config,lang) => {
         disableCloudUploaders,
         sendMessage,
         setTargetManagmentServerUser,
+        saveCurrentState,
+        loadCurrentState,
     }
 }
