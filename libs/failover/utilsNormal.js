@@ -234,13 +234,28 @@ module.exports = (s,app,config,lang) => {
     }
     async function addFailoverServer(serverIp, p2pKey){
         const response = { ok: true }
+        const trimmedKey = `${p2pKey}`.trim()
+        const parsedIp = parseNewConnectionAddress(serverIp.trim())
         const currentConfig = await getConfiguration();
         if(!currentConfig.failoverServers)currentConfig.failoverServers = {};
-        currentConfig.failoverServers[serverIp] = p2pKey;
+        let keyInUse = false
+        for(existingIp in currentConfig.failoverServers){
+            const existingKey = currentConfig.failoverServers[existingIp];
+            if(existingIp !== parsedIp && existingKey === trimmedKey)keyInUse = true;
+        }
+        if(keyInUse){
+            response.ok = false;
+            response.msg = lang['Key Already Exists']
+            return response
+        }
+        currentConfig.failoverServers[parsedIp] = trimmedKey;
         config = Object.assign(config, { failoverServers: currentConfig.failoverServers })
         const configError = await modifyConfiguration(currentConfig)
+        response.host = parsedIp;
+        response.key = trimmedKey;
         if(configError){
             response.ok = false;
+            response.msg = lang['Failed to Save']
             response.err = configError
             s.systemLog(configError)
         }

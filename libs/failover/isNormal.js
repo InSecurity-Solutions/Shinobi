@@ -48,7 +48,9 @@ module.exports = (s,app,config,lang) => {
                 const failoverServer = req.body.failoverServer;
                 const peerConnectKey = req.body.peerConnectKey;
                 const response = await addFailoverServer(failoverServer, peerConnectKey)
-                await connectToFailover({ host: failoverServer, key: peerConnectKey })
+                await connectToFailover({ host: response.host, key: response.key })
+                response.failoverServer = response.host
+                response.peerConnectKey = response.key
                 s.closeJsonResponse(res,response)
             },res,req)
         })

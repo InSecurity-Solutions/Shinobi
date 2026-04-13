@@ -76,7 +76,7 @@ $(document).ready(function(){
                 title: lang['Settings Changed'],
                 text: lang.failoverServersSaved,
             })
-            drawServerRow(formValues)
+            drawServerRow(response)
         }
         return false
     })
