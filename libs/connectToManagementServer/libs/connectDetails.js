@@ -89,6 +89,17 @@ module.exports = (s,config,lang) => {
         const apiKey = await getFirstApiKey(user.ke, user.uid)
         return { groupKey: user.ke, apiKey }
     }
+    async function getFirstAdminUser(){
+        const { rows } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Users",
+            limit: 1,
+        });
+        let user = rows[0];
+        if(!user)user = await createDummyAdminUser();
+        return user
+    }
     async function getAdminApiKey(targetUser){
         if(!targetUser){
             return await getFirstAdminApiKey()
@@ -103,7 +114,7 @@ module.exports = (s,config,lang) => {
             limit: 1,
         });
         let user = rows[0];
-        if(!user)user = await getFirstAdminApiKey();
+        if(!user)user = await getFirstAdminUser();
         const apiKey = await getFirstApiKey(user.ke, user.uid)
         return { groupKey: user.ke, apiKey }
     }
