@@ -14,6 +14,7 @@ module.exports = (s,config,lang,app) => {
         connectAllManagementServers,
         migrateOldConfiguration,
         sendMessageToAllConnectedServers,
+        resetAllManagementServers,
     } = require('./utils.js')(s,config,lang)
     s.connectAllManagementServers = connectAllManagementServers;
     s.onLoadedUsersAtStartup(() => {
@@ -58,6 +59,17 @@ module.exports = (s,config,lang,app) => {
             const peerConnectKey = req.body.peerConnectKey;
             const response = await removeManagementServer(managementServer, peerConnectKey)
             await disconnectFromManagmentServer(managementServer, peerConnectKey)
+            s.closeJsonResponse(res,response)
+        },res,req)
+    })
+
+    /**
+    * API : Restart Management Connections
+    */
+    app.get(config.webPaths.superApiPrefix+':auth/mgmt/restartConnections', async function (req,res){
+        s.superAuth(req.params,async (resp) => {
+            const response = { ok: true }
+            await resetAllManagementServers()
             s.closeJsonResponse(res,response)
         },res,req)
     })
