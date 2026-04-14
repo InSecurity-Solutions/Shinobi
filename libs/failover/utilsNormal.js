@@ -131,8 +131,10 @@ module.exports = (s,app,config,lang) => {
             });
         }
     }
-    function sendFailoverServerCache(clientConnection, serverIp){
-        sendMessage(clientConnection, { f: 'cache_other_failovers', allServers: failoverServerCache, serverIp })
+    function sendFailoverServerCache(){
+        runOnFailoverConnections((host, serverConnection) => {
+            sendMessage(serverConnection, { f: 'cache_other_failovers', allServers: failoverServerCache, serverIp: host })
+        })
     }
     function connectToFailover({ host, key }){
         clearTimeout(reconnectTimeouts[host])
@@ -167,7 +169,7 @@ module.exports = (s,app,config,lang) => {
                     await cacheUsers(clientConnection)
                     await cacheMonitors(clientConnection)
                     sendMessage(clientConnection, { f: 'init_complete' })
-                    sendFailoverServerCache(clientConnection, parsedIp)
+                    sendFailoverServerCache()
                     s.debugLog('Initialized Failover at ', host)
                 break;
                 case'insertEvents':
@@ -200,12 +202,14 @@ module.exports = (s,app,config,lang) => {
         return failoverServerConnections[host]
     }
     function closeFailoverConnection(host){
+        sendFailoverServerCache()
         if(failoverServerConnections[host]){
             return new Promise(function(resolve){
                 try{
                     sendMessage(failoverServerConnections[host],{ f: 'exit' })
                     failoverServerConnections[host].onclose = (event) => {
                         delete(failoverServerConnections[host])
+                        delete(failoverServerCache[host])
                         resolve()
                     }
                     failoverServerConnections[host].terminate()
