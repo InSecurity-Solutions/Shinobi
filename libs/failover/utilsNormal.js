@@ -5,6 +5,7 @@ const fs = require('fs').promises
 const { createWebSocketClient } = require('../basic/websocketTools.js')
 module.exports = (s,app,config,lang) => {
     const failoverServerConnections = {}
+    const failoverServerCache = {}
     const writeStreams = {}
     const reconnectTimeouts = {}
     const {
@@ -130,6 +131,9 @@ module.exports = (s,app,config,lang) => {
             });
         }
     }
+    function sendFailoverServerCache(clientConnection, serverIp){
+        sendMessage(clientConnection, { f: 'cache_other_failovers', allServers: failoverServerCache, serverIp })
+    }
     function connectToFailover({ host, key }){
         clearTimeout(reconnectTimeouts[host])
         const parsedIp = parseNewConnectionAddress(host)
@@ -141,6 +145,7 @@ module.exports = (s,app,config,lang) => {
                 failoverServerConnections[host].terminate()
             }catch(err){}
             delete(failoverServerConnections[host])
+            delete(failoverServerCache[host])
             clearTimeout(reconnectTimeouts[host])
             reconnectTimeouts[host] = setTimeout(function(){
                 connectToFailover({ host, key })
@@ -162,6 +167,7 @@ module.exports = (s,app,config,lang) => {
                     await cacheUsers(clientConnection)
                     await cacheMonitors(clientConnection)
                     sendMessage(clientConnection, { f: 'init_complete' })
+                    sendFailoverServerCache(clientConnection, parsedIp)
                     s.debugLog('Initialized Failover at ', host)
                 break;
                 case'insertEvents':
@@ -179,6 +185,7 @@ module.exports = (s,app,config,lang) => {
             }
         })
         failoverServerConnections[host] = clientConnection
+        failoverServerCache[host] = { time: new Date(), key };
     }
     function getFailoverConnections(){
         return failoverServerConnections

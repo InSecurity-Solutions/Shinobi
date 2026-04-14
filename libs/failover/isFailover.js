@@ -28,6 +28,8 @@ module.exports = async (s,app,config,lang) => {
         const eventsTransmitting = {}
         const cloudRecordsTransmitting = {}
         const normalServerConnections = {}
+        const failoverServerCache = {}
+        let thisDetectedServerIp = null
         const allowCloudUploads = config.failoverAllowCloudUploaders;
         async function loadFailoverState(){
             const data = await loadCurrentState()
@@ -46,7 +48,6 @@ module.exports = async (s,app,config,lang) => {
             gracefulExitRequested = {},
         } = await loadFailoverState();
         const theWebSocket = createWebSocketServer()
-        // const theWebSocketForFailovers = createWebSocketServer()
         function saveFailoverState(){
             return saveCurrentState({
                 time: new Date(),
@@ -79,6 +80,7 @@ module.exports = async (s,app,config,lang) => {
         function setLostServerActionTimeout(peerConnectKey){
             lostServerActionTimeout(peerConnectKey, async () => {
                 console.log('Failover : Setting up lost Server configurations ', peerConnectKey)
+                // need to send signal to other Failover servers not to do the same thing if one is already doing
                 const filteredUsers = (cachedUsers[peerConnectKey] || []).filter(user => user.mail !== 'dummy@shinobi.dummy');
                 if(filteredUsers[0]){
                     await setTargetManagmentServerUser(filteredUsers[0].mail)
@@ -86,7 +88,7 @@ module.exports = async (s,app,config,lang) => {
                     await importMonitors(cachedMonitors[peerConnectKey] || [])
                     lostConnections[peerConnectKey] = true
                     delete(lostServerActionTimeouts[peerConnectKey])
-                    await s.resetAllManagementServers()                    
+                    await s.resetAllManagementServers()
                 }
             })
         }
@@ -161,9 +163,20 @@ module.exports = async (s,app,config,lang) => {
                 }
             }
             async function onAuthenticatedExit(){
-                if(!gracefulExitRequested[peerConnectKey]){
+                if(!gracefulExitRequested[peerConnectKey] && checkIfFirstConnectedFailoverServer(peerConnectKey)){
                     setLostServerActionTimeout(peerConnectKey)
                 }
+            }
+            function checkIfFirstConnectedFailoverServer(peerConnectKey) {
+                let oldestServer = null;
+                for (const serverIp in failoverServerCache[peerConnectKey]) {
+                    const aServer = failoverServerCache[peerConnectKey][serverIp];
+                    if (oldestServer === null || aServer.time < oldestServer.time) {
+                        oldestServer = serverIp;
+                    }
+                }
+                if(oldestServer === thisDetectedServerIp)return true;
+                return false;
             }
             async function onAuthenticatedData(message){
                 const data = bson.deserialize(Buffer.from(message))
@@ -171,6 +184,10 @@ module.exports = async (s,app,config,lang) => {
                     case'exit':
                         console.log('Failover : Requested Graceful Exit ', peerConnectKey)
                         gracefulExitRequested[peerConnectKey] = true
+                    break;
+                    case'cache_other_failovers':
+                        thisDetectedServerIp = data.serverIp
+                        failoverServerCache[peerConnectKey] = data.allServers;
                     break;
                     case'init_complete':
                         console.log('Initialized as Failover for ', peerConnectKey)
@@ -185,6 +202,7 @@ module.exports = async (s,app,config,lang) => {
                                 await beginCloudUploadRecordsTransmission()
                                 await deleteMonitors(cachedMonitors[peerConnectKey] || [])
                                 await deleteUsers(cachedUsers[peerConnectKey] || [])
+                                await s.resetAllManagementServers()
                             })
                         }
                     break;
@@ -258,11 +276,6 @@ module.exports = async (s,app,config,lang) => {
                 theWebSocket.emit('connection', ws, request)
             })
         })
-        // s.onHttpRequestUpgrade('/failoverToFailover',(request, socket, head) => {
-        //     theWebSocketForFailovers.handleUpgrade(request, socket, head, function done(ws) {
-        //         theWebSocketForFailovers.emit('connection', ws, request)
-        //     })
-        // })
         /**
         * API : Superuser : Get Failover Keys
         */
