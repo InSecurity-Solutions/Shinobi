@@ -1,5 +1,7 @@
 {
   "port": 8080,
+  "isFailover": false,
+  "failoverAllowCloudUploaders": false,
   "debugLog": false,
   "enableFaceManager": false,
   "videosDir": "__DIR__/videos",

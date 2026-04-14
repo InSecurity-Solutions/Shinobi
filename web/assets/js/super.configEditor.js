@@ -3,6 +3,16 @@ $(document).ready(function () {
     "title": lang["Main Configuration"],
     "type": "object",
     "properties": {
+      "isFailover": {
+        "title": lang["Enable as Failover Server"],
+        "type": "boolean",
+        "default": false
+      },
+      "failoverAllowCloudUploaders": {
+        "title": lang["Enable Failover Cloud Uploads"],
+        "type": "boolean",
+        "default": false
+      },
       "debugLog": {
         "title": lang["Enable Debug Log"],
         "type": "boolean",

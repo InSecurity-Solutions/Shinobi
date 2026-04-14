@@ -2055,6 +2055,8 @@
    "Default is Global value": "Default is Global value",
    "rejectUnauth": "Ignore server certificate",
    "Central Management" : "Central Management",
+   "Enable as Failover Server" : "Enable as Failover Server",
+   "Enable Failover Cloud Uploads" : "Enable Failover Cloud Uploads",
    "Failover Servers" : "Failover Servers",
    "Failover Keys" : "Failover Keys",
    "failoverServersDescription" : "Connect to your failover servers here. You need to put the IP Address and Port of your failover Shinobi server here. Server Key must be created on the failover server. To set a Shinobi server as a Failover server you need to add <code>\"isFailover\": true,</code> to the conf.json and Restart the server.",
