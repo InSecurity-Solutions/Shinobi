@@ -542,17 +542,21 @@ module.exports = function(s,config,lang){
             service: 'ptz',
             options: { "ProfileToken": profileToken }
         }));
-        const presets = response.responseFromDevice ? response.responseFromDevice.GetPresetsResponse.Preset.slice(0, numberOf).map((item) => {
-            return { token: item.$.token, name: item.Name }
-        }) : [];
-        if(asObject){
-            const theObject = {};
-            for(preset of presets){
-                theObject[preset.token] = preset
+        try{
+            const presets = response.responseFromDevice ? response.responseFromDevice.GetPresetsResponse.Preset.slice(0, numberOf).map((item) => {
+                return { token: item.$.token, name: item.Name }
+            }) : [];
+            if(asObject){
+                const theObject = {};
+                for(preset of presets){
+                    theObject[preset.token] = preset
+                }
+                return theObject
             }
-            return theObject
+            return presets
+        }catch(err){
+            return asObject ? {} : []
         }
-        return presets
     }
     const goToPreset = async (onvifDevice, presetToken, speed = 1) => {
         const response = (await runOnvifMethod({
