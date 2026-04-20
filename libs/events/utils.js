@@ -196,6 +196,7 @@ module.exports = (s,config,lang) => {
             Object.keys(filters).forEach(function(key){
                 var conditionChain = {}
                 var dFilter = filters[key]
+                const haltState = dFilter.actions.halt
                 if(dFilter.enabled === '0')return;
                 var numberOfOpenAndCloseBrackets = 0
                 dFilter.where.forEach(function(condition,place){
@@ -214,7 +215,7 @@ module.exports = (s,config,lang) => {
                     var modifyFilters = function(toCheck,matrixPosition){
                         var param = toCheck[condition.p1]
                         var pass = function(){
-                            if(matrixPosition && dFilter.actions.halt === '1'){
+                            if(matrixPosition && haltState === '1'){
                                 delete(d.details.matrices[matrixPosition])
                             }else{
                                 conditionChain[place].ok = true
@@ -292,8 +293,8 @@ module.exports = (s,config,lang) => {
                     }
                 })
                 if(eval(validationString.join(' '))){
-                    if(dFilter.actions.halt !== '1'){
-                        delete(dFilter.actions.halt)
+                    if(haltState === '0' || !haltState){
+                        delete(haltState)
                         Object.keys(dFilter.actions).forEach(function(key){
                             var value = dFilter.actions[key]
                             filter[key] = parseValue(key,value)
@@ -301,16 +302,16 @@ module.exports = (s,config,lang) => {
                         if(dFilter.actions.record === '1'){
                             filter.forceRecord = true
                         }
-                    }else{
+                    }else if(haltState === '1'){
                         filter.halt = true
                     }
                 }else{
-                    if(dFilter.actions.haltOnFail === '1'){
+                    if(haltState === '2'){
                         filter.halt = true
                     }
                 }
             })
-            if(d.details.matrices && d.details.matrices.length === 0 && d.details.reason !== 'motion' || filter.halt === true){
+            if(filter.halt === true || (d.details.matrices && d.details.matrices.length === 0 && d.details.reason !== 'motion')){
                 return false
             }else if(hasMatrices(d.details)){
                 var reviewedMatrix = []

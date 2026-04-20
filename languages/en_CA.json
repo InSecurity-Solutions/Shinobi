@@ -1997,6 +1997,8 @@
    "deleteImage": "Delete Image",
    "deleteImageText": "Are you sure you want to delete this image? it will not be recoverable.",
    "Drop Event": "Drop Event",
+   "On Condition Succeed": "On Condition Succeed",
+   "On Condition Failure": "On Condition Failure",
    "Detector Command": "Detector Command",
    "Use Record Method": "Use Record Method",
    "Main Configuration": "Main Configuration",
