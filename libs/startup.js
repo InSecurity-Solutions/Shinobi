@@ -1,9 +1,5 @@
-
 var fs = require('fs');
-var moment = require('moment');
-var crypto = require('crypto');
 var exec = require('child_process').exec;
-var execSync = require('child_process').execSync;
 module.exports = function(s,config,lang,io){
     const {
         scanForOrphanedVideos
@@ -15,8 +11,15 @@ module.exports = function(s,config,lang,io){
     const {
         checkForStaticUsers
     } = require('./user/startup.js')(s,config,lang,io)
+    const {
+        loadCloudDiskUseForUser,
+        loadAddStorageDiskUseForUser,
+        loadDiskUseForUser,
+    } = require('./user/utils.js')(s,config,lang)
     return new Promise((resolve, reject) => {
         var checkedAdminUsers = {}
+        var loadedAccounts = []
+        var foundMonitors = []
         console.log('FFmpeg version : '+s.ffmpegVersion)
         console.log('Node.js version : '+process.version)
         s.processReady = function(){
@@ -29,7 +32,7 @@ module.exports = function(s,config,lang,io){
             })
             process.send('ready')
         }
-        var checkForTerminalCommands = function(callback){
+        function checkForTerminalCommands(callback){
             var next = function(){
                 if(callback)callback()
             }
@@ -47,9 +50,7 @@ module.exports = function(s,config,lang,io){
                 next()
             }
         }
-        var loadedAccounts = []
-        var foundMonitors = []
-        var loadMonitors = async function(callback){
+        async function loadMonitors(callback){
             for (let i = 0; i < s.beforeMonitorsLoadedOnStartupExtensions.length; i++) {
                 await s.beforeMonitorsLoadedOnStartupExtensions[i]()
             }
@@ -107,7 +108,7 @@ module.exports = function(s,config,lang,io){
                 }
             })
         }
-        var checkForOrphanedVideos = async function(callback){
+        async function checkForOrphanedVideos(callback){
             var monitors = foundMonitors
             if(monitors && monitors[0]){
                 var loadCompleted = 0
@@ -139,224 +140,7 @@ module.exports = function(s,config,lang,io){
                 callback()
             }
         }
-        var loadDiskUseForUser = function(user,callback){
-            s.systemLog(lang.startUpText0, user.mail)
-            var userDetails = JSON.parse(user.details)
-            s.group[user.ke].sizeLimit = parseFloat(userDetails.size) || 10000
-            s.group[user.ke].sizeLimitVideoPercent = parseFloat(userDetails.size_video_percent) || 90
-            s.group[user.ke].sizeLimitTimelapseFramesPercent = parseFloat(userDetails.size_timelapse_percent) || 5
-            s.group[user.ke].sizeLimitFileBinPercent = parseFloat(userDetails.size_filebin_percent) || 5
-            s.knexQuery({
-                action: "select",
-                columns: "*",
-                table: "Videos",
-                where: [
-                    ['ke','=',user.ke],
-                    ['status','!=',0],
-                ]
-            },function(err,videos) {
-                s.knexQuery({
-                    action: "select",
-                    columns: "*",
-                    table: "Timelapse Frames",
-                    where: [
-                        ['ke','=',user.ke],
-                    ]
-                },function(err,timelapseFrames) {
-                    s.knexQuery({
-                        action: "select",
-                        columns: "*",
-                        table: "Files",
-                        where: [
-                            ['ke','=',user.ke],
-                        ]
-                    },function(err,files) {
-                        var usedSpaceVideos = 0
-                        var usedSpaceTimelapseFrames = 0
-                        var usedSpaceFilebin = 0
-                        var addStorageData = {
-                            files: [],
-                            videos: [],
-                            timelapseFrames: [],
-                        }
-                        if(videos && videos[0]){
-                            videos.forEach(function(video){
-                                video.details = s.parseJSON(video.details)
-                                if(!video.details.dir){
-                                    usedSpaceVideos += video.size
-                                }else{
-                                    addStorageData.videos.push(video)
-                                }
-                            })
-                        }
-                        if(timelapseFrames && timelapseFrames[0]){
-                            timelapseFrames.forEach(function(frame){
-                                frame.details = s.parseJSON(frame.details)
-                                if(!frame.details.dir){
-                                    usedSpaceTimelapseFrames += frame.size
-                                }else{
-                                    addStorageData.timelapseFrames.push(frame)
-                                }
-                            })
-                        }
-                        if(files && files[0]){
-                            files.forEach(function(file){
-                                file.details = s.parseJSON(file.details)
-                                if(!file.details.dir){
-                                    usedSpaceFilebin += file.size
-                                }else{
-                                    addStorageData.files.push(file)
-                                }
-                            })
-                        }
-                        s.group[user.ke].usedSpace = (usedSpaceVideos + usedSpaceTimelapseFrames + usedSpaceFilebin) / 1048576
-                        s.group[user.ke].usedSpaceVideos = usedSpaceVideos / 1048576
-                        s.group[user.ke].usedSpaceFilebin = usedSpaceFilebin / 1048576
-                        s.group[user.ke].usedSpaceTimelapseFrames = usedSpaceTimelapseFrames / 1048576
-                        loadAddStorageDiskUseForUser(user,addStorageData,function(){
-                            callback()
-                        })
-                    })
-                })
-            })
-        }
-        var loadCloudDiskUseForUser = function(user,callback){
-            var userDetails = JSON.parse(user.details)
-            user.cloudDiskUse = {}
-            user.size = 0
-            user.limit = userDetails.size
-            s.cloudDisksLoaded.forEach(function(storageType){
-                user.cloudDiskUse[storageType] = {
-                    usedSpace : 0,
-                    usedSpaceVideos : 0,
-                    usedSpaceTimelapseFrames : 0,
-                    firstCount : 0
-                }
-                if(s.cloudDiskUseStartupExtensions[storageType])s.cloudDiskUseStartupExtensions[storageType](user,userDetails)
-            })
-            var loadCloudVideos = function(callback){
-                s.knexQuery({
-                    action: "select",
-                    columns: "*",
-                    table: "Cloud Videos",
-                    where: [
-                        ['ke','=',user.ke],
-                        ['status','!=',0],
-                    ]
-                },function(err,videos) {
-                    if(videos && videos[0]){
-                        videos.forEach(function(video){
-                            var storageType = video.type || JSON.parse(video.details).type
-                            if(!storageType)storageType = 's3'
-                            var videoSize = video.size / 1048576
-                            user.cloudDiskUse[storageType].usedSpace += videoSize
-                            user.cloudDiskUse[storageType].usedSpaceVideos += videoSize
-                            ++user.cloudDiskUse[storageType].firstCount
-                        })
-                        s.cloudDisksLoaded.forEach(function(storageType){
-                            var firstCount = user.cloudDiskUse[storageType].firstCount
-                            // s.systemLog(lang.startUpText1, user.mail+' : '+firstCount,storageType,user.cloudDiskUse[storageType].usedSpace)
-                            delete(user.cloudDiskUse[storageType].firstCount)
-                        })
-                    }
-                    callback()
-                })
-            }
-            var loadCloudTimelapseFrames = function(callback){
-                s.knexQuery({
-                    action: "select",
-                    columns: "*",
-                    table: "Cloud Timelapse Frames",
-                    where: [
-                        ['ke','=',user.ke],
-                    ]
-                },function(err,frames) {
-                    if(frames && frames[0]){
-                        frames.forEach(function(frame){
-                            try{
-                                var storageType = JSON.parse(frame.details).type
-                                if(!storageType)storageType = 's3'
-                                var frameSize = frame.size / 1048576
-                                user.cloudDiskUse[storageType].usedSpace += frameSize
-                                user.cloudDiskUse[storageType].usedSpaceTimelapseFrames += frameSize
-                            }catch(err){
-                                s.debugLog(err)
-                            }
-                        })
-                    }
-                    callback()
-                })
-            }
-            loadCloudVideos(function(){
-                loadCloudTimelapseFrames(function(){
-                    s.group[user.ke].cloudDiskUse = user.cloudDiskUse
-                    callback()
-                })
-            })
-        }
-        var loadAddStorageDiskUseForUser = function(user,data,callback){
-            var videos = data.videos
-            var timelapseFrames = data.timelapseFrames
-            var files = data.files
-            var userDetails = JSON.parse(user.details)
-            var userAddStorageData = s.parseJSON(userDetails.addStorage) || {}
-            var currentStorageNumber = 0
-            var readStorageArray = function(){
-                var storage = s.listOfStorage[currentStorageNumber]
-                if(!storage){
-                    //done all checks, move on to next user
-                    callback()
-                    return
-                }
-                var path = storage.value
-                if(path === ''){
-                    ++currentStorageNumber
-                    readStorageArray()
-                    return
-                }
-                var storageId = path
-                var storageData = userAddStorageData[storageId] || {}
-                if(!s.group[user.ke].addStorageUse[storageId])s.group[user.ke].addStorageUse[storageId] = {}
-                var storageIndex = s.group[user.ke].addStorageUse[storageId]
-                storageIndex.name = storage.name
-                storageIndex.path = path
-                storageIndex.usedSpace = 0
-                storageIndex.sizeLimit = parseFloat(storageData.limit) || parseFloat(userDetails.size) || 10000
-                storageIndex.videoPercent = parseFloat(storageData.videoPercent) || parseFloat(userDetails.size_video_percent) || 95
-                storageIndex.timelapsePercent = parseFloat(storageData.timelapsePercent) || parseFloat(userDetails.size_timelapse_percent) || 5
-                var usedSpaceVideos = 0
-                var usedSpaceTimelapseFrames = 0
-                var usedSpaceFilebin = 0
-                if(videos && videos[0]){
-                    videos.forEach(function(video){
-                        if(video.details.dir === storage.value){
-                            usedSpaceVideos += video.size
-                        }
-                    })
-                }
-                if(timelapseFrames && timelapseFrames[0]){
-                    timelapseFrames.forEach(function(frame){
-                        if(frame.details.dir === storage.value){
-                            usedSpaceTimelapseFrames += frame.size
-                        }
-                    })
-                }
-                if(files && files[0]){
-                    files.forEach(function(file){
-                        usedSpaceFilebin += file.size
-                    })
-                }
-                storageIndex.usedSpace = (usedSpaceVideos + usedSpaceTimelapseFrames + usedSpaceFilebin) / 1048576
-                storageIndex.usedSpaceVideos = usedSpaceVideos / 1048576
-                storageIndex.usedSpaceFilebin = usedSpaceFilebin / 1048576
-                storageIndex.usedSpaceTimelapseFrames = usedSpaceTimelapseFrames / 1048576
-                // s.systemLog(user.mail+' : '+path+' : '+videos.length,storageIndex.usedSpace)
-                ++currentStorageNumber
-                readStorageArray()
-            }
-            readStorageArray()
-        }
-        var loadAdminUsers = function(callback){
+        function loadAdminUsers(callback){
             //get current disk used for each isolated account (admin user) on startup
             s.knexQuery({
                 action: "select",
