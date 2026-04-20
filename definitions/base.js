@@ -1325,8 +1325,12 @@ module.exports = function(s,config,lang){
                             "selected": true
                          },
                          {
-                            "name": lang.Yes,
+                            "name": lang['On Condition Succeed'],
                             "value": "1",
+                         },
+                         {
+                            "name": lang['On Condition Failure'],
+                            "value": "2",
                          }
                       ]
                     },
