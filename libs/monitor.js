@@ -675,7 +675,7 @@ module.exports = function(s,config,lang){
             }else{
                 let monitorConfig = copyMonitorConfiguration(form.ke,form.mid)
                 await s.camera('stop',monitorConfig);
-                await asyncSetTimeout(2500)
+                // await asyncSetTimeout(2500)
                 await s.camera(form.mode,monitorConfig);
             }
             s.tx(txData,'STR_'+form.ke)
