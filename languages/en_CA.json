@@ -2055,6 +2055,8 @@
    "Default is Global value": "Default is Global value",
    "rejectUnauth": "Ignore server certificate",
    "Central Management" : "Central Management",
+   "Simultaneous Monitor Start" : "Simultaneous Monitor Start",
+   "Monitor Start Delay" : "Monitor Start Delay",
    "Enable as Failover Server" : "Enable as Failover Server",
    "Enable Failover Cloud Uploads" : "Enable Failover Cloud Uploads",
    "Failover Servers" : "Failover Servers",

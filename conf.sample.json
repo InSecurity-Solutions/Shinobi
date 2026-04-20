@@ -2,6 +2,8 @@
   "port": 8080,
   "isFailover": false,
   "failoverAllowCloudUploaders": false,
+  "monitorStartQueueSize": 1,
+  "monitorStartQueueDelay": 0.5,
   "debugLog": false,
   "enableFaceManager": false,
   "videosDir": "__DIR__/videos",

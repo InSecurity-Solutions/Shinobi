@@ -13,6 +13,16 @@ $(document).ready(function () {
         "type": "boolean",
         "default": false
       },
+      "monitorStartQueueSize": {
+        "title": lang["Simultaneous Monitor Start"],
+        "type": "integer",
+        "default": 1
+      },
+      "monitorStartQueueDelay": {
+        "title": lang["Monitor Start Delay"],
+        "type": "number",
+        "default": 0.5
+      },
       "debugLog": {
         "title": lang["Enable Debug Log"],
         "type": "boolean",
