@@ -93,7 +93,7 @@ module.exports = function(s,config,lang,io){
                                     code: 5
                                 });
                                 const monObj = Object.assign({},monitor,{id : monitor.mid})
-                                await s.camera('stop',monObj);
+                                // await s.camera('stop',monObj);
                                 if(!config.safeMode)await s.camera(monitor.mode,monObj);
                                 checkAnother()
                             },1000)
