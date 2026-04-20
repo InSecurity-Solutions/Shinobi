@@ -21,6 +21,7 @@ module.exports = async (s,app,config,lang) => {
             setTargetManagmentServerUser,
             saveCurrentState,
             loadCurrentState,
+            updateCachedMonitor,
         } = require('./utilsFailover.js')(s,app,config,lang)
         const reconnectedLostServerActionTimeouts = {}
         const lostServerActionTimeouts = {}
