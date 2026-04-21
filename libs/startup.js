@@ -20,6 +20,7 @@ module.exports = function(s,config,lang,io){
         var checkedAdminUsers = {}
         var loadedAccounts = []
         var foundMonitors = []
+        var loadedMonitors = []
         console.log('FFmpeg version : '+s.ffmpegVersion)
         console.log('Node.js version : '+process.version)
         s.processReady = function(){
@@ -60,7 +61,7 @@ module.exports = function(s,config,lang,io){
                 action: "select",
                 columns: "*",
                 table: "Monitors",
-            },function(err,monitors) {
+            }, function(err,monitors) {
                 foundMonitors = monitors.map(item => {
                     item.details = JSON.parse(item.details)
                     return item
@@ -70,7 +71,7 @@ module.exports = function(s,config,lang,io){
                     var didNotLoad = 0
                     var loadCompleted = 0
                     var orphanedVideosForMonitors = {}
-                    var loadMonitor = function(monitor){
+                    var loadMonitor = async function(monitor){
                         const checkAnother = function(){
                             ++loadCompleted
                             if(loadCompleted <= s.cameraCount && monitors[loadCompleted]){
@@ -81,7 +82,8 @@ module.exports = function(s,config,lang,io){
                             }
                         }
                         if(checkedAdminUsers[monitor.ke]){
-                            setTimeout(async function(){
+                            // setTimeout(async function(){
+                                loadedMonitors.push(monitor)
                                 if(!orphanedVideosForMonitors[monitor.ke])orphanedVideosForMonitors[monitor.ke] = {}
                                 if(!orphanedVideosForMonitors[monitor.ke][monitor.mid])orphanedVideosForMonitors[monitor.ke][monitor.mid] = 0
                                 s.initiateMonitorObject(monitor)
@@ -96,7 +98,7 @@ module.exports = function(s,config,lang,io){
                                 // await s.camera('stop',monObj);
                                 if(!config.safeMode)await s.camera(monitor.mode,monObj);
                                 checkAnother()
-                            },1000)
+                            // },1000)
                         }else{
                             ++didNotLoad
                             checkAnother()
@@ -109,7 +111,7 @@ module.exports = function(s,config,lang,io){
             })
         }
         async function checkForOrphanedVideos(callback){
-            var monitors = foundMonitors
+            var monitors = loadedMonitors
             if(monitors && monitors[0]){
                 var loadCompleted = 0
                 var orphanedVideosForMonitors = {}
