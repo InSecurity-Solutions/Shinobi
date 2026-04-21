@@ -182,7 +182,11 @@ module.exports = (s,app,config,lang) => {
                     insertVideoChunk(data.video, data.data)
                 break;
                 case'insertVideoComplete':
-                    getWriteStream(data.filePath).end()
+                    try{
+                        getWriteStream(data.filePath).end()
+                    }catch(err){
+                        console.log(err)
+                    }
                 break;
             }
         })
@@ -310,5 +314,7 @@ module.exports = (s,app,config,lang) => {
         getFailoverServers,
         addFailoverServer,
         removeFailoverServer,
+        closeFailoverConnection,
+        parseNewConnectionAddress,
     }
 }

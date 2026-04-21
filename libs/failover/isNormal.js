@@ -9,6 +9,8 @@ module.exports = (s,app,config,lang) => {
             removeFailoverServer,
             updateCachedMonitor,
             updateCachedUser,
+            closeFailoverConnection,
+            parseNewConnectionAddress,
         } = require('./utilsNormal.js')(s,app,config,lang)
         s.onMonitorSave((monitorConfig) => {
             runOnFailoverConnections((host, connectionToFailover) => {
@@ -60,10 +62,10 @@ module.exports = (s,app,config,lang) => {
         */
         app.post(config.webPaths.superApiPrefix+':auth/failover/disconnect', async function (req,res){
             s.superAuth(req.params,async (resp) => {
-                const failoverServer = req.body.failoverServer;
+                const failoverServer = parseNewConnectionAddress(req.body.failoverServer);
                 const peerConnectKey = req.body.peerConnectKey;
                 const response = await removeFailoverServer(failoverServer, peerConnectKey)
-                await disconnectFromManagmentServer(failoverServer, peerConnectKey)
+                await closeFailoverConnection(failoverServer)
                 s.closeJsonResponse(res,response)
             },res,req)
         })
