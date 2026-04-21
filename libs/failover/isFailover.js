@@ -84,12 +84,14 @@ module.exports = async (s,app,config,lang) => {
                 // need to send signal to other Failover servers not to do the same thing if one is already doing
                 const filteredUsers = (cachedUsers[peerConnectKey] || []).filter(user => user.mail !== 'dummy@shinobi.dummy');
                 if(filteredUsers[0]){
+                    lostConnections[peerConnectKey] = true
+                    await saveFailoverState()
                     await setTargetManagmentServerUser(filteredUsers[0].mail)
                     await importUsers(cachedUsers[peerConnectKey] || [])
-                    await importMonitors(cachedMonitors[peerConnectKey] || [])
-                    lostConnections[peerConnectKey] = true
-                    delete(lostServerActionTimeouts[peerConnectKey])
                     await s.resetAllManagementServers()
+                    await importMonitors(cachedMonitors[peerConnectKey] || [])
+                    delete(lostServerActionTimeouts[peerConnectKey])
+                    await saveFailoverState()
                 }
             })
         }
