@@ -26,8 +26,10 @@ module.exports = (s,app,config,lang) => {
     function sendMessage(client, data){
         try{
             client.send(bson.serialize(data))
+            return true
         }catch(err){
             console.log('Failover : Failure to sendMessage', data, err)
+            return false
         }
     }
     async function importMonitors(monitors, peerConnectKey, lostConnections){
@@ -90,7 +92,12 @@ module.exports = (s,app,config,lang) => {
             const videoStream = createReadStream(filePath, { highWaterMark: 20 });
             videoStream
             .on('data',function(data){
-                sendMessage(connectionToNormal,{ f: 'insertVideoChunk', video, data, chunkNumber });
+                const ok = sendMessage(connectionToNormal,{ f: 'insertVideoChunk', video, data, chunkNumber });
+                if(!ok){
+                    response.ok = false
+                    response.err = 'Lost Connection'
+                    try{ videoStream.destroy() }catch(err){ }
+                }
                 ++chunkNumber
             })
             .on('error',function(err){
