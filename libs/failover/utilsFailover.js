@@ -24,7 +24,11 @@ module.exports = (s,app,config,lang) => {
     } = require('../system/utils.js')(config)
     const failoverStateFilePath = path.join(process.cwd(),'failoverState.json')
     function sendMessage(client, data){
-        client.send(bson.serialize(data))
+        try{
+            client.send(bson.serialize(data))
+        }catch(err){
+            console.log('Failover : Failure to sendMessage', data, err)
+        }
     }
     async function importMonitors(monitors){
         for(const monitor of monitors){
