@@ -85,12 +85,12 @@ module.exports = async (s,app,config,lang) => {
                 const filteredUsers = (cachedUsers[peerConnectKey] || []).filter(user => user.mail !== 'dummy@shinobi.dummy');
                 if(filteredUsers[0]){
                     lostConnections[peerConnectKey] = true
+                    delete(lostServerActionTimeouts[peerConnectKey])
                     await saveFailoverState()
                     await setTargetManagmentServerUser(filteredUsers[0].mail)
                     await importUsers(cachedUsers[peerConnectKey] || [])
                     await s.resetAllManagementServers()
-                    await importMonitors(cachedMonitors[peerConnectKey] || [])
-                    delete(lostServerActionTimeouts[peerConnectKey])
+                    await importMonitors(cachedMonitors[peerConnectKey] || [], peerConnectKey, lostConnections)
                     await saveFailoverState()
                 }
             })
@@ -245,9 +245,6 @@ module.exports = async (s,app,config,lang) => {
                     case'deleteCachedUser':
                         updateCachedUser(cachedUsers[peerConnectKey], data.user, true)
                         await saveFailoverState()
-                    break;
-                    case'importMonitors':
-                        importMonitors(data.monitors)
                     break;
                     case'deleteMonitors':
                         deleteMonitors(data.monitors, false)

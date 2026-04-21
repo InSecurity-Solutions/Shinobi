@@ -30,12 +30,12 @@ module.exports = (s,app,config,lang) => {
             console.log('Failover : Failure to sendMessage', data, err)
         }
     }
-    async function importMonitors(monitors){
+    async function importMonitors(monitors, peerConnectKey, lostConnections){
         for(const monitor of monitors){
             const details = parseJSON(monitor.details)
             details.dir = ''
             monitor.details = stringJSON(details)
-            await s.addOrEditMonitor(monitor, null, { uid: '$SYSTEM' })
+            if(lostConnections[peerConnectKey])await s.addOrEditMonitor(monitor, null, { uid: '$SYSTEM' })
         }
     }
     async function deleteMonitors(monitors, deleteFiles){
