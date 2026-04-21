@@ -50,6 +50,19 @@ module.exports = (s,app,config,lang) => {
         sendMessage(connectionToFailover,{ f: 'cacheUsers', users });
         return users
     }
+    async function getPermissions(){
+        const { rows: permissions } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Permission Sets"
+        });
+        return permissions || []
+    }
+    async function cachePermissions(connectionToFailover){
+        const permissions = await getPermissions();
+        sendMessage(connectionToFailover,{ f: 'cachePermissions', permissions });
+        return users
+    }
     async function updateCachedUser(connectionToFailover, user, deleteUser){
         if(user){
             if(deleteMonitor){
@@ -166,6 +179,7 @@ module.exports = (s,app,config,lang) => {
             switch(data.f){
                 case'init':
                     s.debugLog('Initializing Failover at ', host)
+                    await cachePermissions(clientConnection)
                     await cacheUsers(clientConnection)
                     await cacheMonitors(clientConnection)
                     sendMessage(clientConnection, { f: 'init_complete' })

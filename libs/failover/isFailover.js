@@ -5,6 +5,7 @@ module.exports = async (s,app,config,lang) => {
         const {
             importUsers,
             importMonitors,
+            importPermissions,
             deleteUsers,
             stopMonitors,
             stopMonitorQueues,
@@ -46,6 +47,7 @@ module.exports = async (s,app,config,lang) => {
             cachedMonitors = {},
             cachedMonitorsIndex = {},
             cachedUsers = {},
+            cachedPermissions = {},
             lostConnections = {},
             gracefulExitRequested = {},
             skipImport = {},
@@ -57,6 +59,7 @@ module.exports = async (s,app,config,lang) => {
                 cachedMonitors,
                 cachedMonitorsIndex,
                 cachedUsers,
+                cachedPermissions,
                 lostConnections,
                 gracefulExitRequested,
                 skipImport,
@@ -96,6 +99,7 @@ module.exports = async (s,app,config,lang) => {
                     delete(lostServerActionTimeouts[peerConnectKey])
                     await saveFailoverState()
                     await setTargetManagmentServerUser(filteredUsers[0].mail)
+                    await importPermissions(cachedPermissions[peerConnectKey] || [])
                     await importUsers(cachedUsers[peerConnectKey] || [])
                     await s.resetAllManagementServers()
                     await importMonitors(cachedMonitors[peerConnectKey] || [], peerConnectKey, lostConnections, skipImport, saveFailoverState)
@@ -245,6 +249,10 @@ module.exports = async (s,app,config,lang) => {
                             disableCloudUploaders(user)
                         }
                         cachedUsers[peerConnectKey] = data.users
+                        await saveFailoverState()
+                    break;
+                    case'cachePermissions':
+                        cachedPermissions[peerConnectKey] = data.permissions
                         await saveFailoverState()
                     break;
                     case'updateCachedUser':

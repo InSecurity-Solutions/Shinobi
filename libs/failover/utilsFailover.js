@@ -90,6 +90,36 @@ module.exports = (s,app,config,lang) => {
             })
         }
     }
+    async function importPermissions(permissions){
+        for(permission of permissions){
+            const { rows } = await s.knexQueryPromise({
+                action: "select",
+                table: "Permission Sets",
+                where: {
+                    ke: permission.ke,
+                    name: permission.name,
+                },
+                limit: 1,
+            });
+            if(!rows[0])await s.knexQueryPromise({
+                action: "insert",
+                table: "Permission Sets",
+                insert: permission
+            });
+        }
+    }
+    async function deletePermissions(permissions){
+        for(const permission of permissions){
+            await s.knexQueryPromise({
+                action: "delete",
+                table: "Permission Sets",
+                where: {
+                    ke: permission.ke,
+                    name: permission.name,
+                }
+            });
+        }
+    }
     function uploadVideo(video, connectionToNormal){
         return new Promise((resolve) => {
             const filePath = getVideoFilePath(video);
@@ -297,7 +327,9 @@ module.exports = (s,app,config,lang) => {
     }
     return {
         importUsers,
+        importPermissions,
         deleteUsers,
+        deletePermissions,
         importMonitors,
         stopMonitors,
         stopMonitorQueues,
