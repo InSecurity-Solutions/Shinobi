@@ -41,12 +41,14 @@ module.exports = async (s,app,config,lang) => {
             }
             return data
         }
+
         const {
             cachedMonitors = {},
             cachedMonitorsIndex = {},
             cachedUsers = {},
             lostConnections = {},
             gracefulExitRequested = {},
+            skipImport = {},
         } = await loadFailoverState();
         const theWebSocket = createWebSocketServer()
         function saveFailoverState(){
@@ -57,8 +59,14 @@ module.exports = async (s,app,config,lang) => {
                 cachedUsers,
                 lostConnections,
                 gracefulExitRequested,
+                skipImport,
                 lostServerActionTimeoutsIndex: Object.keys(lostServerActionTimeouts)
             })
+        }
+        async function loadPendingMonitorImports(){
+            for(peerConnectKey in lostConnections){
+                if(lostConnections[peerConnectKey])await importMonitors(cachedMonitors[peerConnectKey] || [], peerConnectKey, lostConnections, skipImport, saveFailoverState)
+            }
         }
         function runOnNormalServerConnections(callback){
             for(peerConnectKey in normalServerConnections){
@@ -90,7 +98,7 @@ module.exports = async (s,app,config,lang) => {
                     await setTargetManagmentServerUser(filteredUsers[0].mail)
                     await importUsers(cachedUsers[peerConnectKey] || [])
                     await s.resetAllManagementServers()
-                    await importMonitors(cachedMonitors[peerConnectKey] || [], peerConnectKey, lostConnections)
+                    await importMonitors(cachedMonitors[peerConnectKey] || [], peerConnectKey, lostConnections, skipImport, saveFailoverState)
                     await saveFailoverState()
                 }
             })
@@ -196,6 +204,7 @@ module.exports = async (s,app,config,lang) => {
                         console.log('Initialized as Failover for ', peerConnectKey)
                         if(lostConnections[peerConnectKey]){
                             lostConnections[peerConnectKey] = false
+                            skipImport[peerConnectKey] = {}
                             reconnectedLostServerActionTimeout(peerConnectKey, async () => {
                                 console.log('Failover : Reconnected to ', peerConnectKey)
                                 await stopMonitorQueues(cachedMonitors[peerConnectKey] || [])
@@ -336,6 +345,9 @@ module.exports = async (s,app,config,lang) => {
         })
         s.onProcessExit(() => {
             saveFailoverState()
+        });
+        s.onProcessReady(() => {
+            loadPendingMonitorImports()
         });
     }
 }

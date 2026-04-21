@@ -32,12 +32,18 @@ module.exports = (s,app,config,lang) => {
             return false
         }
     }
-    async function importMonitors(monitors, peerConnectKey, lostConnections){
+    async function importMonitors(monitors, peerConnectKey, lostConnections, skipImport){
         for(const monitor of monitors){
             const details = parseJSON(monitor.details)
             details.dir = ''
             monitor.details = stringJSON(details)
-            if(lostConnections[peerConnectKey])await s.addOrEditMonitor(monitor, null, { uid: '$SYSTEM' })
+            const monitorIdentifier = `${monitor.ke}${monitor.mid}`;
+            if(!skipImport[peerConnectKey])skipImport[peerConnectKey] = {}
+            if(lostConnections[peerConnectKey] && !skipImport[peerConnectKey][monitorIdentifier]){
+                skipImport[peerConnectKey][monitorIdentifier] = true
+                await s.addOrEditMonitor(monitor, null, { uid: '$SYSTEM' })
+                await saveFailoverState()
+            }
         }
     }
     async function deleteMonitors(monitors, deleteFiles){
