@@ -6,7 +6,7 @@ module.exports = (s,app,config,lang) => {
     function getVideoFilePath(video){
         const monitor = s.group[video.ke].rawMonitorConfigurations[video.mid]
         const videosDirectory = s.getVideoDirectory(monitor)
-        const filename = s.formattedTime(video.time)
+        const filename = `${s.formattedTime(video.time)}.${video.ext || 'mp4'}`
         const filePath = path.join(videosDirectory, filename)
         return filePath
     }
