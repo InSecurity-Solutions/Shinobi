@@ -61,7 +61,7 @@ module.exports = (s,app,config,lang) => {
     async function cachePermissions(connectionToFailover){
         const permissions = await getPermissions();
         sendMessage(connectionToFailover,{ f: 'cachePermissions', permissions });
-        return users
+        return permissions
     }
     async function updateCachedUser(connectionToFailover, user, deleteUser){
         if(user){
