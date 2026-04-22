@@ -175,10 +175,10 @@ module.exports = (s,app,config,lang) => {
                     if(deleteAfterUpload && response.ok){
                         await deleteVideo(video)
                     }
+                    responses.push(response)
                 }catch(err){
                     console.error('isFailover : downloadVideosFromMonitors Error', video, err)
                 }
-                responses.push(response)
             }
         }
         return responses
