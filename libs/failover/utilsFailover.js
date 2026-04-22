@@ -32,7 +32,7 @@ module.exports = (s,app,config,lang) => {
             return false
         }
     }
-    async function importMonitors(monitors, peerConnectKey, lostConnections, skipImport){
+    async function importMonitors(monitors, peerConnectKey, lostConnections, skipImport, saveFailoverState){
         for(const monitor of monitors){
             const details = parseJSON(monitor.details)
             details.dir = ''
