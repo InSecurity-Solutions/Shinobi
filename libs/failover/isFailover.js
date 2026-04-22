@@ -161,7 +161,6 @@ module.exports = async (s,app,config,lang) => {
             }
             function onAuthenticate(data){
                 const { key } = bson.deserialize(Buffer.from(data))
-                clearKillTimer(client)
                 client.removeListener('message', onAuthenticate);
                 if(Object.keys(config.failoverConnectionKeys).includes(key)){
                     clearTimeout(lostServerActionTimeouts[peerConnectKey])
@@ -206,6 +205,7 @@ module.exports = async (s,app,config,lang) => {
                     break;
                     case'init_complete':
                         console.log('Initialized as Failover for ', peerConnectKey)
+                        clearKillTimer(client)
                         if(lostConnections[peerConnectKey]){
                             lostConnections[peerConnectKey] = false
                             skipImport[peerConnectKey] = {}
