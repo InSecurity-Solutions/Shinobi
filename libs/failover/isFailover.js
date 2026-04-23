@@ -23,6 +23,8 @@ module.exports = async (s,app,config,lang) => {
             saveCurrentState,
             loadCurrentState,
             updateCachedMonitor,
+            saveMonitorsCache,
+            loadMonitorsCache,
         } = require('./utilsFailover.js')(s,app,config,lang)
         const reconnectedLostServerActionTimeouts = {}
         const lostServerActionTimeouts = {}
@@ -35,12 +37,13 @@ module.exports = async (s,app,config,lang) => {
         const allowCloudUploads = config.failoverAllowCloudUploaders;
         async function loadFailoverState(){
             const data = await loadCurrentState()
+            const monitorsCache = await loadMonitorsCache()
             if(data.lostServerActionTimeoutsIndex.length > 0){
                 for(indexItem of data.lostServerActionTimeoutsIndex){
                     setLostServerActionTimeout(indexItem)
                 }
             }
-            return data
+            return { ...data, ...monitorsCache }
         }
 
         const {
@@ -53,18 +56,24 @@ module.exports = async (s,app,config,lang) => {
             skipImport = {},
         } = await loadFailoverState();
         const theWebSocket = createWebSocketServer()
-        function saveFailoverState(){
-            return saveCurrentState({
-                time: new Date(),
-                cachedMonitors,
-                cachedMonitorsIndex,
-                cachedUsers,
-                cachedPermissions,
-                lostConnections,
-                gracefulExitRequested,
-                skipImport,
-                lostServerActionTimeoutsIndex: Object.keys(lostServerActionTimeouts)
-            })
+        async function saveFailoverState(saveMonitors = false, saveState = true){
+            if(saveState){
+                await saveCurrentState({
+                    time: new Date(),
+                    cachedUsers,
+                    cachedPermissions,
+                    lostConnections,
+                    gracefulExitRequested,
+                    skipImport,
+                    lostServerActionTimeoutsIndex: Object.keys(lostServerActionTimeouts)
+                })
+            }
+            if(saveMonitors){
+                await saveMonitorsCache({
+                    cachedMonitors,
+                    cachedMonitorsIndex,
+                })
+            }
         }
         async function loadPendingMonitorImports(){
             for(peerConnectKey in lostConnections){
@@ -206,9 +215,10 @@ module.exports = async (s,app,config,lang) => {
                     case'init_complete':
                         console.log('Initialized as Failover for ', peerConnectKey)
                         clearKillTimer(client)
+                        skipImport[peerConnectKey] = {}
+                        await saveFailoverState()
                         if(lostConnections[peerConnectKey]){
                             lostConnections[peerConnectKey] = false
-                            skipImport[peerConnectKey] = {}
                             reconnectedLostServerActionTimeout(peerConnectKey, async () => {
                                 console.log('Failover : Reconnected to ', peerConnectKey)
                                 await stopMonitorQueues(cachedMonitors[peerConnectKey] || [])
@@ -219,6 +229,7 @@ module.exports = async (s,app,config,lang) => {
                                 await deleteMonitors(cachedMonitors[peerConnectKey] || [])
                                 await deleteUsers(cachedUsers[peerConnectKey] || [])
                                 await s.resetAllManagementServers()
+                                await saveFailoverState()
                             })
                         }
                     break;
@@ -237,12 +248,12 @@ module.exports = async (s,app,config,lang) => {
                     case'updateCachedMonitor':
                         setMonitorInCacheIndex(peerConnectKey,data.monitor.ke,data.monitor.mid,true)
                         updateCachedMonitor(cachedMonitors[peerConnectKey], data.monitor)
-                        await saveFailoverState()
+                        await saveFailoverState(true, false)
                     break;
                     case'deleteCachedMonitor':
                         setMonitorInCacheIndex(peerConnectKey,data.monitor.ke,data.monitor.mid,false)
                         updateCachedMonitor(cachedMonitors[peerConnectKey], data.monitor, true)
-                        await saveFailoverState()
+                        await saveFailoverState(true, false)
                     break;
                     case'cacheUsers':
                         for(user of data.users){
@@ -343,16 +354,22 @@ module.exports = async (s,app,config,lang) => {
 
         s.onMonitorSave((monitorConfig) => {
             runOnNormalServerConnections((peerConnectKey, connectionToNormal) => {
-                if(setMonitorInCacheIndex(peerConnectKey,monitorConfig.ke,monitorConfig.mid))updateCachedMonitor(cachedMonitors[peerConnectKey], monitorConfig)
+                if(setMonitorInCacheIndex(peerConnectKey,monitorConfig.ke,monitorConfig.mid)){
+                    updateCachedMonitor(cachedMonitors[peerConnectKey], monitorConfig)
+                    saveFailoverState(true, false)
+                }
             })
         })
         s.onMonitorDelete((monitorConfig) => {
             runOnNormalServerConnections((peerConnectKey, connectionToNormal) => {
-                if(setMonitorInCacheIndex(peerConnectKey,monitorConfig.ke,monitorConfig.mid))updateCachedMonitor(cachedMonitors[peerConnectKey], monitorConfig, true)
+                if(setMonitorInCacheIndex(peerConnectKey,monitorConfig.ke,monitorConfig.mid)){
+                    updateCachedMonitor(cachedMonitors[peerConnectKey], monitorConfig, true)
+                    saveFailoverState(true, false)
+                }
             })
         })
         s.onProcessExit(() => {
-            saveFailoverState()
+            saveFailoverState(true)
         });
         s.onProcessReady(() => {
             loadPendingMonitorImports()

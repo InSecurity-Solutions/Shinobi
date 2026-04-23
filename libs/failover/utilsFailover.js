@@ -23,6 +23,7 @@ module.exports = (s,app,config,lang) => {
         getConfiguration
     } = require('../system/utils.js')(config)
     const failoverStateFilePath = path.join(process.cwd(),'failoverState.json')
+    const failoverStateCachedMonitorsFilePath = path.join(process.cwd(),'failoverStateMonitors.json')
     function sendMessage(client, data){
         try{
             client.send(bson.serialize(data))
@@ -42,7 +43,7 @@ module.exports = (s,app,config,lang) => {
             if(lostConnections[peerConnectKey] && !skipImport[peerConnectKey][monitorIdentifier]){
                 skipImport[peerConnectKey][monitorIdentifier] = true
                 await s.addOrEditMonitor(monitor, null, { uid: '$SYSTEM' })
-                await saveFailoverState()
+                await saveFailoverState(true, false)
             }
         }
     }
@@ -324,12 +325,23 @@ module.exports = (s,app,config,lang) => {
     async function saveCurrentState(data){
         await fs.writeFile(failoverStateFilePath, JSON.stringify(data))
     }
+    async function saveMonitorsCache(data){
+        await fs.writeFile(failoverStateCachedMonitorsFilePath, JSON.stringify(data))
+    }
     async function loadCurrentState(){
         const defaultObject = {
             lostServerActionTimeoutsIndex: []
         }
         try{
             return JSON.parse(await fs.readFile(failoverStateFilePath, 'utf8')) || defaultObject
+        }catch(err){
+            return defaultObject
+        }
+    }
+    async function loadMonitorsCache(){
+        const defaultObject = {}
+        try{
+            return JSON.parse(await fs.readFile(failoverStateCachedMonitorsFilePath, 'utf8')) || defaultObject
         }catch(err){
             return defaultObject
         }
@@ -356,5 +368,7 @@ module.exports = (s,app,config,lang) => {
         setTargetManagmentServerUser,
         saveCurrentState,
         loadCurrentState,
+        saveMonitorsCache,
+        loadMonitorsCache,
     }
 }
