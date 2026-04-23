@@ -2,7 +2,7 @@ const path = require('path')
 const bson = require('bson')
 const fs = require('fs').promises
 const { createReadStream, createWriteStream } = require('fs')
-module.exports = (s,app,config,lang) => {
+module.exports = async (s,app,config,lang) => {
     const {
         getVideoFilePath,
     } = require('./utils.js')(s,app,config,lang)
@@ -24,6 +24,52 @@ module.exports = (s,app,config,lang) => {
     } = require('../system/utils.js')(config)
     const failoverStateFilePath = path.join(process.cwd(),'failoverState.json')
     const failoverStateCachedMonitorsFilePath = path.join(process.cwd(),'failoverStateMonitors.json')
+    const reconnectedLostServerActionTimeouts = {}
+    const lostServerActionTimeouts = {}
+    const videosTransmitting = {}
+    const eventsTransmitting = {}
+    const cloudRecordsTransmitting = {}
+    const normalServerConnections = {}
+    const allowCloudUploads = config.failoverAllowCloudUploaders;
+    async function loadFailoverState(){
+        const data = await loadCurrentState()
+        const monitorsCache = await loadMonitorsCache()
+        if(data.lostServerActionTimeoutsIndex.length > 0){
+            for(indexItem of data.lostServerActionTimeoutsIndex){
+                setLostServerActionTimeout(indexItem)
+            }
+        }
+        return { ...data, ...monitorsCache }
+    }
+
+    const {
+        cachedMonitors = {},
+        cachedMonitorsIndex = {},
+        cachedUsers = {},
+        cachedPermissions = {},
+        lostConnections = {},
+        gracefulExitRequested = {},
+        skipImport = {},
+    } = await loadFailoverState();
+    async function saveFailoverState(saveMonitors = false, saveState = true){
+        if(saveState){
+            saveCurrentState({
+                time: new Date(),
+                cachedUsers,
+                cachedPermissions,
+                lostConnections,
+                gracefulExitRequested,
+                skipImport,
+                lostServerActionTimeoutsIndex: Object.keys(lostServerActionTimeouts)
+            })
+        }
+        if(saveMonitors){
+            saveMonitorsCache({
+                cachedMonitors,
+                cachedMonitorsIndex,
+            })
+        }
+    }
     function sendMessage(client, data){
         try{
             client.send(bson.serialize(data))
@@ -33,7 +79,8 @@ module.exports = (s,app,config,lang) => {
             return false
         }
     }
-    async function importMonitors(monitors, peerConnectKey, lostConnections, skipImport, saveFailoverState){
+    async function importMonitors(peerConnectKey){
+        const monitors = cachedMonitors[peerConnectKey]
         for(const monitor of monitors){
             const details = parseJSON(monitor.details)
             details.dir = ''
@@ -47,7 +94,8 @@ module.exports = (s,app,config,lang) => {
             }
         }
     }
-    async function deleteMonitors(monitors, deleteFiles){
+    async function deleteMonitors(peerConnectKey, deleteFiles){
+        const monitors = cachedMonitors[peerConnectKey]
         for(const monitor of monitors){
             const { mid: monitorId, ke: groupKey } = monitor;
             await deleteMonitor({
@@ -58,7 +106,8 @@ module.exports = (s,app,config,lang) => {
             })
         }
     }
-    async function stopMonitorQueues(monitors){
+    async function stopMonitorQueues(peerConnectKey){
+        const monitors = cachedMonitors[peerConnectKey]
         const groupKeys = [...new Set(Object.values(monitors).map(monitor => monitor.ke))]
         for(const groupKey of groupKeys){
             try{
@@ -68,7 +117,8 @@ module.exports = (s,app,config,lang) => {
             }
         }
     }
-    function stopMonitors(monitors, deleteFiles){
+    function stopMonitors(peerConnectKey, deleteFiles){
+        const monitors = cachedMonitors[peerConnectKey]
         return new Promise(function(resolve){
             let finished = 0
             let numberOf = monitors.length
@@ -87,7 +137,8 @@ module.exports = (s,app,config,lang) => {
             await legacyCreateAdminUser(user, 'ke', false)
         }
     }
-    async function deleteUsers(users, deleteFiles){
+    async function deleteUsers(peerConnectKey, deleteFiles){
+        const users = cachedUsers[peerConnectKey]
         for(const user of users){
             await legacyDeleteUser({
                 account: user,
@@ -166,7 +217,9 @@ module.exports = (s,app,config,lang) => {
             id : monitorId
         })
     }
-    async function transmitVideosFromMonitors(monitors, connectionToNormal, deleteAfterUpload){
+    async function transmitVideosFromMonitors(peerConnectKey, deleteAfterUpload){
+        const monitors = cachedMonitors[peerConnectKey]
+        const connectionToNormal = normalServerConnections[peerConnectKey]
         const responses = []
         for(const monitor of monitors){
             const { mid: monitorId, ke: groupKey } = monitor;
@@ -181,7 +234,7 @@ module.exports = (s,app,config,lang) => {
             });
             for(const video of videos){
                 try{
-                    const response = await uploadVideo(video);
+                    const response = await uploadVideo(video, connectionToNormal);
                     if(deleteAfterUpload && response.ok){
                         await deleteVideo(video)
                     }
@@ -193,7 +246,9 @@ module.exports = (s,app,config,lang) => {
         }
         return responses
     }
-    async function transmitEventsFromMonitors(monitors, connectionToNormal, deleteAfterUpload){
+    async function transmitEventsFromMonitors(peerConnectKey, deleteAfterUpload){
+        const monitors = cachedMonitors[peerConnectKey]
+        const connectionToNormal = normalServerConnections[peerConnectKey]
         const response = { ok: true }
         for(const monitor of monitors){
             const { mid: monitorId, ke: groupKey } = monitor;
@@ -220,7 +275,9 @@ module.exports = (s,app,config,lang) => {
         }
         return response
     }
-    async function transmitCloudUploadRecordsFromMonitors(monitors, connectionToNormal, deleteAfterUpload){
+    async function transmitCloudUploadRecordsFromMonitors(peerConnectKey, deleteAfterUpload){
+        const monitors = cachedMonitors[peerConnectKey]
+        const connectionToNormal = normalServerConnections[peerConnectKey]
         const response = { ok: true }
         for(const monitor of monitors){
             const { mid: monitorId, ke: groupKey } = monitor;
@@ -294,23 +351,25 @@ module.exports = (s,app,config,lang) => {
         }
         return response
     }
-    function updateCachedMonitor(cachedMonitors, monitor, deleteMonitor){
+    function updateCachedMonitor(peerConnectKey, monitor, deleteMonitor){
+        const monitors = cachedMonitors[peerConnectKey]
         const { ke: groupKey, mid: monitorId } = monitor;
-        const monitorCacheIndex = cachedMonitors.findIndex(row => row.ke === groupKey && row.mid === monitorId)
+        const monitorCacheIndex = monitors.findIndex(row => row.ke === groupKey && row.mid === monitorId)
         if(deleteMonitor){
-            cachedMonitors.splice(monitorCacheIndex, 1)
+            monitors.splice(monitorCacheIndex, 1)
         }else{
-            cachedMonitors[monitorCacheIndex] = monitor
+            monitors[monitorCacheIndex] = monitor
         }
     }
-    function updateCachedUser(cachedUsers, user, deleteUser){
+    function updateCachedUser(peerConnectKey, user, deleteUser){
+        const users = cachedUsers[peerConnectKey]
         const { ke: groupKey, uid: userId } = user;
-        const userCacheIndex = cachedUsers.findIndex(row => row.ke === groupKey && row.mid === userId)
+        const userCacheIndex = users.findIndex(row => row.ke === groupKey && row.mid === userId)
         if(deleteUser){
-            cachedUsers.splice(userCacheIndex, 1)
+            users.splice(userCacheIndex, 1)
         }else{
             disableCloudUploaders(user)
-            cachedUsers[userCacheIndex] = user
+            users[userCacheIndex] = user
         }
     }
     function disableCloudUploaders(user){
@@ -346,6 +405,125 @@ module.exports = (s,app,config,lang) => {
             return defaultObject
         }
     }
+    function setMonitorInCacheIndex(peerConnectKey,groupKey,monitorId,modifierBoolean){
+        if(!cachedMonitorsIndex[peerConnectKey])cachedMonitorsIndex[peerConnectKey] = {}
+        if(modifierBoolean !== undefined){
+            if(!modifierBoolean){
+                delete(cachedMonitorsIndex[peerConnectKey][`${groupKey}${monitorId}`])
+            }else{
+                cachedMonitorsIndex[peerConnectKey][`${groupKey}${monitorId}`] = true
+            }
+        }
+        return cachedMonitorsIndex[peerConnectKey][`${groupKey}${monitorId}`]
+    }
+    function setNormalServerConnection(peerConnectKey, client){
+        if(!client){
+            delete(normalServerConnections[peerConnectKey])
+        }else{
+            normalServerConnections[peerConnectKey] = client
+        }
+    }
+    function getNormalServerConnection(peerConnectKey){
+        return normalServerConnections[peerConnectKey]
+    }
+    function getNormalServerConnections(){
+        return normalServerConnections
+    }
+    async function loadPendingMonitorImports(){
+        for(peerConnectKey in lostConnections){
+            if(lostConnections[peerConnectKey]){
+                await importMonitors(peerConnectKey)
+            }
+        }
+    }
+    function runOnNormalServerConnections(callback){
+        for(peerConnectKey in normalServerConnections){
+            const serverConnection = normalServerConnections[peerConnectKey]
+            callback(peerConnectKey, serverConnection)
+        }
+    }
+    function reconnectedLostServerActionTimeout(peerConnectKey,callback){
+        if(lostConnections[peerConnectKey]){
+            lostConnections[peerConnectKey] = false
+            clearTimeout(reconnectedLostServerActionTimeouts[peerConnectKey])
+            reconnectedLostServerActionTimeouts[peerConnectKey] = setTimeout(function(){
+                callback()
+            },10000)
+        }
+    }
+    function lostServerActionTimeout(peerConnectKey,callback){
+        clearTimeout(lostServerActionTimeouts[peerConnectKey])
+        lostServerActionTimeouts[peerConnectKey] = setTimeout(function(){
+            callback()
+        },10000)
+    }
+    function setLostServerActionTimeout(peerConnectKey){
+        lostServerActionTimeout(peerConnectKey, async () => {
+            console.log('Failover : Setting up lost Server configurations ', peerConnectKey)
+            // need to send signal to other Failover servers not to do the same thing if one is already doing
+            const filteredUsers = (cachedUsers[peerConnectKey] || []).filter(user => user.mail !== 'dummy@shinobi.dummy');
+            if(filteredUsers[0]){
+                lostConnections[peerConnectKey] = true
+                delete(lostServerActionTimeouts[peerConnectKey])
+                await saveFailoverState()
+                await setTargetManagmentServerUser(filteredUsers[0].mail)
+                await importPermissions(cachedPermissions[peerConnectKey] || [])
+                await importUsers(cachedUsers[peerConnectKey] || [])
+                await s.resetAllManagementServers()
+                await importMonitors(peerConnectKey)
+                await saveFailoverState()
+            }
+        })
+    }
+    function deleteLostServerActionTimeout(peerConnectKey){
+        clearTimeout(lostServerActionTimeouts[peerConnectKey])
+        delete(lostServerActionTimeouts[peerConnectKey])
+    }
+    function clearSkipImport(peerConnectKey){
+        skipImport[peerConnectKey] = {}
+    }
+    async function beginVideoTransmission(peerConnectKey){
+        var response = []
+        if(!videosTransmitting[peerConnectKey]){
+            videosTransmitting[peerConnectKey] = true
+            response = await transmitVideosFromMonitors(peerConnectKey, true)
+            videosTransmitting[peerConnectKey] = false
+        }
+        sendMessage(normalServerConnections[peerConnectKey], { f: 'transmitVideosFromMonitorsResponse', response })
+    }
+    async function beginEventTransmission(peerConnectKey){
+        var response = { ok: true }
+        if(!eventsTransmitting[peerConnectKey]){
+            eventsTransmitting[peerConnectKey] = true
+            await transmitEventsFromMonitors(peerConnectKey, true)
+            eventsTransmitting[peerConnectKey] = false
+        }
+        sendMessage(normalServerConnections[peerConnectKey], { f: 'transmitEventsFromMonitorsResponse', response })
+    }
+    async function beginCloudUploadRecordsTransmission(peerConnectKey){
+        var response = { ok: true }
+        if(allowCloudUploads && !cloudRecordsTransmitting[peerConnectKey]){
+            cloudRecordsTransmitting[peerConnectKey] = true
+            await transmitCloudUploadRecordsFromMonitors(peerConnectKey, true)
+            cloudRecordsTransmitting[peerConnectKey] = false
+        }
+        sendMessage(normalServerConnections[peerConnectKey], { f: 'transmitCloudUploadRecordsFromMonitorsResponse', response })
+    }
+    function setMonitorCache(peerConnectKey, monitors){
+        cachedMonitors[peerConnectKey] = monitors
+    }
+    function setUserCache(peerConnectKey, monitors){
+        cachedUsers[peerConnectKey] = monitors
+    }
+    function setPermissionCache(peerConnectKey, monitors){
+        cachedPermissions[peerConnectKey] = monitors
+    }
+    function setGracefulExitRequest(peerConnectKey, theBoolean){
+        gracefulExitRequested[peerConnectKey] = theBoolean
+    }
+    function getGracefulExitRequest(peerConnectKey, theBoolean){
+        return gracefulExitRequested[peerConnectKey]
+    }
     return {
         importUsers,
         importPermissions,
@@ -370,5 +548,26 @@ module.exports = (s,app,config,lang) => {
         loadCurrentState,
         saveMonitorsCache,
         loadMonitorsCache,
+        setMonitorInCacheIndex,
+        setNormalServerConnection,
+        getNormalServerConnection,
+        getNormalServerConnections,
+        loadPendingMonitorImports,
+        runOnNormalServerConnections,
+        reconnectedLostServerActionTimeout,
+        lostServerActionTimeout,
+        setLostServerActionTimeout,
+        clearSkipImport,
+        beginVideoTransmission,
+        beginEventTransmission,
+        beginCloudUploadRecordsTransmission,
+        setMonitorCache,
+        setUserCache,
+        setPermissionCache,
+        setGracefulExitRequest,
+        getGracefulExitRequest,
+        deleteLostServerActionTimeout,
+        //
+        saveFailoverState,
     }
 }
