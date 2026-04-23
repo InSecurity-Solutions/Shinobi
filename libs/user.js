@@ -97,17 +97,19 @@ module.exports = function(s,config,lang){
         if(s.group[groupKey]&&s.group[groupKey].init){
             clearTimeout(diskUsedEmitterTimeouts[groupKey])
             diskUsedEmitterTimeouts[groupKey] = setTimeout(() => {
-                delete diskUsedEmitterTimeouts[groupKey]
-                s.tx({
-                    f: 'diskUsed',
-                    size: s.group[groupKey].usedSpace,
-                    usedSpace: s.group[groupKey].usedSpace,
-                    usedSpaceVideos: s.group[groupKey].usedSpaceVideos,
-                    usedSpaceFilebin: s.group[groupKey].usedSpaceFilebin,
-                    usedSpaceTimelapseFrames: s.group[groupKey].usedSpaceTimelapseFrames,
-                    limit: s.group[groupKey].sizeLimit,
-                    addStorage: s.group[groupKey].addStorageUse,
-                },'GRP_'+groupKey);
+                if(s.group[groupKey]&&s.group[groupKey].init){
+                    delete diskUsedEmitterTimeouts[groupKey]
+                    s.tx({
+                        f: 'diskUsed',
+                        size: s.group[groupKey].usedSpace,
+                        usedSpace: s.group[groupKey].usedSpace,
+                        usedSpaceVideos: s.group[groupKey].usedSpaceVideos,
+                        usedSpaceFilebin: s.group[groupKey].usedSpaceFilebin,
+                        usedSpaceTimelapseFrames: s.group[groupKey].usedSpaceTimelapseFrames,
+                        limit: s.group[groupKey].sizeLimit,
+                        addStorage: s.group[groupKey].addStorageUse,
+                    },'GRP_'+groupKey);
+                }
             },1000)
         }
     }
