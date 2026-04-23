@@ -67,10 +67,19 @@ module.exports = (s,app,config,lang) => {
             }
         }
     }
-    async function stopMonitors(monitors, deleteFiles){
-        for(const monitor of monitors){
-            await s.camera('stop',monitor)
-        }
+    function stopMonitors(monitors, deleteFiles){
+        return new Promise(function(resolve){
+            let finished = 0
+            let numberOf = monitors.length
+            for(const monitor of monitors){
+                s.camera('stop',monitor).then(() => {
+                    ++finished
+                    if(finished === numberOf){
+                        resolve()
+                    }
+                })
+            }
+        })
     }
     async function importUsers(users){
         for(user of users){
