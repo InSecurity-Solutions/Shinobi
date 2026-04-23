@@ -767,6 +767,7 @@ module.exports = (s,config,lang) => {
                 })
             }
             s.unloadGroupApps(account);
+            delete(s.group[account.ke])
             s.runExtensionsForArray('onAccountDelete', null, [
                 account,
                 {
