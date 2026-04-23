@@ -58,7 +58,7 @@ module.exports = async (s,app,config,lang) => {
         const theWebSocket = createWebSocketServer()
         async function saveFailoverState(saveMonitors = false, saveState = true){
             if(saveState){
-                await saveCurrentState({
+                saveCurrentState({
                     time: new Date(),
                     cachedUsers,
                     cachedPermissions,
@@ -69,7 +69,7 @@ module.exports = async (s,app,config,lang) => {
                 })
             }
             if(saveMonitors){
-                await saveMonitorsCache({
+                saveMonitorsCache({
                     cachedMonitors,
                     cachedMonitorsIndex,
                 })
@@ -77,7 +77,9 @@ module.exports = async (s,app,config,lang) => {
         }
         async function loadPendingMonitorImports(){
             for(peerConnectKey in lostConnections){
-                if(lostConnections[peerConnectKey])await importMonitors(cachedMonitors[peerConnectKey] || [], peerConnectKey, lostConnections, skipImport, saveFailoverState)
+                if(lostConnections[peerConnectKey]){
+                    await importMonitors(cachedMonitors[peerConnectKey] || [], peerConnectKey, lostConnections, skipImport, saveFailoverState)
+                }
             }
         }
         function runOnNormalServerConnections(callback){
@@ -368,9 +370,6 @@ module.exports = async (s,app,config,lang) => {
                 }
             })
         })
-        s.onProcessExit(() => {
-            saveFailoverState(true)
-        });
         s.onProcessReady(() => {
             loadPendingMonitorImports()
         });
