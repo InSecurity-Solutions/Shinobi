@@ -171,6 +171,14 @@ module.exports = (s,config,lang) => {
             clearInterval(activeMonitor.objectCountIntervals);
             clearTimeout(activeMonitor.timeoutToRestart)
             clearTimeout(activeMonitor.fatalErrorTimeout);
+            clearTimeout(activeMonitor.trigger_timer)
+            delete(activeMonitor.trigger_timer)
+            clearTimeout(activeMonitor.initialHeartBeat)
+            clearInterval(activeMonitor.detector_notrigger_timeout)
+            delete(activeMonitor.detector_notrigger_timeout)
+            clearTimeout(activeMonitor.noViewerCountDisableSubstream)
+            clearTimeout(activeMonitor.motion_lock)
+            clearTimeout(activeMonitor.resetFatalErrorCountTimer)
             delete(activeMonitor.onvifConnection)
             delete(activeMonitor.buildingTimelapseVideo)
             // if(activeMonitor.onChildNodeExit){
@@ -588,9 +596,9 @@ module.exports = (s,config,lang) => {
         const monitorConfig = copyMonitorConfiguration(groupKey,monitorId);
         const streamType = monitorConfig.details.stream_type;
         const analyzeDuration = (parseInt(monitorConfig.details.aduration) / 1000) || 10000;
-        let initialHeartBeat = null
+        activeMonitor.initialHeartBeat = null
         if(streamType !== 'useSubstream'){
-            initialHeartBeat = setTimeout(() => {
+            activeMonitor.initialHeartBeat = setTimeout(() => {
                 resetStreamCheck({
                     ke: groupKey,
                     mid: monitorId,
@@ -598,7 +606,7 @@ module.exports = (s,config,lang) => {
             }, analyzeDuration);
         }
         activeMonitor.spawn_exit = async function(){
-            clearTimeout(initialHeartBeat)
+            clearTimeout(activeMonitor.initialHeartBeat)
             if(activeMonitor.isStarted === true){
                 if(e.details.loglevel !== 'quiet'){
                     s.userLog(e,{type:lang['Process Unexpected Exit'],msg:{msg:lang.unexpectedExitText,cmd:activeMonitor.ffmpeg}});
@@ -823,10 +831,6 @@ module.exports = (s,config,lang) => {
             if(activeMonitor.last_frame){delete(activeMonitor.last_frame)}
             if(activeMonitor.isStarted !== true){return}
             await cameraDestroy(e)
-            clearTimeout(activeMonitor.trigger_timer)
-            delete(activeMonitor.trigger_timer)
-            clearInterval(activeMonitor.detector_notrigger_timeout)
-            clearTimeout(activeMonitor.fatalErrorTimeout);
             activeMonitor.isStarted = false
             activeMonitor.isRecording = false
             s.tx({f:'monitor_stopping',mid:monitorId,ke:groupKey,time:s.formattedTime()},'GRP_'+groupKey);
@@ -1605,7 +1609,16 @@ module.exports = (s,config,lang) => {
         const typeIsLocal = e.type === 'local'
         const doPingTest = e.type !== 'socket' && e.type !== 'dashcam' && e.protocol !== 'udp' && e.type !== 'local' && e.details.skip_ping !== '1';
         if(!theGroup.startMonitorInQueue){
-            theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
+            if(config.monitorStartQueueDisabled){
+                theGroup.startMonitorInQueue = {
+                    push: async (action, callback) => {
+                        await action();
+                        callback();
+                    }
+                }
+            }else{
+                theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
+            }
         }
         const startMonitorInQueue = theGroup.startMonitorInQueue
         if(!activeMonitor.isStarted)return;
