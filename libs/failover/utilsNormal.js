@@ -85,9 +85,23 @@ module.exports = (s,app,config,lang) => {
         }
         return writeStream
     }
-    function insertVideoChunk(video, chunk){
-        const filePath = getVideoFilePath(video);
+    function insertVideoChunk(video, chunk, monitorInfo){
+        const filePath = getVideoFilePath(video, monitorInfo);
         let writeStream = getWriteStream(filePath)
+
+        let bufferChunk;
+        if (Buffer.isBuffer(chunk)) {
+            bufferChunk = chunk;
+        } else if (chunk instanceof Uint8Array) {
+            bufferChunk = Buffer.from(chunk);
+        } else if (chunk instanceof ArrayBuffer) {
+            bufferChunk = Buffer.from(chunk);
+        } else if (chunk && chunk.data) {
+            bufferChunk = Buffer.from(chunk.data);
+        } else {
+            bufferChunk = Buffer.from(chunk);
+        }
+
         if(!writeStreams[filePath]){
             const activeMonitor = s.group[video.ke].activeMonitors[video.mid]
             const monitorConfig = s.group[video.ke].rawMonitorConfigurations[video.mid]
@@ -121,7 +135,7 @@ module.exports = (s,app,config,lang) => {
                 })
             })
         }
-        writeStream.write(chunk)
+        writeStream.write(bufferChunk)
     }
     function sendMessage(clientConnection,data){
         clientConnection.send(bson.serialize(data))
@@ -193,7 +207,7 @@ module.exports = (s,app,config,lang) => {
                     insertCloudVideos(data.videos)
                 break;
                 case'insertVideoChunk':
-                    insertVideoChunk(data.video, data.data)
+                    insertVideoChunk(data.video, data.data, data.monitorInfo)
                 break;
                 case'insertVideoComplete':
                     try{

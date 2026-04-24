@@ -181,15 +181,22 @@ module.exports = async (s,app,config,lang) => {
             });
         }
     }
-    function uploadVideo(video, connectionToNormal){
+    function uploadVideo(video, connectionToNormal, monitor){
         return new Promise((resolve) => {
             const filePath = getVideoFilePath(video);
             const response = { ok: true, filePath }
+            const monitorInfo = {
+                mid: video.mid,
+                ke: video.ke,
+                details: {
+                    dir: parseJSON(monitor.details).dir
+                }
+            }
             let chunkNumber = 0
             const videoStream = createReadStream(filePath, { highWaterMark: 20 });
             videoStream
             .on('data',function(data){
-                const ok = sendMessage(connectionToNormal,{ f: 'insertVideoChunk', video, data, chunkNumber });
+                const ok = sendMessage(connectionToNormal,{ f: 'insertVideoChunk', video, data, monitorInfo, chunkNumber });
                 if(!ok){
                     response.ok = false
                     response.err = 'Lost Connection'
@@ -234,7 +241,7 @@ module.exports = async (s,app,config,lang) => {
             });
             for(const video of videos){
                 try{
-                    const response = await uploadVideo(video, connectionToNormal);
+                    const response = await uploadVideo(video, connectionToNormal, monitor);
                     if(deleteAfterUpload && response.ok){
                         await deleteVideo(video)
                     }
