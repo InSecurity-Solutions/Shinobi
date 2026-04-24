@@ -210,7 +210,7 @@ module.exports = async (s,app,config,lang) => {
                 response.err = err
             })
             .on('close',function(){
-                sendMessage(connectionToNormal,{ f: 'insertVideoComplete', video, response, filePath })
+                sendMessage(connectionToNormal,{ f: 'insertVideoComplete', video, response, monitorInfo })
                 resolve(response)
             })
         })

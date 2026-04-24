@@ -110,32 +110,40 @@ module.exports = (s,app,config,lang) => {
             writeStreams[filePath] = createWriteStream(filePath)
             writeStream = writeStreams[filePath]
             wstream.on('finish', async () => {
-                const groupKey = video.ke
-                const monitorId = video.mid
-                const filesize = await fs.stat(filePath)
-                const insert = {
-                    startTime : video.time,
-                    filesize : filesize,
-                    endTime : video.end,
-                    dir : videoDirectory,
-                    file : filename,
-                    filename : filename,
-                    filesizeMB : parseFloat((filesize/1048576).toFixed(2))
-                }
-                s.insertDatabaseRow(monitorConfig,insert,function(response){
-                    postProcessCompletedMp4Video(response.insertQuery).then((isGood) => {
-                        s.insertCompletedVideoExtensions.forEach(function(extender){
-                            extender(activeMonitor, monitorConfig, insert)
+                try {
+                    const groupKey = video.ke
+                    const monitorId = video.mid
+                    const filesize = await fs.stat(filePath)
+                    const insert = {
+                        startTime : video.time,
+                        filesize : filesize,
+                        endTime : video.end,
+                        dir : videoDirectory,
+                        file : filename,
+                        filename : filename,
+                        filesizeMB : parseFloat((filesize/1048576).toFixed(2))
+                    }
+                    s.insertDatabaseRow(monitorConfig,insert,function(response){
+                        postProcessCompletedMp4Video(response.insertQuery).then((isGood) => {
+                            s.insertCompletedVideoExtensions.forEach(function(extender){
+                                extender(activeMonitor, monitorConfig, insert)
+                            })
+                            s.purgeDiskForGroup(groupKey)
+                            s.setDiskUsedForGroup(groupKey,insert.filesizeMB)
+                            clearTimeout(activeMonitor.recordingChecker)
+                            clearTimeout(activeMonitor.streamChecker)
                         })
-                        s.purgeDiskForGroup(groupKey)
-                        s.setDiskUsedForGroup(groupKey,insert.filesizeMB)
-                        clearTimeout(activeMonitor.recordingChecker)
-                        clearTimeout(activeMonitor.streamChecker)
                     })
-                })
+                } catch (err) {
+                    console.error('Error finishing video:', err);
+                } finally {
+                    delete writeStreams[filePath];
+                }
             })
         }
         writeStream.write(bufferChunk)
+        bufferChunk = null
+        chunk = null
     }
     function sendMessage(clientConnection,data){
         clientConnection.send(bson.serialize(data))
@@ -211,7 +219,8 @@ module.exports = (s,app,config,lang) => {
                 break;
                 case'insertVideoComplete':
                     try{
-                        getWriteStream(data.filePath).end()
+                        const filePath = getVideoFilePath(data.video, data.monitorInfo);
+                        getWriteStream(filePath).end()
                     }catch(err){
                         console.log(err)
                     }
