@@ -215,8 +215,9 @@ module.exports = function(s,config,lang,io){
                     //check for subscription
                     checkSubscription(config.subscriptionId || config.peerConnectKey || config.p2pApiKey, function(){
                         //check terminal commander
-                        checkForTerminalCommands(function(){
+                        checkForTerminalCommands(async function(){
                             //load administrators (groups)
+                            await s.runExtensionsForArrayAwaited('onBeforeLoadedUsersAtStartup', null, [])
                             loadAdminUsers(async function(){
                                 await s.runExtensionsForArrayAwaited('onLoadedUsersAtStartup', null, [])
                                 //load monitors (for groups)

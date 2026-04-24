@@ -162,6 +162,8 @@ module.exports = function(s,config){
     // no arguments
     createExtension(`onLoadedUsersAtStartup`)
     // no arguments
+    createExtension(`onBeforeLoadedUsersAtStartup`)
+    // no arguments
     createExtension(`onBeforeDatabaseLoad`)
     // [0] config : The Configuration object used to initiate the Shinobi core process.
     createExtension(`onFFmpegLoaded`)
