@@ -241,7 +241,7 @@ module.exports = async (s,app,config,lang) => {
             });
             for(const video of videos){
                 try{
-                    const existsAlready = await videoExistsInNormal(connectionToNormal, video)
+                    const existsAlready = await videoExistsInNormal(connectionToNormal, video, monitor)
                     const response = existsAlready ? { ok: true, exists: true } : await uploadVideo(video, connectionToNormal, monitor);
                     if(deleteAfterUpload && response.ok){
                         await deleteVideo(video)
@@ -576,6 +576,7 @@ module.exports = async (s,app,config,lang) => {
         getGracefulExitRequest,
         deleteLostServerActionTimeout,
         //
+        getVideoFilePath,
         saveFailoverState,
     }
 }

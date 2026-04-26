@@ -235,8 +235,18 @@ module.exports = (s,app,config,lang) => {
                     }
                 break;
                 case'videoExistsInNormal':
-                    let exists = !!(await getVideo(data.video))
-                    sendMessage(clientConnection, { f: 'videoExistsInNormalResponse', callbackId: data.callbackId, exists })
+                    try{
+                        let exists = !!(await getVideo(data.video))
+                        if(exists){
+                            const filePath = getVideoFilePath(data.video, data.monitorInfo);
+                            const fileSize = (await fs.stat(filePath)).size
+                            const fileSizeOk = data.fileSize === fileSize
+                            exists = exists && fileSizeOk
+                        }
+                        sendMessage(clientConnection, { f: 'videoExistsInNormalResponse', callbackId: data.callbackId, exists })
+                    }catch(err){
+                        console.log(err)
+                    }
                 break;
             }
         })

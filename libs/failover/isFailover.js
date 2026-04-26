@@ -1,4 +1,5 @@
 const bson = require('bson')
+const fs = require('fs').promises
 const { createWebSocketServer } = require('../basic/websocketTools.js')
 module.exports = async (s,app,config,lang) => {
     if(config.isFailover){
@@ -45,6 +46,7 @@ module.exports = async (s,app,config,lang) => {
             getGracefulExitRequest,
             deleteLostServerActionTimeout,
             //
+            getVideoFilePath,
             saveFailoverState,
         } = await require('./utilsFailover.js')(s,app,config,lang)
         let thisDetectedServerIp = null
@@ -59,15 +61,24 @@ module.exports = async (s,app,config,lang) => {
         function clearKillTimer(client){
             clearTimeout(client.killTimer)
         }
-        function videoExistsInNormal(client, video){
-            return new Promise(function(resolve){
+        function videoExistsInNormal(client, video, monitor){
+            return new Promise(async function(resolve){
+                const filePath = getVideoFilePath(video);
                 const callbackId = generateRandomId(5)
+                const fileSize = (await fs.stat(filePath)).size
+                const monitorInfo = {
+                    mid: video.mid,
+                    ke: video.ke,
+                    details: {
+                        dir: parseJSON(monitor.details).dir
+                    }
+                }
                 awaitingCallbacks[callbackId] = function(exists){
                     clearTimeout(awaitedTimeout)
                     delete(awaitingCallbacks[callbackId])
                     resolve(exists)
                 }
-                sendMessage(client, { f: 'videoExistsInNormal', video, callbackId })
+                sendMessage(client, { f: 'videoExistsInNormal', video, monitorInfo, fileSize, callbackId })
                 let awaitedTimeout = setTimeout(() => {
                     delete(awaitingCallbacks[callbackId])
                     resolve(false)
