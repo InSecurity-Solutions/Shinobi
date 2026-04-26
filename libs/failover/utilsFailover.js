@@ -193,7 +193,7 @@ module.exports = async (s,app,config,lang) => {
                 }
             }
             let chunkNumber = 0
-            const videoStream = createReadStream(filePath, { highWaterMark: 20 });
+            const videoStream = createReadStream(filePath, { highWaterMark: 16 * 1024 });
             videoStream
             .on('data',function(data){
                 const ok = sendMessage(connectionToNormal,{ f: 'insertVideoChunk', video, data, monitorInfo, chunkNumber });
