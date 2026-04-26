@@ -224,7 +224,7 @@ module.exports = async (s,app,config,lang) => {
             id : monitorId
         })
     }
-    async function transmitVideosFromMonitors(peerConnectKey, deleteAfterUpload){
+    async function transmitVideosFromMonitors(peerConnectKey, deleteAfterUpload, videoExistsInNormal){
         const monitors = cachedMonitors[peerConnectKey]
         const connectionToNormal = normalServerConnections[peerConnectKey]
         const responses = []
@@ -241,7 +241,8 @@ module.exports = async (s,app,config,lang) => {
             });
             for(const video of videos){
                 try{
-                    const response = await uploadVideo(video, connectionToNormal, monitor);
+                    const existsAlready = await videoExistsInNormal(connectionToNormal, video)
+                    const response = existsAlready ? { ok: true, exists: true } : await uploadVideo(video, connectionToNormal, monitor);
                     if(deleteAfterUpload && response.ok){
                         await deleteVideo(video)
                     }
@@ -489,11 +490,11 @@ module.exports = async (s,app,config,lang) => {
     function clearSkipImport(peerConnectKey){
         skipImport[peerConnectKey] = {}
     }
-    async function beginVideoTransmission(peerConnectKey){
+    async function beginVideoTransmission(peerConnectKey, videoExistsInNormal){
         var response = []
         if(!videosTransmitting[peerConnectKey]){
             videosTransmitting[peerConnectKey] = true
-            response = await transmitVideosFromMonitors(peerConnectKey, true)
+            response = await transmitVideosFromMonitors(peerConnectKey, true, videoExistsInNormal)
             videosTransmitting[peerConnectKey] = false
         }
         sendMessage(normalServerConnections[peerConnectKey], { f: 'transmitVideosFromMonitorsResponse', response })

@@ -166,6 +166,15 @@ module.exports = (s,app,config,lang) => {
             });
         }
     }
+    async function getVideo(video){
+        const rows = await s.knexQueryPromise({
+            action: "select",
+            table: "Videos",
+            where: video,
+            limit: 1,
+        })
+        return rows[0];
+    }
     function sendFailoverServerCache(){
         runOnFailoverConnections((host, serverConnection) => {
             sendMessage(serverConnection, { f: 'cache_other_failovers', allServers: failoverServerCache, serverIp: host })
@@ -224,6 +233,10 @@ module.exports = (s,app,config,lang) => {
                     }catch(err){
                         console.log(err)
                     }
+                break;
+                case'videoExistsInNormal':
+                    let exists = !!(await getVideo(data.video))
+                    sendMessage(clientConnection, { f: 'videoExistsInNormalResponse', callbackId: data.callbackId, exists })
                 break;
             }
         })

@@ -49,6 +49,7 @@ module.exports = async (s,app,config,lang) => {
         } = await require('./utilsFailover.js')(s,app,config,lang)
         let thisDetectedServerIp = null
         const failoverServerCache = {}
+        const awaitingCallbacks = {}
         const theWebSocket = createWebSocketServer()
         function setClientKillTimerIfNotAuthenticatedInTime(client){
             client.killTimer = setTimeout(function(){
@@ -57,6 +58,21 @@ module.exports = async (s,app,config,lang) => {
         }
         function clearKillTimer(client){
             clearTimeout(client.killTimer)
+        }
+        function videoExistsInNormal(client, video){
+            return new Promise(function(resolve){
+                const callbackId = generateRandomId(5)
+                awaitingCallbacks[callbackId] = function(exists){
+                    clearTimeout(awaitedTimeout)
+                    delete(awaitingCallbacks[callbackId])
+                    resolve(exists)
+                }
+                sendMessage(client, { f: 'videoExistsInNormal', video, callbackId })
+                let awaitedTimeout = setTimeout(() => {
+                    delete(awaitingCallbacks[callbackId])
+                    resolve(false)
+                },10000)
+            })
         }
         theWebSocket.on('connection',(client, req) => {
             const ip = req.socket.remoteAddress;
@@ -118,7 +134,7 @@ module.exports = async (s,app,config,lang) => {
                             console.log('Failover : Reconnected to ', peerConnectKey)
                             await stopMonitorQueues(peerConnectKey)
                             await stopMonitors(peerConnectKey)
-                            await beginVideoTransmission(peerConnectKey)
+                            await beginVideoTransmission(peerConnectKey, videoExistsInNormal)
                             await beginEventTransmission(peerConnectKey)
                             await beginCloudUploadRecordsTransmission(peerConnectKey)
                             await deleteMonitors(peerConnectKey)
@@ -173,6 +189,9 @@ module.exports = async (s,app,config,lang) => {
                     break;
                     case'deleteUsers':
                         deleteUsers(data.users, false)
+                    break;
+                    case'videoExistsInNormalResponse':
+                        awaitingCallbacks[data.callbackId](data.exists)
                     break;
                     default:
                         console.log(`No Failover Handler!`)
