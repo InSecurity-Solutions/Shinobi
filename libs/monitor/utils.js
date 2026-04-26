@@ -1818,7 +1818,7 @@ module.exports = (s,config,lang) => {
                 }else{
                     launchMonitorProcesses(monitorConfig)
                 };
-            },activeMonitor.errorFatalCount >= 3 ? 1000 * 60 * 60 : 5000);
+            },activeMonitor.errorFatalCount >= 3 ? 1000 * 60 * 10 : 5000);
         }else{
             await cameraDestroy(e)
         }
