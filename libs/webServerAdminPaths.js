@@ -1,6 +1,7 @@
 module.exports = function(s,config,lang,app){
     const {
         deleteMonitor,
+        monitorStart,
     } = require('./monitor/utils.js')(s,config,lang);
     require('./webPaths/permissionSets.js')(s,config,lang,app)
     require('./webPaths/customSettings.js')(s,config,lang,app)
@@ -49,6 +50,13 @@ module.exports = function(s,config,lang,app){
                         user: user,
                         deleteFiles: req.query.deleteFiles === 'true',
                     });
+                break;
+                case'restart':
+                    let monitorConfig = getMonitorConfiguration(groupKey,monitorId);
+                    if(monitorConfig.mode !== 'stop' && monitorConfig.mode !== 'idle'){
+                        await monitorStart(Object.assign({}, monitorConfig))
+                        endData.ok = true;
+                    }
                 break;
                 default:
                     var form = s.getPostData(req)
