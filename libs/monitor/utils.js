@@ -1609,16 +1609,7 @@ module.exports = (s,config,lang) => {
         const typeIsLocal = e.type === 'local'
         const doPingTest = e.type !== 'socket' && e.type !== 'dashcam' && e.protocol !== 'udp' && e.type !== 'local' && e.details.skip_ping !== '1';
         if(!theGroup.startMonitorInQueue){
-            if(config.monitorStartQueueDisabled){
-                theGroup.startMonitorInQueue = {
-                    push: async (action, callback) => {
-                        await action();
-                        callback();
-                    }
-                }
-            }else{
-                theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
-            }
+            theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDisabled ? 0.1 : config.monitorStartQueueDelay, config.monitorStartQueueSize)
         }
         const startMonitorInQueue = theGroup.startMonitorInQueue
         if(!activeMonitor.isStarted)return;

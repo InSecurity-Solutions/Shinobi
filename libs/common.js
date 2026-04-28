@@ -117,7 +117,7 @@ module.exports = {
         return async.queue(function(action, callback) {
             setTimeout(function(){
                 action().then(callback)
-            },timeoutInSeconds * 1000 || 1000)
+            },timeoutInSeconds < 0.2 ? 10 : timeoutInSeconds * 1000 || 1000)
         },queueItemsRunningInParallel || 3)
     },
     copyObject: (obj) => {
