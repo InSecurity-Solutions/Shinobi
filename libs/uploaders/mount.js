@@ -144,6 +144,25 @@ module.exports = function(s,config,lang){
             });
         }
     }
+    async function fileExistAlready(video, sourceFilePath, targetFilePath){
+        let fileInDatabase = false
+        let fileInFilesystem = false
+        const sourceSize = (await fs.stat(sourceFilePath)).size
+        try{
+            const targetSize = (await fs.stat(targetFilePath)).size
+            const fileSizeSame = targetSize === sourceSize
+            fileInFilesystem = fileSizeSame
+        }catch(err){
+        }
+        const rows = await s.knexQueryPromise({
+            action: "select",
+            table: "Videos",
+            where: video,
+            limit: 1,
+        });
+        fileInDatabase = !!rows[0]
+        return { fileInDatabase, fileInFilesystem };
+    }
     async function uploadVideo(e,k,insertQuery){
         //e = video object
         //k = temporary values
@@ -153,16 +172,24 @@ module.exports = function(s,config,lang){
         if(s.group[groupKey].mnt && s.group[groupKey].init.use_mnt !== '0' && s.group[groupKey].init.mnt_save === '1'){
             const monitorId = insertQuery.mid
             const filename = `${s.formattedTime(insertQuery.time)}.${insertQuery.ext}`
-            var fileStream = createReadStream(k.dir + filename);
-            var saveLocation = path.join(s.group[groupKey].init.mnt_dir,groupKey,monitorId,filename)
-            const response = await uploadObject(groupKey, {
+            const sourceFilePath = k.dir + filename
+            const saveLocation = path.join(s.group[groupKey].init.mnt_dir,groupKey,monitorId,filename)
+            const { fileInDatabase, fileInFilesystem } = await fileExistAlready({
+                mid: monitorId,
+                ke: groupKey,
+                ext: insertQuery.ext,
+                time: insertQuery.time,
+                end: k.endTime,
+            }, sourceFilePath, saveLocation);
+            var fileStream = createReadStream(sourceFilePath);
+            const response = fileInFilesystem ? { ok: true } : await uploadObject(groupKey, {
                 filePath: saveLocation,
                 readStream: fileStream,
             });
             if(response.err){
                 s.userLog(e,{type:lang['Mounted Drive Storage Upload Error'],msg:response.err})
             }
-            if(s.group[groupKey].init.mnt_log === '1' && response.ok){
+            if(!fileInDatabase && s.group[groupKey].init.mnt_log === '1' && response.ok){
                 await s.knexQueryPromise({
                     action: "insert",
                     table: "Cloud Videos",
