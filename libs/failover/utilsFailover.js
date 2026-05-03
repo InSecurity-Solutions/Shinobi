@@ -81,6 +81,11 @@ module.exports = async (s,app,config,lang) => {
     }
     async function importMonitors(peerConnectKey){
         const monitors = cachedMonitors[peerConnectKey]
+        let startedCount = 0
+        let completedCount = 0
+        let resolveAll
+        const allDone = new Promise(resolve => { resolveAll = resolve })
+
         for(const monitor of monitors){
             const details = parseJSON(monitor.details)
             details.dir = ''
@@ -89,9 +94,24 @@ module.exports = async (s,app,config,lang) => {
             if(!skipImport[peerConnectKey])skipImport[peerConnectKey] = {}
             if(lostConnections[peerConnectKey] && !skipImport[peerConnectKey][monitorIdentifier]){
                 skipImport[peerConnectKey][monitorIdentifier] = true
-                await s.addOrEditMonitor(monitor, null, { uid: '$SYSTEM' })
-                await saveFailoverState(true, false)
+                if(config.monitorStartQueueDisabled){
+                    startedCount++
+                    s.addOrEditMonitor(monitor, null, { uid: '$SYSTEM' }).then(async () => {
+                        completedCount++
+                        if(completedCount === startedCount){
+                            await saveFailoverState(true, false)
+                            resolveAll()
+                        }
+                    })
+                }else{
+                    await s.addOrEditMonitor(monitor, null, { uid: '$SYSTEM' })
+                    await saveFailoverState(true, false)
+                }
             }
+        }
+
+        if(config.monitorStartQueueDisabled && startedCount > 0){
+            await allDone
         }
     }
     async function deleteMonitors(peerConnectKey, deleteFiles){

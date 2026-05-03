@@ -51,64 +51,74 @@ module.exports = function(s,config,lang,io){
                 next()
             }
         }
-        async function loadMonitors(callback){
+        async function loadMonitors(){
             for (let i = 0; i < s.beforeMonitorsLoadedOnStartupExtensions.length; i++) {
                 await s.beforeMonitorsLoadedOnStartupExtensions[i]()
             }
             s.systemLog(lang.startUpText4)
             //preliminary monitor start
-            s.knexQuery({
+            const { rows: monitors, err } = await s.knexQueryPromise({
                 action: "select",
                 columns: "*",
                 table: "Monitors",
-            }, function(err,monitors) {
-                foundMonitors = monitors.map(item => {
-                    item.details = JSON.parse(item.details)
-                    return item
-                })
-                if(err){s.systemLog('Startup Error', err.toString())}
-                if(monitors && monitors[0]){
-                    var didNotLoad = 0
-                    var loadCompleted = 0
-                    var orphanedVideosForMonitors = {}
-                    var loadMonitor = async function(monitor){
-                        const checkAnother = function(){
-                            ++loadCompleted
-                            if(loadCompleted <= s.cameraCount && monitors[loadCompleted]){
-                                loadMonitor(monitors[loadCompleted])
+            });
+            foundMonitors = monitors.map(item => {
+                item.details = JSON.parse(item.details)
+                return item
+            })
+            if(err){s.systemLog('Startup Error', err.toString())}
+            if(monitors && monitors[0]){
+                var didNotLoad = 0
+                var orphanedVideosForMonitors = {}
+                let startedCount = 0
+                let completedCount = 0
+                let resolveAll
+                const allDone = new Promise(resolve => { resolveAll = resolve })
+                for(monitor of monitors){
+                    if(checkedAdminUsers[monitor.ke]){
+                        loadedMonitors.push(monitor)
+                        if(!orphanedVideosForMonitors[monitor.ke])orphanedVideosForMonitors[monitor.ke] = {}
+                        if(!orphanedVideosForMonitors[monitor.ke][monitor.mid])orphanedVideosForMonitors[monitor.ke][monitor.mid] = 0
+                        s.initiateMonitorObject(monitor)
+                        s.group[monitor.ke].rawMonitorConfigurations[monitor.mid] = monitor
+                        s.sendMonitorStatus({
+                            id: monitor.mid,
+                            ke: monitor.ke,
+                            status: 'Stopped',
+                            code: 5
+                        });
+                        const monObj = Object.assign({},monitor,{id : monitor.mid})
+                        // await s.camera('stop',monObj);
+                        if(!config.safeMode){
+                            if(config.monitorStartQueueDisabled){
+                                if(startedCount <= s.cameraCount){
+                                    startedCount++
+                                    s.camera(monitor.mode,monObj).then(() => {
+                                        completedCount++
+                                        if(completedCount >= startedCount){
+                                            resolveAll()
+                                        }
+                                    })
+                                }
                             }else{
-                                if(didNotLoad > 0)console.log(`${didNotLoad} Monitor${didNotLoad === 1 ? '' : 's'} not loaded because Admin user does not exist for them. It may have been deleted.`);
-                                callback()
+                                await s.camera(monitor.mode,monObj);
+                                startedCount++
+                                if(startedCount >= s.cameraCount){
+                                    break;
+                                }
                             }
                         }
-                        if(checkedAdminUsers[monitor.ke]){
-                            // setTimeout(async function(){
-                                loadedMonitors.push(monitor)
-                                if(!orphanedVideosForMonitors[monitor.ke])orphanedVideosForMonitors[monitor.ke] = {}
-                                if(!orphanedVideosForMonitors[monitor.ke][monitor.mid])orphanedVideosForMonitors[monitor.ke][monitor.mid] = 0
-                                s.initiateMonitorObject(monitor)
-                                s.group[monitor.ke].rawMonitorConfigurations[monitor.mid] = monitor
-                                s.sendMonitorStatus({
-                                    id: monitor.mid,
-                                    ke: monitor.ke,
-                                    status: 'Stopped',
-                                    code: 5
-                                });
-                                const monObj = Object.assign({},monitor,{id : monitor.mid})
-                                // await s.camera('stop',monObj);
-                                if(!config.safeMode)await s.camera(monitor.mode,monObj);
-                                checkAnother()
-                            // },1000)
-                        }else{
-                            ++didNotLoad
-                            checkAnother()
-                        }
+                    }else{
+                        ++didNotLoad
                     }
-                    loadMonitor(monitors[loadCompleted])
-                }else{
-                    callback()
                 }
-            })
+                if(config.monitorStartQueueDisabled && startedCount > 0){
+                    await allDone
+                }
+                if(didNotLoad > 0){
+                    console.log(`${didNotLoad} Monitor${didNotLoad === 1 ? '' : 's'} not loaded because Admin user does not exist for them. It may have been deleted.`);
+                }
+            }
         }
         async function checkForOrphanedVideos(callback){
             var monitors = loadedMonitors
@@ -221,11 +231,10 @@ module.exports = function(s,config,lang,io){
                             loadAdminUsers(async function(){
                                 await s.runExtensionsForArrayAwaited('onLoadedUsersAtStartup', null, [])
                                 //load monitors (for groups)
-                                loadMonitors(function(){
-                                    //check for orphaned videos
-                                    checkForOrphanedVideos(() => {
-                                        s.processReady()
-                                    })
+                                await loadMonitors()
+                                //check for orphaned videos
+                                checkForOrphanedVideos(() => {
+                                    s.processReady()
                                 })
                             })
                         })
