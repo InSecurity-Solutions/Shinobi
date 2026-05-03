@@ -1608,10 +1608,21 @@ module.exports = (s,config,lang) => {
         const typeIsH264 = e.type === 'h264'
         const typeIsLocal = e.type === 'local'
         const doPingTest = e.type !== 'socket' && e.type !== 'dashcam' && e.protocol !== 'udp' && e.type !== 'local' && e.details.skip_ping !== '1';
-        if(!theGroup.startMonitorInQueue){
-            theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDisabled ? 0.1 : config.monitorStartQueueDelay, config.monitorStartQueueSize)
+        let startMonitorInQueue
+        if(config.monitorStartQueueDisabled){
+            if(!theGroup.startMonitorInQueue){
+                theGroup.startMonitorInQueue = {}
+            }
+            if(!theGroup.startMonitorInQueue[monitorId]){
+                theGroup.startMonitorInQueue[monitorId] = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
+            }
+            startMonitorInQueue = theGroup.startMonitorInQueue[monitorId]
+        }else{
+            if(!theGroup.startMonitorInQueue){
+                theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
+            }
+            startMonitorInQueue = theGroup.startMonitorInQueue
         }
-        const startMonitorInQueue = theGroup.startMonitorInQueue
         if(!activeMonitor.isStarted)return;
         // e = monitor object
         clearTimeout(activeMonitor.resetFatalErrorCountTimer)

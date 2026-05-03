@@ -111,7 +111,14 @@ module.exports = async (s,app,config,lang) => {
         const groupKeys = [...new Set(Object.values(monitors).map(monitor => monitor.ke))]
         for(const groupKey of groupKeys){
             try{
-                s.group[groupKey].startMonitorInQueue.kill()
+                if(config.monitorStartQueueDisabled){
+                    let startMonitorInQueue = s.group[groupKey].startMonitorInQueue
+                    for(monitorId in startMonitorInQueue){
+                        startMonitorInQueue[monitorId].kill()
+                    }
+                }else{
+                    s.group[groupKey].startMonitorInQueue.kill()
+                }
             }catch(err){
                 console.log(err)
             }
