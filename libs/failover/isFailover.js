@@ -64,13 +64,13 @@ module.exports = async (s,app,config,lang) => {
         function videoExistsInNormal(client, video, monitor){
             return new Promise(async function(resolve){
                 const filePath = getVideoFilePath(video);
-                const callbackId = generateRandomId(5)
+                const callbackId = s.gid(5)
                 const fileSize = (await fs.stat(filePath)).size
                 const monitorInfo = {
                     mid: video.mid,
                     ke: video.ke,
                     details: {
-                        dir: parseJSON(monitor.details).dir
+                        dir: s.parseJSON(monitor.details).dir
                     }
                 }
                 awaitingCallbacks[callbackId] = function(exists){
