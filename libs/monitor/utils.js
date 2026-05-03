@@ -1614,7 +1614,7 @@ module.exports = (s,config,lang) => {
                 theGroup.startMonitorInQueue = {}
             }
             if(!theGroup.startMonitorInQueue[monitorId]){
-                theGroup.startMonitorInQueue[monitorId] = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
+                theGroup.startMonitorInQueue[monitorId] = createQueueAwaited(config.monitorStartQueueDelay, 1)
             }
             startMonitorInQueue = theGroup.startMonitorInQueue[monitorId]
         }else{
