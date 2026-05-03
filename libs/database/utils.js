@@ -106,11 +106,11 @@ module.exports = function(s,config){
             var dbQuery
             switch(options.action){
                 case'select':
-                    options.columns = options.columns.indexOf(',') === -1 ? [options.columns] : options.columns.split(',');
+                    options.columns = options.columns ? options.columns.indexOf(',') === -1 ? [options.columns] : options.columns.split(',') : ['*'];
                     dbQuery = s.databaseEngine.select(...options.columns).from(options.table)
                 break;
                 case'count':
-                    options.columns = options.columns.indexOf(',') === -1 ? [options.columns] : options.columns.split(',');
+                    options.columns = options.columns ? options.columns.indexOf(',') === -1 ? [options.columns] : options.columns.split(',') : ['*'];
                     dbQuery = s.databaseEngine(options.table)
                     dbQuery.count(options.columns)
                 break;
