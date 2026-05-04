@@ -169,6 +169,7 @@ module.exports = (s,app,config,lang) => {
     async function getVideo(video){
         const rows = await s.knexQueryPromise({
             action: "select",
+            columns: "*",
             table: "Videos",
             where: video,
             limit: 1,
