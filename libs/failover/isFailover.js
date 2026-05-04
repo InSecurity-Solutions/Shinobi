@@ -63,7 +63,7 @@ module.exports = async (s,app,config,lang) => {
         }
         function videoExistsInNormal(client, video, monitor){
             return new Promise(async function(resolve){
-                const filePath = getVideoFilePath(video);
+                const filePath = getVideoFilePath(video, monitor);
                 const callbackId = s.gid(5)
                 const fileSize = (await fs.stat(filePath)).size
                 const monitorInfo = {
