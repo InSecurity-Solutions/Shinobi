@@ -123,10 +123,11 @@ module.exports = function(s,config,lang){
         }
     }
     //user log
-    s.userLog = function(e,x){
+    s.userLog = function(e, x, forceSave){
         if(e.id && !e.mid)e.mid = e.id
         if(!x||!e.mid){return}
         if(
+            forceSave ||
             (e.details && e.details.sqllog === '1') ||
             e.mid.indexOf('$') > -1
         ){

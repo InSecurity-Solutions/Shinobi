@@ -609,7 +609,7 @@ module.exports = (s,config,lang) => {
             clearTimeout(activeMonitor.initialHeartBeat)
             if(activeMonitor.isStarted === true){
                 if(e.details.loglevel !== 'quiet'){
-                    s.userLog(e,{type:lang['Process Unexpected Exit'],msg:{msg:lang.unexpectedExitText,cmd:activeMonitor.ffmpeg}});
+                    s.userLog(e,{type:lang['Process Unexpected Exit'],msg:{msg:lang.unexpectedExitText,cmd:activeMonitor.ffmpeg}}, true);
                 }
                 await fatalError(e,'Process Unexpected Exit');
                 scanForOrphanedVideos(e,{
@@ -631,7 +631,7 @@ module.exports = (s,config,lang) => {
             msg: {
                 cmd: activeMonitor.ffmpeg
             }
-        })
+        }, true)
     }
     async function deleteMonitorData(groupKey,monitorId){
         // deleteVideos
@@ -738,11 +738,11 @@ module.exports = (s,config,lang) => {
             const monitorConfig = Object.assign({}, s.group[groupKey].rawMonitorConfigurations[monitorId])
             s.userLog({
                 ke: groupKey,
-                mid: monitorId
+                mid: '$USER'
             },{
                 type: lang.monitorDeleted,
                 msg: `${lang.byUser} : ${userId}`
-            });
+            }, true);
             await s.camera('stop', {
                 ke: groupKey,
                 mid: monitorId,
@@ -835,7 +835,7 @@ module.exports = (s,config,lang) => {
             activeMonitor.isRecording = false
             s.tx({f:'monitor_stopping',mid:monitorId,ke:groupKey,time:s.formattedTime()},'GRP_'+groupKey);
             // s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true})
-            s.userLog(e,{type:lang['Monitor Stopped'],msg:lang.MonitorStoppedText});
+            s.userLog(e,{type:lang['Monitor Stopped'],msg:lang.MonitorStoppedText}, true);
             clearTimeout(activeMonitor.delete)
             if(e.delete === 1){
                 activeMonitor.delete = setTimeout(function(){
@@ -1028,7 +1028,7 @@ module.exports = (s,config,lang) => {
         s.userLog({
             ke: groupKey,
             mid: monitorId,
-        },restartMessage)
+        },restartMessage, true)
         scanForOrphanedVideos({
             ke: groupKey,
             mid: monitorId,
