@@ -1484,6 +1484,7 @@ module.exports = (s,config,lang) => {
         const activeMonitor = getActiveMonitor(groupKey,monitorId)
         activeMonitor.spawn.stderr.on('data',async function(d){
             d=d.toString();
+            let forceSave = false
             switch(true){
                 case checkLog(d,'Not Enough Bandwidth'):
                     activeMonitor.criticalErrors['453'] = true
@@ -1491,6 +1492,7 @@ module.exports = (s,config,lang) => {
                 case checkLog(d,'No space left on device'):
                     s.checkUserPurgeLock(groupKey)
                     s.purgeDiskForGroup(groupKey)
+                    forceSave = true
                 break;
                 case checkLog(d,'error parsing AU headers'):
                     s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingTextAudio});
@@ -1534,7 +1536,7 @@ module.exports = (s,config,lang) => {
                     },60000)
                 break;
             }
-            s.userLog(e,{type:"FFMPEG STDERR",msg:d})
+            s.userLog(e,{type:"FFMPEG STDERR",msg:d}, forceSave)
         })
     }
     function setNoEventsDetector(e){
