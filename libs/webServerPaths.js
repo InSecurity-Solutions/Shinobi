@@ -325,6 +325,7 @@ module.exports = function(s,config,lang,app,io){
             if(board === 'super'){
                 s.userLog(logTo,logData)
             }else{
+                s.userLog(logTo,logData)
                 s.knexQuery({
                     action: "select",
                     columns: "ke,uid,details",
@@ -338,7 +339,6 @@ module.exports = function(s,config,lang,app,io){
                         r.details = JSON.parse(r.details)
                         logData.id = r.uid
                         logData.type = lang['Authentication Failed']
-                        logTo.ke = r.ke
                     }
                     s.userLog(logTo,logData)
                 })
