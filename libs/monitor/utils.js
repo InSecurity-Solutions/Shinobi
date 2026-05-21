@@ -388,7 +388,7 @@ module.exports = (s,config,lang) => {
                     msg: lang["Process Started"],
                     cmd: ffmpegCommandString,
                 },
-            });
+            },true);
             const subStreamProcess = spawn(config.ffmpegDir,ffmpegCommandParsed,{detached: true,stdio: stdioPipes})
             attachStreamChannelHandlers({
                 ke: groupKey,
@@ -437,7 +437,7 @@ module.exports = (s,config,lang) => {
                     },{
                         type: lang["Substream Process"],
                         msg: lang["Process Crashed for Monitor"],
-                    })
+                    },true)
                     setTimeout(() => {
                         spawnSubstreamProcess(e)
                     },2000)
@@ -624,7 +624,7 @@ module.exports = (s,config,lang) => {
         activeMonitor.spawn.on('end',activeMonitor.spawn_exit)
         activeMonitor.spawn.on('exit',activeMonitor.spawn_exit)
         activeMonitor.spawn.on('error',function(er){
-            s.userLog(e,{type:'Spawn Error',msg:er});fatalError(e,'Spawn Error')
+            s.userLog(e,{type:'Spawn Error',msg:er},true);fatalError(e,'Spawn Error')
         })
         s.userLog(e,{
             type: lang['Process Started'],
@@ -869,7 +869,7 @@ module.exports = (s,config,lang) => {
         const monitorId = e.mid || e.id
         const groupKey = e.ke
         s.tx({f:'monitor_idle',mid:monitorId,ke:groupKey,time:s.formattedTime()},'GRP_'+groupKey);
-        s.userLog(e,{type:lang['Monitor Idling'],msg:lang.MonitorIdlingText});
+        s.userLog(e,{type:lang['Monitor Idling'],msg:lang.MonitorIdlingText},true);
         s.sendMonitorStatus({
             id: monitorId,
             ke: groupKey,
@@ -1495,10 +1495,10 @@ module.exports = (s,config,lang) => {
                     forceSave = true
                 break;
                 case checkLog(d,'error parsing AU headers'):
-                    s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingTextAudio});
+                    s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingTextAudio},true);
                 break;
                 case checkLog(d,'error while decoding'):
-                    s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingText});
+                    s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingText},true);
                 break;
                 case d.startsWith('DTS'):
                 case checkLog(d,'pkt->duration = 0'):
@@ -1516,7 +1516,7 @@ module.exports = (s,config,lang) => {
                 case checkLog(d,'Could not find tag for vp8'):
                 case checkLog(d,'Only VP8 or VP9 Video'):
                 case checkLog(d,'Could not write header'):
-                    return s.userLog(e,{type:lang['Incorrect Settings Chosen'],msg:{msg:d}})
+                    return s.userLog(e,{type:lang['Incorrect Settings Chosen'],msg:{msg:d}},true)
                 break;
                 case checkLog(d,'Connection refused'):
                 case checkLog(d,'Connection timed out'):
@@ -1525,12 +1525,14 @@ module.exports = (s,config,lang) => {
                 case checkLog(d,'bad vlc'):
                 case checkLog(d,'does not contain an image sequence pattern or a pattern is invalid.'):
                 case checkLog(d,'error dc'):
+                    forceSave = true
                     // activeMonitor.timeoutToRestart = setTimeout(() => {
                     //     doFatalErrorCatch(e,d)
                     // },15000)
                 break;
                 case checkLog(d,'Could not find codec parameters'):
                 case checkLog(d,'No route to host'):
+                    forceSave = true;
                     activeMonitor.timeoutToRestart = setTimeout(async () => {
                         doFatalErrorCatch(e,d)
                     },60000)
@@ -1554,7 +1556,7 @@ module.exports = (s,config,lang) => {
                 fetchTimeout(detector_notrigger_webhook_url,10000,{
                     method: webhookMethod
                 }).catch((err) => {
-                    s.userLog(d,{type:lang["Event Webhook Error"],msg:{error:err,data:data}})
+                    s.userLog(d,{type:lang["Event Webhook Error"],msg:{error:err,data:data}},true)
                 })
             }
             if(currentConfig.detector_notrigger_command_enable === '1' && !s.group[groupKey].activeMonitors[monitorId].detector_notrigger_command){
@@ -1739,7 +1741,7 @@ module.exports = (s,config,lang) => {
                               s.onMonitorPingFailedExtensions.forEach(function(extender){
                                   extender(Object.assign(theGroup.rawMonitorConfigurations[monitorId],{}),e)
                               })
-                              s.userLog(e,{type:lang["Ping Failed"],msg:lang.skipPingText1});
+                              s.userLog(e,{type:lang["Ping Failed"],msg:lang.skipPingText1},true);
                               fatalError(e,"Ping Failed").then(() => {
                                   resolve();
                               });
@@ -1817,7 +1819,7 @@ module.exports = (s,config,lang) => {
         if(activeMonitor.isStarted === true){
             activeMonitor.fatalErrorTimeout = setTimeout(function(){
                 if(maxCount !== 0 && activeMonitor.errorFatalCount > maxCount){
-                    s.userLog(e,{type:lang["Fatal Error"],msg:`${lang.onFatalErrorExit}, ${errorMessage}`});
+                    s.userLog(e,{type:lang["Fatal Error"],msg:`${lang.onFatalErrorExit}, ${errorMessage}`},true);
                     s.camera('stop',{mid:monitorId,ke:groupKey})
                 }else{
                     launchMonitorProcesses(monitorConfig)

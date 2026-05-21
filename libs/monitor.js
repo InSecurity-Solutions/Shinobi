@@ -432,7 +432,7 @@ module.exports = function(s,config,lang){
                         s.userLog({
                             ke: groupKey,
                             mid: '$USER'
-                        },{type:lang['Videos Merge'],msg:data.toString()})
+                        },{type:lang['Videos Merge'],msg:data.toString()}, true)
                     })
                     merger.on('close',function(){
                         merger.removeAllListeners()
@@ -630,7 +630,10 @@ module.exports = function(s,config,lang){
                     monitorQuery[v] = form[v]
                 }
             })
-            s.userLog(form,{type:'Monitor Updated',msg:'by user : '+user.uid})
+            s.userLog({
+                ke: form.ke,
+                mid: '$USER'
+            },{type:lang['Monitor Updated'],msg:`${form.name} (${form.mid}) ${lang['modified by user']} : ${user.mail} (${user.uid})`}, true)
             endData.msg = lang['Monitor Updated by user']+' : '+user.uid
             s.knexQuery({
                 action: "update",
@@ -652,7 +655,10 @@ module.exports = function(s,config,lang){
                     monitorQuery[v] = form[v]
                 }
             })
-            s.userLog(form,{type:'Monitor Added',msg:'by user : '+user.uid})
+            s.userLog({
+                ke: form.ke,
+                mid: '$USER'
+            },{type:lang['Monitor Added'],msg:`${form.name} (${form.mid}) ${lang['added by user']} : ${user.mail} (${user.uid})`}, true)
             endData.msg = lang['Monitor Added by user']+' : '+user.uid
             s.knexQuery({
                 action: "insert",
