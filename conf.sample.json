@@ -11,6 +11,9 @@
   "detectorMergePamRegionTriggers": true,
   "wallClockTimestampAsDefault": true,
   "useBetterP2P": true,
+  "logCpuAndRamDangerZone": false,
+  "logFailoverActivity": false,
+  "logCentralManagementActivity": false,
   "smtpServerOptions": {
       "allowInsecureAuth": true
   },

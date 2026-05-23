@@ -56,6 +56,15 @@ class CentralConnection {
       }
     };
 
+    if (this.config.logCentralManagementActivity) {
+        this.logger.main = (...args) => {
+            parentPort.postMessage({ f: 'systemLog', data: args });
+        }
+    }else{
+        this.logger.main = (...args) => {
+            parentPort.postMessage({ f: 'debugLog', data: args });
+        }
+    }
     // if (this.config.debugLog) {
       this.logger.debugLog = (...args) => {
         parentPort.postMessage({ f: 'debugLog', data: args });
@@ -79,7 +88,7 @@ class CentralConnection {
           _this.internalEvents.emit('onTriggerNotificationSend', data);
           break;
         case 'exit':
-          _this.logger.debugLog('Closing Central Connection...');
+          _this.logger.main('Closing Central Connection...');
           process.exit(0);
           break;
       }
@@ -136,8 +145,7 @@ class CentralConnection {
   }
 
   async startWebsocketConnection() {
-    this.logger.debugLog('startWebsocketConnection EXECUTE', new Error());
-    console.log('Central : Connecting to Central Server...');
+    this.logger.main('Central : Connecting to Central Server...');
 
     try {
       this.clearAllTimers();
@@ -164,18 +172,18 @@ class CentralConnection {
   }
 
   onWebsocketOpen() {
-    console.log('Central : Connected! Authenticating...');
+    this.logger.main('Central : Connected! Authenticating...');
     this.authenticateConnection();
   }
 
   onWebsocketError(err) {
-    console.log('Central tunnelToCentral Error:', err);
-    console.log('Central Restarting...');
+    this.logger.main(`Central tunnelToCentral Error: ${err.toString()}`);
+    this.logger.main('Central Restarting...');
     this.disconnectedConnection();
   }
 
   onWebsocketClose() {
-    console.log('Central Connection Closed!');
+    this.logger.main('Central Connection Closed!');
     this.clearAllTimers();
     this.timers.onClosed = setTimeout(() => {
       this.disconnectedConnection();
@@ -210,7 +218,7 @@ class CentralConnection {
   setupSocketCheckTimer() {
     this.timers.socketCheck = setInterval(() => {
       if (this.tunnelToP2P.readyState !== 1) {
-        this.logger.debugLog('Tunnel NOT Ready! Reconnecting...');
+        this.logger.main('Tunnel NOT Ready! Reconnecting...');
         this.disconnectedConnection();
       }
     }, SOCKET_CHECK_INTERVAL);
@@ -241,11 +249,11 @@ class CentralConnection {
   disconnectedConnection() {
     this.logger.debugLog('stayDisconnected', this.stayDisconnected);
     this.clearAllTimers();
-    this.logger.debugLog('DISCONNECTED!');
+    this.logger.main('Disconnected from Managment Server!');
 
     if (this.stayDisconnected) return;
 
-    this.logger.debugLog('RESTARTING!');
+    this.logger.main('Restarting Connection to Management Server!');
     setTimeout(() => {
       if (!this.tunnelToP2P || this.tunnelToP2P.readyState !== 1) {
         this.startWebsocketConnection();
@@ -404,7 +412,7 @@ class CentralConnection {
     this.onIncomingMessage('pong', () => {}); // Heartbeat response
 
     this.onIncomingMessage('init', () => {
-      console.log('Central : Authenticated!');
+      this.logger.main('Central : Authenticated!');
       parentPort.postMessage({ f: 'authenticated' });
     });
 
@@ -432,9 +440,9 @@ class CentralConnection {
     });
 
     this.onIncomingMessage('disconnect', (data) => {
-      console.log('FAILED LICENSE CHECK ON P2P');
+      this.logger.main('Central : FAILED LICENSE CHECK ON CENTRAL');
       this.stayDisconnected = !data?.retryLater;
-      if (data?.retryLater) console.log('Retrying Central Later...');
+      if (data?.retryLater) this.logger.main('Central : Retrying Central Later...');
     });
   }
 }

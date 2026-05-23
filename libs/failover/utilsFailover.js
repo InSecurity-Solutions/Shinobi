@@ -41,7 +41,15 @@ module.exports = async (s,app,config,lang) => {
         }
         return { ...data, ...monitorsCache }
     }
-
+    if(config.logFailoverActivity){
+        function logFailoverActivity(...args){
+            s.systemLog(...args)
+        }
+    }else{
+        function logFailoverActivity(...args){
+            s.debugLog(...args)
+        }
+    }
     const {
         cachedMonitors = {},
         cachedMonitorsIndex = {},
@@ -81,11 +89,6 @@ module.exports = async (s,app,config,lang) => {
     }
     async function importMonitors(peerConnectKey){
         const monitors = cachedMonitors[peerConnectKey]
-        let startedCount = 0
-        let completedCount = 0
-        let resolveAll
-        const allDone = new Promise(resolve => { resolveAll = resolve })
-
         for(const monitor of monitors){
             const details = parseJSON(monitor.details)
             details.dir = ''
@@ -94,24 +97,9 @@ module.exports = async (s,app,config,lang) => {
             if(!skipImport[peerConnectKey])skipImport[peerConnectKey] = {}
             if(lostConnections[peerConnectKey] && !skipImport[peerConnectKey][monitorIdentifier]){
                 skipImport[peerConnectKey][monitorIdentifier] = true
-                if(config.monitorStartQueueDisabled){
-                    startedCount++
-                    s.addOrEditMonitor(monitor, null, { uid: '$SYSTEM' }).then(async () => {
-                        completedCount++
-                        if(completedCount === startedCount){
-                            await saveFailoverState(true, false)
-                            resolveAll()
-                        }
-                    })
-                }else{
-                    await s.addOrEditMonitor(monitor, null, { uid: '$SYSTEM' })
-                    await saveFailoverState(true, false)
-                }
+                await s.addOrEditMonitor(monitor, null, { uid: '$SYSTEM' })
+                await saveFailoverState(true, false)
             }
-        }
-
-        if(config.monitorStartQueueDisabled && startedCount > 0){
-            await allDone
         }
     }
     async function deleteMonitors(peerConnectKey, deleteFiles){
@@ -131,14 +119,7 @@ module.exports = async (s,app,config,lang) => {
         const groupKeys = [...new Set(Object.values(monitors).map(monitor => monitor.ke))]
         for(const groupKey of groupKeys){
             try{
-                if(config.monitorStartQueueDisabled){
-                    let startMonitorInQueue = s.group[groupKey].startMonitorInQueue
-                    for(monitorId in startMonitorInQueue){
-                        startMonitorInQueue[monitorId].kill()
-                    }
-                }else{
-                    s.group[groupKey].startMonitorInQueue.kill()
-                }
+                s.group[groupKey].startMonitorInQueue.kill()
             }catch(err){
                 console.log(err)
             }
@@ -494,7 +475,7 @@ module.exports = async (s,app,config,lang) => {
     }
     function setLostServerActionTimeout(peerConnectKey){
         lostServerActionTimeout(peerConnectKey, async () => {
-            console.log('Failover : Setting up lost Server configurations ', peerConnectKey)
+            logFailoverActivity(`Failover : Setting up lost Server configurations ${peerConnectKey}`)
             // need to send signal to other Failover servers not to do the same thing if one is already doing
             const filteredUsers = (cachedUsers[peerConnectKey] || []).filter(user => user.mail !== 'dummy@shinobi.dummy');
             if(filteredUsers[0]){

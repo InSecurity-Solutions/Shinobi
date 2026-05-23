@@ -15,6 +15,15 @@ module.exports = (s,app,config,lang) => {
         modifyConfiguration,
         getConfiguration
     } = require('../system/utils.js')(config)
+    if(config.logFailoverActivity){
+        function logFailoverActivity(...args){
+            s.systemLog(...args)
+        }
+    }else{
+        function logFailoverActivity(...args){
+            s.debugLog(...args)
+        }
+    }
     async function getMonitors(){
         const { rows: monitors } = await s.knexQueryPromise({
             action: "select",
@@ -184,10 +193,10 @@ module.exports = (s,app,config,lang) => {
     function connectToFailover({ host, key }){
         clearTimeout(reconnectTimeouts[host])
         const parsedIp = parseNewConnectionAddress(host)
-        s.debugLog('Attempting Connection to Failover at ', parsedIp)
+        s.systemLog('Attempting Connection to Failover at ', parsedIp)
         const clientConnection = createWebSocketClient(parsedIp)
         function reconnectOnFailure(){
-            s.debugLog('Failover Connection Failed, Trying again...', host)
+            s.systemLog('Failover Connection Failed, Trying again...', host)
             try{
                 failoverServerConnections[host].terminate()
             }catch(err){}
@@ -200,23 +209,23 @@ module.exports = (s,app,config,lang) => {
         }
         clientConnection.onclose = reconnectOnFailure
         clientConnection.on('open', () => {
-            s.debugLog('Connected to Failover, Attempting Authentication... ', host)
+            s.systemLog('Connected to Failover, Attempting Authentication... ', host)
             sendMessage(clientConnection, { key })
         })
         clientConnection.on('error', (data) => {
-            s.debugLog('Failover Connection Error : ', data)
+            s.systemLog('Failover Connection Error : ', data)
         })
         clientConnection.on('message', async (message) => {
             const data = bson.deserialize(Buffer.from(message))
             switch(data.f){
                 case'init':
-                    s.debugLog('Initializing Failover at ', host)
+                    s.systemLog('Initializing Failover at ', host)
                     await cachePermissions(clientConnection)
                     await cacheUsers(clientConnection)
                     await cacheMonitors(clientConnection)
                     sendMessage(clientConnection, { f: 'init_complete' })
                     sendFailoverServerCache()
-                    s.debugLog('Initialized Failover at ', host)
+                    s.systemLog('Initialized Failover at ', host)
                 break;
                 case'insertEvents':
                     insertEvents(data.events)
@@ -279,7 +288,7 @@ module.exports = (s,app,config,lang) => {
                     }
                     failoverServerConnections[host].terminate()
                 }catch(err){
-                    s.debugLog(err)
+                    s.systemLog(err)
                     resolve()
                 }
             })

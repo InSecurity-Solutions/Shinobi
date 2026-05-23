@@ -8,6 +8,21 @@ $(document).ready(function () {
         "type": "boolean",
         "default": false
       },
+      "logCpuAndRamDangerZone": {
+        "title": lang["Enable Critical CPU and RAM Logging"],
+        "type": "boolean",
+        "default": false
+      },
+      "logFailoverActivity": {
+        "title": lang["Enable Failover Status Logging"],
+        "type": "boolean",
+        "default": false
+      },
+      "logCentralManagementActivity": {
+        "title": lang["Enable Central Management Status Logging"],
+        "type": "boolean",
+        "default": false
+      },
       "failoverAllowCloudUploaders": {
         "title": lang["Enable Failover Cloud Uploads"],
         "type": "boolean",

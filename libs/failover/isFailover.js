@@ -53,6 +53,15 @@ module.exports = async (s,app,config,lang) => {
         const failoverServerCache = {}
         const awaitingCallbacks = {}
         const theWebSocket = createWebSocketServer()
+        if(config.logFailoverActivity){
+            function logFailoverActivity(...args){
+                s.systemLog(...args)
+            }
+        }else{
+            function logFailoverActivity(...args){
+                s.debugLog(...args)
+            }
+        }
         function setClientKillTimerIfNotAuthenticatedInTime(client){
             client.killTimer = setTimeout(function(){
                 client.terminate()
@@ -63,14 +72,14 @@ module.exports = async (s,app,config,lang) => {
         }
         function videoExistsInNormal(client, video, monitor){
             return new Promise(async function(resolve){
-                const filePath = getVideoFilePath(video, monitor);
-                const callbackId = s.gid(5)
+                const filePath = getVideoFilePath(video);
+                const callbackId = generateRandomId(5)
                 const fileSize = (await fs.stat(filePath)).size
                 const monitorInfo = {
                     mid: video.mid,
                     ke: video.ke,
                     details: {
-                        dir: s.parseJSON(monitor.details).dir
+                        dir: parseJSON(monitor.details).dir
                     }
                 }
                 awaitingCallbacks[callbackId] = function(exists){
@@ -99,13 +108,13 @@ module.exports = async (s,app,config,lang) => {
                     peerConnectKey = `${key}`
                     deleteLostServerActionTimeout(peerConnectKey)
                     setNormalServerConnection(peerConnectKey, client)
-                    console.log('Authenticated as Failover for ', peerConnectKey)
+                    logFailoverActivity(`Authenticated as Failover for ${peerConnectKey}`)
                     client.on('message', onAuthenticatedData)
                     client.on('close', onAuthenticatedExit)
                     sendMessage(client, { f: 'init' })
-                    console.log('Initializing as Failover for ', peerConnectKey)
+                    logFailoverActivity(`Initializing as Failover for ${peerConnectKey}`)
                 }else{
-                    console.log('Failed Authentication as Failover for ', key)
+                    logFailoverActivity(`Failed Authentication as Failover for ${key}`)
                     client.terminate()
                 }
             }
@@ -129,7 +138,7 @@ module.exports = async (s,app,config,lang) => {
                 const data = bson.deserialize(Buffer.from(message))
                 switch(data.f){
                     case'exit':
-                        console.log('Failover : Requested Graceful Exit ', peerConnectKey)
+                        logFailoverActivity(`Failover : Requested Graceful Exit ${peerConnectKey}`)
                         setGracefulExitRequest(peerConnectKey, true)
                     break;
                     case'cache_other_failovers':
@@ -137,20 +146,28 @@ module.exports = async (s,app,config,lang) => {
                         failoverServerCache[peerConnectKey] = data.allServers;
                     break;
                     case'init_complete':
-                        console.log('Initialized as Failover for ', peerConnectKey)
+                        logFailoverActivity(`Initialized as Failover for ${peerConnectKey}`)
                         clearKillTimer(client)
                         clearSkipImport(peerConnectKey)
                         await saveFailoverState()
                         reconnectedLostServerActionTimeout(peerConnectKey, async () => {
-                            console.log('Failover : Reconnected to ', peerConnectKey)
+                            logFailoverActivity(`Failover : Reconnected to ${peerConnectKey}`)
+                            logFailoverActivity(`Failover : Stopping Monitors ${peerConnectKey}...`)
                             await stopMonitorQueues(peerConnectKey)
                             await stopMonitors(peerConnectKey)
+                            logFailoverActivity(`Failover : Uploading Videos to ${peerConnectKey}...`)
                             await beginVideoTransmission(peerConnectKey, videoExistsInNormal)
+                            logFailoverActivity(`Failover : Copying Events to ${peerConnectKey}...`)
                             await beginEventTransmission(peerConnectKey)
+                            logFailoverActivity(`Failover : Copying Cloud Videos Records to ${peerConnectKey}...`)
                             await beginCloudUploadRecordsTransmission(peerConnectKey)
+                            logFailoverActivity(`Failover : Removing Monitors added by ${peerConnectKey}...`)
                             await deleteMonitors(peerConnectKey)
+                            logFailoverActivity(`Failover : Removing Users added by ${peerConnectKey}...`)
                             await deleteUsers(peerConnectKey)
+                            logFailoverActivity(`Failover : Resetting Management Server Connections...`)
                             await s.resetAllManagementServers()
+                            logFailoverActivity(`Failover : Saving Failover Cache...`)
                             await saveFailoverState()
                         })
                     break;
@@ -205,18 +222,17 @@ module.exports = async (s,app,config,lang) => {
                         awaitingCallbacks[data.callbackId](data.exists)
                     break;
                     default:
-                        console.log(`No Failover Handler!`)
-                        console.log(`here's what we got :`)
-                        console.log(data)
+                        logFailoverActivity(`No Failover Handler!`)
+                        logFailoverActivity(data)
                     break;
                 }
             }
             client.on('message', onAuthenticate)
             client.on('close', () => {
                 if(getGracefulExitRequest(peerConnectKey)){
-                    console.log('Failover : Gracefully Disconnected ', peerConnectKey)
+                    logFailoverActivity(`Failover : Gracefully Disconnected ${peerConnectKey}`)
                 }else{
-                    console.log('Failover : Lost Connection for ', peerConnectKey)
+                    logFailoverActivity(`Failover : Lost Connection for ${peerConnectKey}`)
                 }
                 clearTimeout(client.killTimer)
                 client.removeAllListeners()
