@@ -157,7 +157,7 @@ module.exports = function(s,config,lang,io){
             setInterval(async () => {
                 const cpu = await s.cpuUsage()
                 const ram = await s.ramUsage()
-                logCpu(percent)
+                logCpu(cpu)
                 logRam(ram.percent)
                 s.tx({
                     f: 'os',
