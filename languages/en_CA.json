@@ -1171,6 +1171,8 @@
    "Stopping": "Stopping",
    "Died": "Died",
    "Restart": "Restart",
+   "Restart Monitor": "Restart Monitor",
+   "restartMonitorMsg": "Do you want to restart the Monitor? Any active recordings will end and live streams will be lost momentarily.",
    "Monitor Stopped": "Monitor Stopped",
    "MonitorStoppedText": "Monitor session has been ordered to stop.",
    "Monitor Idling": "Monitor Idling",
