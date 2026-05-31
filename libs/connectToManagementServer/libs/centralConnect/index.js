@@ -87,6 +87,10 @@ class CentralConnection {
           data.peerConnectKey = this.peerConnectKey;
           _this.internalEvents.emit('onTriggerNotificationSend', data);
           break;
+        case 'saveLogToCentral':
+          data.data.peerConnectKey = this.peerConnectKey;
+          _this.internalEvents.emit('saveLogToCentral', data.data);
+          break;
         case 'exit':
           _this.logger.main('Closing Central Connection...');
           process.exit(0);
@@ -95,6 +99,9 @@ class CentralConnection {
     });
     this.internalEvents.on('onTriggerNotificationSend', (data) => {
         this.sendDataToTunnel({ f: 'onTriggerNotificationSend', data });
+    });
+    this.internalEvents.on('saveLogToCentral', (data) => {
+        this.sendDataToTunnel({ f: 'saveLogToCentral', data });
     });
   }
 
@@ -207,10 +214,10 @@ class CentralConnection {
     this.scheduleHeartbeatCheck();
   }
 
-  sendDataToTunnel(data) {
+  sendDataToTunnel(data, logFailureToSend) {
     if (this.tunnelToP2P.readyState === 1) {
         this.tunnelToP2P.send(bson.serialize(data));
-    }else{
+    }else if(logFailureToSend){
         console.log('Cant Send Data, Tunnel Not Ready!')
     }
   }
@@ -255,6 +262,7 @@ class CentralConnection {
 
     this.logger.main('Restarting Connection to Management Server!');
     setTimeout(() => {
+        console.log(`!this.tunnelToP2P || this.tunnelToP2P.readyState !== 1`,!this.tunnelToP2P || this.tunnelToP2P.readyState !== 1)
       if (!this.tunnelToP2P || this.tunnelToP2P.readyState !== 1) {
         this.startWebsocketConnection();
       }

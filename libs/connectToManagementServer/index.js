@@ -5,6 +5,7 @@ module.exports = (s,config,lang,app) => {
     }
     const { modifyConfiguration, getConfiguration } = require('../system/utils.js')(config)
     require('./libs/pairServer.js')(s,config,lang)
+    require('./libs/logging.js')(s,config,lang)
     const {
         getManagementServers,
         addManagementServer,
@@ -26,6 +27,9 @@ module.exports = (s,config,lang,app) => {
     })
     s.onTriggerNotificationSend((groupKey, data, files) => {
         sendMessageToAllConnectedServers({ f: 'onTriggerNotificationSend', groupKey, data, files })
+    })
+    s.onSaveLogToCentral((data) => {
+        sendMessageToAllConnectedServers({ f: 'saveLogToCentral', data })
     })
     /**
     * API : Superuser : Get Management Server Settings

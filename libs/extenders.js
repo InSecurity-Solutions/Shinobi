@@ -212,6 +212,10 @@ module.exports = function(s,config){
     createExtension(`onScheduleDeleted`)
     // [0] groupKey : Group Key of Schedule
     // [1] schedule : The deleted schedule item
+    createExtension(`onSaveLogToCentral`)
+    // [0] data : "saveLog" values for Central db insert
+    createExtension(`onSystemLog`)
+    // [0] logEvent : the databse row being inserted
 
     /////// CRON ////////
     createExtension(`onCronGroupProcessed`)

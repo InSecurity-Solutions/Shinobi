@@ -126,11 +126,13 @@ module.exports = function(s,config,lang){
     s.userLog = function(e, x, forceSave){
         if(e.id && !e.mid)e.mid = e.id
         if(!x||!e.mid){return}
+        let doSave = forceSave;
         if(
             forceSave ||
             (e.details && e.details.sqllog === '1') ||
             e.mid.indexOf('$') > -1
         ){
+            doSave = true
             s.knexQuery({
                 action: "insert",
                 table: "Logs",
@@ -150,7 +152,7 @@ module.exports = function(s,config,lang){
         }
         s.tx(logEvent,'GRPLOG_'+e.ke);
         s.onUserLogExtensions.forEach(function(extender){
-            extender(logEvent)
+            extender(logEvent, doSave)
         })
     }
     s.loadGroup = function(e){

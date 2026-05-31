@@ -1516,6 +1516,7 @@ module.exports = (s,config,lang) => {
                 case checkLog(d,'Could not find tag for vp8'):
                 case checkLog(d,'Only VP8 or VP9 Video'):
                 case checkLog(d,'Could not write header'):
+                    forceSave = true
                     return s.userLog(e,{type:lang['Incorrect Settings Chosen'],msg:{msg:d}},true)
                 break;
                 case checkLog(d,'Connection refused'):

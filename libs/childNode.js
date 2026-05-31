@@ -153,8 +153,8 @@ module.exports = function(s,config,lang,app,io){
         s.tx = function(x,y){
             sendDataToMasterNode({f:'s.tx',data:x,to:y})
         }
-        s.userLog = function(x,y){
-            sendDataToMasterNode({f:'s.userLog',mon:x,data:y})
+        s.userLog = function(x,y, forceSave){
+            sendDataToMasterNode({f:'s.userLog', mon:x,data:y, forceSave})
         }
         s.queuedSqlCallbacks = {}
         s.sqlQuery = function(query,values,onMoveOn){

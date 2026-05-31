@@ -76,7 +76,7 @@ module.exports = function(s,config,lang,app,io){
             break;
             case's.userLog':
                 if(!data.mon || !data.data)return console.log('LOG DROPPED',data.mon,data.data);
-                s.userLog(data.mon,data.data)
+                s.userLog(data.mon,data.data,data.forceSave)
             break;
         }
     }
