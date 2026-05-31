@@ -186,6 +186,13 @@ module.exports = function(s,config){
                     }
                 })
                 s.tx({f:'log',log:{time:s.timeObject(),ke:'$',mid:'$SYSTEM',time:s.timeObject(),info:s.s({type:q,msg:w})}},'$');
+                s.runExtensionsForArray('onSystemLog', null, [
+                    {
+                        ke: '$',
+                        mid: '$SYSTEM',
+                        info: {type:q,msg:w},
+                    }
+                ])
             }
             return console.log(s.timeObject().format(),q,w,e)
         }
