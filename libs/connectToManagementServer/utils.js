@@ -67,8 +67,9 @@ module.exports = (s,config,lang) => {
         return response
     }
     function terminateSshToManagement(serverIp){
-        if(s.connectedMgmtServers[serverIp]){
-            s.connectedMgmtServers[serverIp].sshWorker.terminate()
+        clearTimeout(queuedSshRestart[serverIp])
+        if(s.connectedMgmtServers[serverIp] && s.connectedMgmtServers[serverIp].sshWorker){
+            try{ s.connectedMgmtServers[serverIp].sshWorker.terminate() }catch(err){}
             delete(s.connectedMgmtServers[serverIp].sshWorker)
         }
     }
@@ -86,10 +87,7 @@ module.exports = (s,config,lang) => {
     }
     async function provideSshToManagement(serverIp, p2pKey){
         if(sshDisabled)return;
-        if(queuedSshRestart[serverIp]){
-            clearTimeout(queuedSshRestart[serverIp]);
-            return s.connectedMgmtServers[serverIp].sshWorker
-        }
+        terminateSshToManagement(serverIp)
         const configFromFile = await getConfiguration()
         const wsServerParts = serverIp.split(':')
         wsServerParts[serverIp.includes('://') ? 2 : 1] = configFromFile.sshSocketPort || 9021
@@ -116,7 +114,7 @@ module.exports = (s,config,lang) => {
         worker.on('exit', (code) => {
             if(!s.connectedMgmtServers[serverIp].wantTerminate){
                 console.log('cameraPeer SSH Exited, Restarting...', serverIp, code)
-                s.connectedMgmtServers[serverIp].sshWorker = provideSshToManagement(serverIp, p2pKey)
+                // s.connectedMgmtServers[serverIp].sshWorker = provideSshToManagement(serverIp, p2pKey)
             }else{
                 console.log('cameraPeer SSH Exited, NOT Restarting...', serverIp, code)
             }
