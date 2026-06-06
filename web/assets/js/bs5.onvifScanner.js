@@ -2,13 +2,18 @@ $(document).ready(function(e){
     //onvif probe
     var loadedResults = {}
     var loadedResultsByIp = {}
-    var monitorEditorWindow = $('#tab-monitorSettings')
     var onvifScannerWindow = $('#tab-onvifScanner')
     var onvifScannerResultPane = onvifScannerWindow.find('.onvif_result')
+    var onvifScannerProgress = $('#onvifScanner-progress')
+    var onvifScannerProgressBar = onvifScannerProgress.find('.progress-bar')
+    var onvifScannerProgressText = onvifScannerProgress.find('.progress-text')
     var onvifScannerErrorResultPane = onvifScannerWindow.find('.onvif_result_error')
     var scanForm = onvifScannerWindow.find('form');
     var sideMenuList = $(`#side-menu-link-onvifScanner  ul`)
-    var checkTimeout;
+    var foundDevicesCount = 0
+    var otherDevicesCount = 0
+    var foundDevicesCountEl = $(`#onvif-scanner-found-devices-count`)
+    var otherDevicesCountEl = $(`#onvif-scanner-other-devices-count`)
     function addCredentialsToUri(uri,username,password){
         let newUri = `${uri}`
         const uriParts = newUri.split('://')
@@ -30,12 +35,10 @@ $(document).ready(function(e){
         var html = buildSubMenuItems(allFound)
         sideMenuList.html(html)
     }
-    var setAsLoading = function(appearance){
+    function setAsLoading(appearance){
         if(appearance){
-            onvifScannerWindow.find('._loading').show()
             onvifScannerWindow.find('[type="submit"]').prop('disabled',true)
         }else{
-            onvifScannerWindow.find('._loading').hide()
             onvifScannerWindow.find('[type="submit"]').prop('disabled',false)
         }
     }
@@ -94,7 +97,6 @@ $(document).ready(function(e){
                 </div>
             `)
             onvifScannerWindow.find('._notfound').remove()
-            setAsLoading(false)
             drawFoundCamerasSubMenu()
         }else{
             if(!loadedResultsByIp[options.ip]){
@@ -168,6 +170,34 @@ $(document).ready(function(e){
             }
         })
     }
+    function showButtons(runType){
+        onvifScannerWindow.find(`.view-running,.view-idle,.view-paused`).hide()
+        onvifScannerWindow.find(`.view-${runType}`).show()
+    }
+    function isMonitorAddedToServer(d){
+        var theLocation = getLocationFromUri(d.uri)
+        var pathLocation = theLocation.location
+        var host = pathLocation.hostname
+        var path = pathLocation.pathname + (pathLocation.search && pathLocation.search !== '?' ? pathLocation.search : '')
+        var foundMonitor = Object.values(loadedMonitors).findIndex(monitor => {
+            return monitor.host === host && monitor.path === path
+        });
+        return foundMonitor > -1
+    }
+    function drawProbeResultChecked(d){
+        var drawTheRow = true
+        if(!d.error){
+            drawTheRow = !isMonitorAddedToServer(d)
+            if(drawTheRow){
+                foundDevicesCount += 1
+                foundDevicesCountEl.text(foundDevicesCount)
+            }
+        }else{
+            otherDevicesCount += 1
+            otherDevicesCountEl.text(otherDevicesCount)
+        }
+        if(drawTheRow)drawProbeResult(d)
+    }
     scanForm.submit(function(e){
         e.preventDefault();
         loadedResults = {}
@@ -176,7 +206,8 @@ $(document).ready(function(e){
         var form = el.serializeObject();
         onvifScannerResultPane.empty();
         onvifScannerErrorResultPane.empty();
-        setAsLoading(true)
+        foundDevicesCount = 0
+        otherDevicesCount = 0
         mainSocket.f({
             f: 'onvif',
             ip: form.ip,
@@ -184,13 +215,6 @@ $(document).ready(function(e){
             user: form.user,
             pass: form.pass
         });
-        clearTimeout(checkTimeout)
-        checkTimeout = setTimeout(function(){
-            if(onvifScannerResultPane.find('.card').length === 0){
-                setAsLoading(false)
-                onvifScannerResultPane.append(`<div class="p-2 text-center ${definitions.Theme.isDark ? 'text-white' : ''} _notfound text-white epic-text">${lang.sorryNothingWasFound}</div>`)
-            }
-        },5000)
         return false;
     });
     onvifScannerWindow.on('click','.copy',function(){
@@ -209,12 +233,62 @@ $(document).ready(function(e){
             })
         })
     })
+    onvifScannerWindow.on('click','.scan-pause',function(){
+        mainSocket.f({ f: 'onvif_scan_pause' })
+    })
+    onvifScannerWindow.on('click','.scan-resume',function(){
+        mainSocket.f({ f: 'onvif_scan_resume' })
+    })
+    onvifScannerWindow.on('click','.scan-cancel',function(){
+        mainSocket.f({ f: 'onvif_scan_cancel' })
+    })
     loadLocalOptions()
     onWebSocketEvent(function (d){
         switch(d.f){
             case'onvif':
-                drawProbeResult(d)
+                drawProbeResultChecked(d)
+            break;
+            case'onvif_scan_progress':
+                onvifScannerProgressBar.css('width',`${d.percent}%`)
+                onvifScannerProgressText.text(`${d.processedItems} / ${d.totalItems}, ${d.percent}%`)
+            break;
+            case'onvif_scan_status':
+                if(d.active){
+                    setAsLoading(true)
+                    showButtons('running')
+                    d.found.forEach((result) => {
+                        drawProbeResultChecked(result)
+                    })
+                }else{
+                    showButtons('idle')
+                }
+            break;
+            case'onvif_scan_started':
+                setAsLoading(true)
+                showButtons('running')
+            break;
+            case'onvif_scan_ended':
+                setAsLoading(false)
+                showButtons('idle')
+                if(d.foundNumber === 0)onvifScannerResultPane.append(`<div class="p-2 text-center _notfound text-white epic-text">${lang.sorryNothingWasFound}</div>`)
+                new PNotify({
+                    title: lang['ONVIF Scanner'],
+                    text: lang['Scan Complete'],
+                    type: 'success'
+                });
+            break;
+            case'onvif_scan_resume':
+                showButtons('running')
+            break;
+            case'onvif_scan_pause':
+                showButtons('paused')
+            break;
+            case'onvif_scan_cancel':
+                showButtons('idle')
             break;
         }
+    })
+    addOnTabOpen('onvifScanner', () => {
+        mainSocket.f({ f: 'onvif_scan_status' })
     })
 })
