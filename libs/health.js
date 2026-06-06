@@ -3,6 +3,26 @@ var exec = require('child_process').exec;
 var spawn = require('child_process').spawn;
 const { getCpuUsageOnLinux, getRamUsageOnLinux } = require('./health/utils.js')
 module.exports = function(s,config,lang,io){
+    let lastLoggedCpu = new Date()
+    let lastLoggedRam = new Date()
+    const allowedLogInterval = 1000 * 1000 * 60 * 60 // 1 hour
+    const criticalUtilization = 90
+    function logCpu(percent){
+        if(percent < criticalUtilization)return;
+        const timeNow = new Date()
+        if(timeNow - lastLoggedCpu > allowedLogInterval){
+            lastLoggedCpu = new Date()
+            s.systemLog(`CPU Reached Critical Utilization ${percent}`)
+        }
+    }
+    function logRam(percent){
+        if(percent < criticalUtilization)return;
+        const timeNow = new Date()
+        if(timeNow - lastLoggedRam > allowedLogInterval){
+            lastLoggedRam = new Date()
+            s.systemLog(`RAM Reached Critical Utilization ${percent}`)
+        }
+    }
     s.heartBeat = function(){
         setTimeout(s.heartBeat, 8000);
         io.sockets.emit('ping',{beat:1});
@@ -133,14 +153,28 @@ module.exports = function(s,config,lang,io){
         }
     }
     if(config.childNodes.mode !== 'child'){
-        setInterval(async () => {
-            const cpu = await s.cpuUsage()
-            const ram = await s.ramUsage()
-            s.tx({
-                f: 'os',
-                cpu: cpu,
-                ram: ram
-            },'CPU')
-        },10000)
+        if(config.logCpuAndRamDangerZone){
+            setInterval(async () => {
+                const cpu = await s.cpuUsage()
+                const ram = await s.ramUsage()
+                logCpu(cpu)
+                logRam(ram.percent)
+                s.tx({
+                    f: 'os',
+                    cpu: cpu,
+                    ram: ram
+                },'CPU')
+            },10000)
+        }else{
+            setInterval(async () => {
+                const cpu = await s.cpuUsage()
+                const ram = await s.ramUsage()
+                s.tx({
+                    f: 'os',
+                    cpu: cpu,
+                    ram: ram
+                },'CPU')
+            },10000)
+        }
     }
 }

@@ -97,17 +97,19 @@ module.exports = function(s,config,lang){
         if(s.group[groupKey]&&s.group[groupKey].init){
             clearTimeout(diskUsedEmitterTimeouts[groupKey])
             diskUsedEmitterTimeouts[groupKey] = setTimeout(() => {
-                delete diskUsedEmitterTimeouts[groupKey]
-                s.tx({
-                    f: 'diskUsed',
-                    size: s.group[groupKey].usedSpace,
-                    usedSpace: s.group[groupKey].usedSpace,
-                    usedSpaceVideos: s.group[groupKey].usedSpaceVideos,
-                    usedSpaceFilebin: s.group[groupKey].usedSpaceFilebin,
-                    usedSpaceTimelapseFrames: s.group[groupKey].usedSpaceTimelapseFrames,
-                    limit: s.group[groupKey].sizeLimit,
-                    addStorage: s.group[groupKey].addStorageUse,
-                },'GRP_'+groupKey);
+                if(s.group[groupKey]&&s.group[groupKey].init){
+                    delete diskUsedEmitterTimeouts[groupKey]
+                    s.tx({
+                        f: 'diskUsed',
+                        size: s.group[groupKey].usedSpace,
+                        usedSpace: s.group[groupKey].usedSpace,
+                        usedSpaceVideos: s.group[groupKey].usedSpaceVideos,
+                        usedSpaceFilebin: s.group[groupKey].usedSpaceFilebin,
+                        usedSpaceTimelapseFrames: s.group[groupKey].usedSpaceTimelapseFrames,
+                        limit: s.group[groupKey].sizeLimit,
+                        addStorage: s.group[groupKey].addStorageUse,
+                    },'GRP_'+groupKey);
+                }
             },1000)
         }
     }
@@ -121,13 +123,16 @@ module.exports = function(s,config,lang){
         }
     }
     //user log
-    s.userLog = function(e,x){
+    s.userLog = function(e, x, forceSave){
         if(e.id && !e.mid)e.mid = e.id
         if(!x||!e.mid){return}
+        let doSave = forceSave;
         if(
+            forceSave ||
             (e.details && e.details.sqllog === '1') ||
             e.mid.indexOf('$') > -1
         ){
+            doSave = true
             s.knexQuery({
                 action: "insert",
                 table: "Logs",
@@ -147,7 +152,7 @@ module.exports = function(s,config,lang){
         }
         s.tx(logEvent,'GRPLOG_'+e.ke);
         s.onUserLogExtensions.forEach(function(extender){
-            extender(logEvent)
+            extender(logEvent, doSave)
         })
     }
     s.loadGroup = function(e){
@@ -180,8 +185,13 @@ module.exports = function(s,config,lang){
         s.sendCloudDiskUsedAmountToClients(e.ke)
         // create monitor management queue
         if(!theGroup.startMonitorInQueue){
-            theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
+            theGroup.startMonitorInQueue = config.monitorStartQueueDisabled ? {} : createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
         }
+    }
+    s.unloadGroupApps = function(user){
+        s.unloadGroupAppExtensions.forEach(function(extender){
+            extender(user)
+        })
     }
     s.loadGroupApps = function(e){
         // e = user

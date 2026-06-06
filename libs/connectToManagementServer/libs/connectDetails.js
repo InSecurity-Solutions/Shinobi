@@ -1,6 +1,9 @@
 const fs = require("fs").promises
 module.exports = (s,config,lang) => {
     const { getNewApiKey } = require('../../user/apiKeys.js')(s,config,lang)
+    const {
+        legacyCreateAdminUser,
+    } = require('../../user/utils.js')(s,config,lang)
     const configPath = s.location.super;
     const requiredApiKeyPermissions = {
         "auth_socket": "1",
@@ -54,6 +57,26 @@ module.exports = (s,config,lang) => {
         const apiKey = superUser.tokens[0];
         return apiKey
     }
+    async function createDummyAdminUser(){
+        const form = {
+            mail: 'dummy@shinobi.dummy',
+            ke: 'DUMMY',
+            pass: '1234',
+            pass_again: '1234',
+            details: s.stringJSON({"factorAuth":"0","size":"","days":"","event_days":"","log_days":"","max_camera":"","permissions":"all","edit_size":"1","edit_days":"1","edit_event_days":"1","edit_log_days":"1","use_aws_s3":"1","use_whcs":"1","use_sftp":"1","use_webdav":"1","use_discordbot":"1","use_ldap":"1","aws_use_global":"0","whcs_use_global":"0","b2_use_global":"0","webdav_use_global":"0"})
+        }
+        const createResponse = await legacyCreateAdminUser(form, 'mail', true)
+        const { rows } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Users",
+            where: {
+                mail: 'dummy@shinobi.dummy'
+            },
+            limit: 1,
+        });
+        return rows[0]
+    }
     async function getFirstAdminApiKey(){
         const { rows } = await s.knexQueryPromise({
             action: "select",
@@ -61,7 +84,37 @@ module.exports = (s,config,lang) => {
             table: "Users",
             limit: 1,
         });
-        const user = rows[0];
+        let user = rows[0];
+        if(!user)user = await createDummyAdminUser();
+        const apiKey = await getFirstApiKey(user.ke, user.uid)
+        return { groupKey: user.ke, apiKey }
+    }
+    async function getFirstAdminUser(){
+        const { rows } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Users",
+            limit: 1,
+        });
+        let user = rows[0];
+        if(!user)user = await createDummyAdminUser();
+        return user
+    }
+    async function getAdminApiKey(targetUser){
+        if(!targetUser){
+            return await getFirstAdminApiKey()
+        }
+        const { rows } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Users",
+            where: {
+                mail: targetUser
+            },
+            limit: 1,
+        });
+        let user = rows[0];
+        if(!user)user = await getFirstAdminUser();
         const apiKey = await getFirstApiKey(user.ke, user.uid)
         return { groupKey: user.ke, apiKey }
     }
@@ -108,9 +161,9 @@ module.exports = (s,config,lang) => {
         });
         return newApiKey
     }
-    async function getConnectionDetails(){
+    async function getConnectionDetails(targetUser){
         const superApiKey = await getFirstSuperApiKey()
-        const { groupKey, apiKey } = await getFirstAdminApiKey()
+        const { groupKey, apiKey } = await getAdminApiKey(targetUser)
         return {
             superApiKey,
             groupKey,

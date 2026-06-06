@@ -12,6 +12,8 @@ module.exports = function(s,config,lang,io){
         maxHttpBufferSize: config.socketIoMaxHttpBufferSize || 1e6,
     }
     require('./monitor/websocket.js')(s,config,lang,io);
+    require('./video/websocket.js')(s,config,lang,io);
+    require('./events/websocket.js')(s,config,lang,io);
     app.disable('x-powered-by');
     //get page URL
     if(!config.baseURL){

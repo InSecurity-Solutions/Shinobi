@@ -171,6 +171,14 @@ module.exports = (s,config,lang) => {
             clearInterval(activeMonitor.objectCountIntervals);
             clearTimeout(activeMonitor.timeoutToRestart)
             clearTimeout(activeMonitor.fatalErrorTimeout);
+            clearTimeout(activeMonitor.trigger_timer)
+            delete(activeMonitor.trigger_timer)
+            clearTimeout(activeMonitor.initialHeartBeat)
+            clearInterval(activeMonitor.detector_notrigger_timeout)
+            delete(activeMonitor.detector_notrigger_timeout)
+            clearTimeout(activeMonitor.noViewerCountDisableSubstream)
+            clearTimeout(activeMonitor.motion_lock)
+            clearTimeout(activeMonitor.resetFatalErrorCountTimer)
             delete(activeMonitor.onvifConnection)
             delete(activeMonitor.buildingTimelapseVideo)
             // if(activeMonitor.onChildNodeExit){
@@ -380,7 +388,7 @@ module.exports = (s,config,lang) => {
                     msg: lang["Process Started"],
                     cmd: ffmpegCommandString,
                 },
-            });
+            },true);
             const subStreamProcess = spawn(config.ffmpegDir,ffmpegCommandParsed,{detached: true,stdio: stdioPipes})
             attachStreamChannelHandlers({
                 ke: groupKey,
@@ -429,7 +437,7 @@ module.exports = (s,config,lang) => {
                     },{
                         type: lang["Substream Process"],
                         msg: lang["Process Crashed for Monitor"],
-                    })
+                    },true)
                     setTimeout(() => {
                         spawnSubstreamProcess(e)
                     },2000)
@@ -588,9 +596,9 @@ module.exports = (s,config,lang) => {
         const monitorConfig = copyMonitorConfiguration(groupKey,monitorId);
         const streamType = monitorConfig.details.stream_type;
         const analyzeDuration = (parseInt(monitorConfig.details.aduration) / 1000) || 10000;
-        let initialHeartBeat = null
+        activeMonitor.initialHeartBeat = null
         if(streamType !== 'useSubstream'){
-            initialHeartBeat = setTimeout(() => {
+            activeMonitor.initialHeartBeat = setTimeout(() => {
                 resetStreamCheck({
                     ke: groupKey,
                     mid: monitorId,
@@ -598,10 +606,10 @@ module.exports = (s,config,lang) => {
             }, analyzeDuration);
         }
         activeMonitor.spawn_exit = async function(){
-            clearTimeout(initialHeartBeat)
+            clearTimeout(activeMonitor.initialHeartBeat)
             if(activeMonitor.isStarted === true){
                 if(e.details.loglevel !== 'quiet'){
-                    s.userLog(e,{type:lang['Process Unexpected Exit'],msg:{msg:lang.unexpectedExitText,cmd:activeMonitor.ffmpeg}});
+                    s.userLog(e,{type:lang['Process Unexpected Exit'],msg:{msg:lang.unexpectedExitText,cmd:activeMonitor.ffmpeg}}, true);
                 }
                 await fatalError(e,'Process Unexpected Exit');
                 scanForOrphanedVideos(e,{
@@ -616,14 +624,14 @@ module.exports = (s,config,lang) => {
         activeMonitor.spawn.on('end',activeMonitor.spawn_exit)
         activeMonitor.spawn.on('exit',activeMonitor.spawn_exit)
         activeMonitor.spawn.on('error',function(er){
-            s.userLog(e,{type:'Spawn Error',msg:er});fatalError(e,'Spawn Error')
+            s.userLog(e,{type:'Spawn Error',msg:er},true);fatalError(e,'Spawn Error')
         })
         s.userLog(e,{
             type: lang['Process Started'],
             msg: {
                 cmd: activeMonitor.ffmpeg
             }
-        })
+        }, true)
     }
     async function deleteMonitorData(groupKey,monitorId){
         // deleteVideos
@@ -730,11 +738,11 @@ module.exports = (s,config,lang) => {
             const monitorConfig = Object.assign({}, s.group[groupKey].rawMonitorConfigurations[monitorId])
             s.userLog({
                 ke: groupKey,
-                mid: monitorId
+                mid: '$USER'
             },{
                 type: lang.monitorDeleted,
                 msg: `${lang.byUser} : ${userId}`
-            });
+            }, true);
             await s.camera('stop', {
                 ke: groupKey,
                 mid: monitorId,
@@ -823,15 +831,11 @@ module.exports = (s,config,lang) => {
             if(activeMonitor.last_frame){delete(activeMonitor.last_frame)}
             if(activeMonitor.isStarted !== true){return}
             await cameraDestroy(e)
-            clearTimeout(activeMonitor.trigger_timer)
-            delete(activeMonitor.trigger_timer)
-            clearInterval(activeMonitor.detector_notrigger_timeout)
-            clearTimeout(activeMonitor.fatalErrorTimeout);
             activeMonitor.isStarted = false
             activeMonitor.isRecording = false
             s.tx({f:'monitor_stopping',mid:monitorId,ke:groupKey,time:s.formattedTime()},'GRP_'+groupKey);
             // s.cameraSendSnapshot({mid:monitorId,ke:groupKey,mon:e},{useIcon: true})
-            s.userLog(e,{type:lang['Monitor Stopped'],msg:lang.MonitorStoppedText});
+            s.userLog(e,{type:lang['Monitor Stopped'],msg:lang.MonitorStoppedText}, true);
             clearTimeout(activeMonitor.delete)
             if(e.delete === 1){
                 activeMonitor.delete = setTimeout(function(){
@@ -865,7 +869,7 @@ module.exports = (s,config,lang) => {
         const monitorId = e.mid || e.id
         const groupKey = e.ke
         s.tx({f:'monitor_idle',mid:monitorId,ke:groupKey,time:s.formattedTime()},'GRP_'+groupKey);
-        s.userLog(e,{type:lang['Monitor Idling'],msg:lang.MonitorIdlingText});
+        s.userLog(e,{type:lang['Monitor Idling'],msg:lang.MonitorIdlingText},true);
         s.sendMonitorStatus({
             id: monitorId,
             ke: groupKey,
@@ -1024,7 +1028,7 @@ module.exports = (s,config,lang) => {
         s.userLog({
             ke: groupKey,
             mid: monitorId,
-        },restartMessage)
+        },restartMessage, true)
         scanForOrphanedVideos({
             ke: groupKey,
             mid: monitorId,
@@ -1480,6 +1484,7 @@ module.exports = (s,config,lang) => {
         const activeMonitor = getActiveMonitor(groupKey,monitorId)
         activeMonitor.spawn.stderr.on('data',async function(d){
             d=d.toString();
+            let forceSave = false
             switch(true){
                 case checkLog(d,'Not Enough Bandwidth'):
                     activeMonitor.criticalErrors['453'] = true
@@ -1487,12 +1492,13 @@ module.exports = (s,config,lang) => {
                 case checkLog(d,'No space left on device'):
                     s.checkUserPurgeLock(groupKey)
                     s.purgeDiskForGroup(groupKey)
+                    forceSave = true
                 break;
                 case checkLog(d,'error parsing AU headers'):
-                    s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingTextAudio});
+                    s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingTextAudio},true);
                 break;
                 case checkLog(d,'error while decoding'):
-                    s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingText});
+                    s.userLog(e,{type:lang['Error While Decoding'],msg:lang.ErrorWhileDecodingText},true);
                 break;
                 case d.startsWith('DTS'):
                 case checkLog(d,'pkt->duration = 0'):
@@ -1510,7 +1516,8 @@ module.exports = (s,config,lang) => {
                 case checkLog(d,'Could not find tag for vp8'):
                 case checkLog(d,'Only VP8 or VP9 Video'):
                 case checkLog(d,'Could not write header'):
-                    return s.userLog(e,{type:lang['Incorrect Settings Chosen'],msg:{msg:d}})
+                    forceSave = true
+                    return s.userLog(e,{type:lang['Incorrect Settings Chosen'],msg:{msg:d}},true)
                 break;
                 case checkLog(d,'Connection refused'):
                 case checkLog(d,'Connection timed out'):
@@ -1519,18 +1526,20 @@ module.exports = (s,config,lang) => {
                 case checkLog(d,'bad vlc'):
                 case checkLog(d,'does not contain an image sequence pattern or a pattern is invalid.'):
                 case checkLog(d,'error dc'):
+                    forceSave = true
                     // activeMonitor.timeoutToRestart = setTimeout(() => {
                     //     doFatalErrorCatch(e,d)
                     // },15000)
                 break;
                 case checkLog(d,'Could not find codec parameters'):
                 case checkLog(d,'No route to host'):
+                    forceSave = true;
                     activeMonitor.timeoutToRestart = setTimeout(async () => {
                         doFatalErrorCatch(e,d)
                     },60000)
                 break;
             }
-            s.userLog(e,{type:"FFMPEG STDERR",msg:d})
+            s.userLog(e,{type:"FFMPEG STDERR",msg:d}, forceSave)
         })
     }
     function setNoEventsDetector(e){
@@ -1548,7 +1557,7 @@ module.exports = (s,config,lang) => {
                 fetchTimeout(detector_notrigger_webhook_url,10000,{
                     method: webhookMethod
                 }).catch((err) => {
-                    s.userLog(d,{type:lang["Event Webhook Error"],msg:{error:err,data:data}})
+                    s.userLog(d,{type:lang["Event Webhook Error"],msg:{error:err,data:data}},true)
                 })
             }
             if(currentConfig.detector_notrigger_command_enable === '1' && !s.group[groupKey].activeMonitors[monitorId].detector_notrigger_command){
@@ -1604,10 +1613,21 @@ module.exports = (s,config,lang) => {
         const typeIsH264 = e.type === 'h264'
         const typeIsLocal = e.type === 'local'
         const doPingTest = e.type !== 'socket' && e.type !== 'dashcam' && e.protocol !== 'udp' && e.type !== 'local' && e.details.skip_ping !== '1';
-        if(!theGroup.startMonitorInQueue){
-            theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
+        let startMonitorInQueue
+        if(config.monitorStartQueueDisabled){
+            if(!theGroup.startMonitorInQueue){
+                theGroup.startMonitorInQueue = {}
+            }
+            if(!theGroup.startMonitorInQueue[monitorId]){
+                theGroup.startMonitorInQueue[monitorId] = createQueueAwaited(config.monitorStartQueueDelay, 1)
+            }
+            startMonitorInQueue = theGroup.startMonitorInQueue[monitorId]
+        }else{
+            if(!theGroup.startMonitorInQueue){
+                theGroup.startMonitorInQueue = createQueueAwaited(config.monitorStartQueueDelay, config.monitorStartQueueSize)
+            }
+            startMonitorInQueue = theGroup.startMonitorInQueue
         }
-        const startMonitorInQueue = theGroup.startMonitorInQueue
         if(!activeMonitor.isStarted)return;
         // e = monitor object
         clearTimeout(activeMonitor.resetFatalErrorCountTimer)
@@ -1722,7 +1742,7 @@ module.exports = (s,config,lang) => {
                               s.onMonitorPingFailedExtensions.forEach(function(extender){
                                   extender(Object.assign(theGroup.rawMonitorConfigurations[monitorId],{}),e)
                               })
-                              s.userLog(e,{type:lang["Ping Failed"],msg:lang.skipPingText1});
+                              s.userLog(e,{type:lang["Ping Failed"],msg:lang.skipPingText1},true);
                               fatalError(e,"Ping Failed").then(() => {
                                   resolve();
                               });
@@ -1800,12 +1820,12 @@ module.exports = (s,config,lang) => {
         if(activeMonitor.isStarted === true){
             activeMonitor.fatalErrorTimeout = setTimeout(function(){
                 if(maxCount !== 0 && activeMonitor.errorFatalCount > maxCount){
-                    s.userLog(e,{type:lang["Fatal Error"],msg:`${lang.onFatalErrorExit}, ${errorMessage}`});
+                    s.userLog(e,{type:lang["Fatal Error"],msg:`${lang.onFatalErrorExit}, ${errorMessage}`},true);
                     s.camera('stop',{mid:monitorId,ke:groupKey})
                 }else{
                     launchMonitorProcesses(monitorConfig)
                 };
-            },activeMonitor.errorFatalCount >= 3 ? 1000 * 60 * 60 : 5000);
+            },activeMonitor.errorFatalCount >= 3 ? 1000 * 60 * 10 : 5000);
         }else{
             await cameraDestroy(e)
         }

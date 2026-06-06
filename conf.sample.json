@@ -1,5 +1,9 @@
 {
   "port": 8080,
+  "isFailover": false,
+  "failoverAllowCloudUploaders": false,
+  "monitorStartQueueSize": 1,
+  "monitorStartQueueDelay": 0.5,
   "debugLog": false,
   "enableFaceManager": false,
   "videosDir": "__DIR__/videos",
@@ -7,6 +11,9 @@
   "detectorMergePamRegionTriggers": true,
   "wallClockTimestampAsDefault": true,
   "useBetterP2P": true,
+  "logCpuAndRamDangerZone": false,
+  "logFailoverActivity": false,
+  "logCentralManagementActivity": false,
   "smtpServerOptions": {
       "allowInsecureAuth": true
   },

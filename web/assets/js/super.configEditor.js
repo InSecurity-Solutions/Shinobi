@@ -3,6 +3,41 @@ $(document).ready(function () {
     "title": lang["Main Configuration"],
     "type": "object",
     "properties": {
+      "isFailover": {
+        "title": lang["Enable as Failover Server"],
+        "type": "boolean",
+        "default": false
+      },
+      "logCpuAndRamDangerZone": {
+        "title": lang["Enable Critical CPU and RAM Logging"],
+        "type": "boolean",
+        "default": false
+      },
+      "logFailoverActivity": {
+        "title": lang["Enable Failover Status Logging"],
+        "type": "boolean",
+        "default": false
+      },
+      "logCentralManagementActivity": {
+        "title": lang["Enable Central Management Status Logging"],
+        "type": "boolean",
+        "default": false
+      },
+      "failoverAllowCloudUploaders": {
+        "title": lang["Enable Failover Cloud Uploads"],
+        "type": "boolean",
+        "default": false
+      },
+      "monitorStartQueueSize": {
+        "title": lang["Simultaneous Monitor Start"],
+        "type": "integer",
+        "default": 1
+      },
+      "monitorStartQueueDelay": {
+        "title": lang["Monitor Start Delay"],
+        "type": "number",
+        "default": 0.5
+      },
       "debugLog": {
         "title": lang["Enable Debug Log"],
         "type": "boolean",

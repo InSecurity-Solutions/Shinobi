@@ -43,6 +43,7 @@ module.exports = function(s,config){
             await extender(...args)
         }
     }
+    s.createExtension = createExtension
     ////// INFO //////
     // Arguments for callback noted below each Extension.
     // Example use of arguments : s.onSocketAuthentication((userDatabaseRow,socketIoConnection,initiateData,sendDataToClient) => { console.log(userDatabaseRow) })
@@ -70,6 +71,9 @@ module.exports = function(s,config){
     // [0] groupLoadedInMemory : Object of group initiated in memory.
     // [1] userDetails : Additional data about the user. If Admin user it will have group data.
     // [2] userDatabaseRow : Object of User database row.
+    createExtension(`onAccountDelete`)
+    // [0] account : Object of group initiated in memory.
+    // [1] optionsUsed : deleteSubAccounts, deleteMonitors, stopMonitors, deleteVideos, deleteEvents, systemAction.
     createExtension(`beforeAccountSave`)
     // [0] infoObject : form (complete post of user data to be update), formDetails (form posted details), userDetails (details in database before save)
     createExtension(`onTwoFactorAuthCodeNotification`)
@@ -159,6 +163,8 @@ module.exports = function(s,config){
     // no arguments
     createExtension(`onLoadedUsersAtStartup`)
     // no arguments
+    createExtension(`onBeforeLoadedUsersAtStartup`)
+    // no arguments
     createExtension(`onBeforeDatabaseLoad`)
     // [0] config : The Configuration object used to initiate the Shinobi core process.
     createExtension(`onFFmpegLoaded`)
@@ -207,6 +213,10 @@ module.exports = function(s,config){
     createExtension(`onScheduleDeleted`)
     // [0] groupKey : Group Key of Schedule
     // [1] schedule : The deleted schedule item
+    createExtension(`onSaveLogToCentral`)
+    // [0] data : "saveLog" values for Central db insert
+    createExtension(`onSystemLog`)
+    // [0] logEvent : the databse row being inserted
 
     /////// CRON ////////
     createExtension(`onCronGroupProcessed`)

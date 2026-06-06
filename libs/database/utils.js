@@ -106,11 +106,11 @@ module.exports = function(s,config){
             var dbQuery
             switch(options.action){
                 case'select':
-                    options.columns = options.columns.indexOf(',') === -1 ? [options.columns] : options.columns.split(',');
+                    options.columns = options.columns ? options.columns.indexOf(',') === -1 ? [options.columns] : options.columns.split(',') : ['*'];
                     dbQuery = s.databaseEngine.select(...options.columns).from(options.table)
                 break;
                 case'count':
-                    options.columns = options.columns.indexOf(',') === -1 ? [options.columns] : options.columns.split(',');
+                    options.columns = options.columns ? options.columns.indexOf(',') === -1 ? [options.columns] : options.columns.split(',') : ['*'];
                     dbQuery = s.databaseEngine(options.table)
                     dbQuery.count(options.columns)
                 break;
@@ -439,6 +439,13 @@ module.exports = function(s,config){
             })
         })
     }
+    const sqlQueryBetweenTimesWithPermissionsPromise = (options) => {
+        return new Promise((resolve,reject) => {
+            sqlQueryBetweenTimesWithPermissions(options, (response) => {
+                resolve(response)
+            })
+        })
+    }
     const connectDatabase = function(){
         s.databaseEngine = require('knex')(s.databaseOptions)
     }
@@ -533,17 +540,18 @@ module.exports = function(s,config){
         return query
     }
     return {
-        knexQuery: knexQuery,
-        knexQueryPromise: knexQueryPromise,
-        knexError: knexError,
-        cleanSqlWhereObject: cleanSqlWhereObject,
-        processSimpleWhereCondition: processSimpleWhereCondition,
-        processWhereCondition: processWhereCondition,
-        mergeQueryValues: mergeQueryValues,
-        getDatabaseRows: getDatabaseRows,
-        sqlQuery: sqlQuery,
-        connectDatabase: connectDatabase,
-        sqlQueryBetweenTimesWithPermissions: sqlQueryBetweenTimesWithPermissions,
+        knexQuery,
+        knexQueryPromise,
+        knexError,
+        cleanSqlWhereObject,
+        processSimpleWhereCondition,
+        processWhereCondition,
+        mergeQueryValues,
+        getDatabaseRows,
+        sqlQuery,
+        connectDatabase,
+        sqlQueryBetweenTimesWithPermissions,
+        sqlQueryBetweenTimesWithPermissionsPromise,
         currentTimestamp,
         createTable,
         alterColumn,

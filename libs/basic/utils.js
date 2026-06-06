@@ -303,6 +303,14 @@ module.exports = (processCwd,config) => {
         }
         return form;
     }
+    function isValidPath(givenPath, startsWithIgnore){
+        let checkPath = `${givenPath}`
+        if(!givenPath)return false;
+        if(startsWithIgnore && givenPath.startsWith(startsWithIgnore)){
+            checkPath = checkPath.replace(startsWithIgnore,'')
+        }
+        return /^(\/?[a-z0-9A-Z\-_. ]+)*\/?$/.test(checkPath.replace('__DIR__',processCwd))
+    }
     return {
         parseJSON: parseJSON,
         stringJSON: stringJSON,
@@ -328,5 +336,6 @@ module.exports = (processCwd,config) => {
         setTimeoutPromise,
         cleanStringsInObject,
         convertNumbersToStrings,
+        isValidPath,
     }
 }

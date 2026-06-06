@@ -16,3 +16,4 @@ faces
 unknownFaces
 .idea/
 /ffmpeg
+failoverState.json

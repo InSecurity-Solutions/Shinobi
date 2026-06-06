@@ -1,7 +1,4 @@
 module.exports = (s,config,lang) => {
-    const {
-        yesNoPossibility,
-    } = require('./fieldValues.js')(s,config,lang);
     return {
          "section": "ONVIF Scanner",
          "blocks": {
@@ -92,7 +89,7 @@ module.exports = (s,config,lang) => {
                ]
            },
            "Found Devices": {
-              "name": lang['Found Devices'],
+              "name": `${lang['Found Devices']} (<span id="onvif-scanner-found-devices-count">0</span>)`,
               "color": "blue",
               "section-pre-class": "col-md-8",
               "info": [
@@ -103,7 +100,7 @@ module.exports = (s,config,lang) => {
               ]
           },
           "Other Devices": {
-             "name": lang['Other Devices'],
+             "name": `${lang['Other Devices']} (<span id="onvif-scanner-other-devices-count">0</span>)`,
              "color": "danger",
              "section-pre-class": "col-md-12",
              "info": [
@@ -114,5 +111,5 @@ module.exports = (s,config,lang) => {
              ]
          },
         }
-      }
+    }
 }

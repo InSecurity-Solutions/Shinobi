@@ -99,6 +99,8 @@ require('./libs/ffmpeg.js')(s,config,lang, async () => {
     require('./libs/connectToManagementServer/index.js')(s,config,lang,app)
     //p2p, commander
     require('./libs/commander.js')(s,config,lang,app)
+    //failover
+    require('./libs/failover/index.js')(s,app,config,lang)
     //on-start actions, daemon(s) starter
     await require('./libs/startup.js')(s,config,lang)
     //cron

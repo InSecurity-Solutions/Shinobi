@@ -14,8 +14,8 @@ function createWebSocketServer(options){
     };
     return theWebSocket
 }
-function createWebSocketClient(connectionHost,options){
-    const clientConnection = new WebSocket(connectionHost, options.engineOptions);
+function createWebSocketClient(connectionHost,options = {}){
+    const clientConnection = new WebSocket(connectionHost, options.engineOptions || {});
     if(options.onMessage){
         const onMessage = options.onMessage;
         clientConnection.on('message', message => {
