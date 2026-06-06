@@ -43,6 +43,7 @@ module.exports = function(s,config){
             await extender(...args)
         }
     }
+    s.createExtension = createExtension
     ////// INFO //////
     // Arguments for callback noted below each Extension.
     // Example use of arguments : s.onSocketAuthentication((userDatabaseRow,socketIoConnection,initiateData,sendDataToClient) => { console.log(userDatabaseRow) })
