@@ -1,5 +1,33 @@
 var fs = require('fs');
 module.exports = (s,config,lang) => {
+    const {
+        deleteMonitor,
+    } = require('../monitor/utils.js')(s,config,lang)
+    function getDefaultUserDetails(options = {}){
+        return {
+            "factorAuth":"0",
+            "size": options.diskLimit || options.size || '',
+            "days":"",
+            "event_days":"",
+            "log_days":"",
+            "max_camera": options.cameraLimit || options.max_camera || '',
+            "permissions":"all",
+            "edit_size":"1",
+            "edit_days":"1",
+            "edit_event_days":"1",
+            "edit_log_days":"1",
+            "use_admin":"1",
+            "use_aws_s3":"1",
+            "use_whcs":"1",
+            "use_sftp":"1",
+            "use_webdav":"1",
+            "use_discordbot":"1",
+            "use_ldap":"1",
+            "aws_use_global":"0",
+            "b2_use_global":"0",
+            "webdav_use_global":"0"
+        }
+    }
     const deleteSetOfVideos = function(options,callback){
         const groupKey = options.groupKey
         const err = options.err
@@ -496,29 +524,7 @@ module.exports = (s,config,lang) => {
     }
     function createAdminUser(user){
         return new Promise((resolve,reject) => {
-            const detailsColumn = Object.assign({
-                "factorAuth":"0",
-                "size": user.diskLimit || user.size || '',
-                "days":"",
-                "event_days":"",
-                "log_days":"",
-                "max_camera": user.cameraLimit || user.max_camera || '',
-                "permissions":"all",
-                "edit_size":"1",
-                "edit_days":"1",
-                "edit_event_days":"1",
-                "edit_log_days":"1",
-                "use_admin":"1",
-                "use_aws_s3":"1",
-                "use_whcs":"1",
-                "use_sftp":"1",
-                "use_webdav":"1",
-                "use_discordbot":"1",
-                "use_ldap":"1",
-                "aws_use_global":"0",
-                "b2_use_global":"0",
-                "webdav_use_global":"0"
-            },s.parseJSON(user.details) || {});
+            const detailsColumn = Object.assign(getDefaultUserDetails(user),s.parseJSON(user.details) || {});
             const insertQuery = {
                 ke: user.ke || s.gid(7),
                 uid: user.uid || s.gid(6),
@@ -559,19 +565,453 @@ module.exports = (s,config,lang) => {
             return null;
         }
     }
+    async function legacyCreateAdminUser(form, existanceCheckBy = 'mail', doPasswordHash = true){
+        const response = { ok: false }
+        const { rows: users } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Users",
+            limit: 1,
+            where: [
+                [existanceCheckBy,'=',form[existanceCheckBy]]
+            ]
+        });
+        if(users[0]){
+            response.msg = lang['Already exists'];
+        }else{
+            form.uid = s.gid()
+            if(!form.ke){
+                form.ke = s.gid()
+            }else{
+                form.ke = form.ke.replace(/[`~!@#$%^&*()_|+\-=?;:'",.<>\{\}\[\]\\\/]/gi, '').trim()
+            }
+            if(!s.group[form.ke]){
+                response.ok = true
+                //check if "details" is object
+                if(form.details instanceof Object){
+                    form.details = JSON.stringify(Object.assign(getDefaultUserDetails(), form.details))
+                }else{
+                    try{
+                        form.details = JSON.parse(form.details)
+                        form.details = Object.assign(getDefaultUserDetails(), form.details)
+                    }catch(err){
+                        response.error = err.toString()
+                        form.details = getDefaultUserDetails()
+                    }
+                    form.details = JSON.stringify(form.details)
+                }
+                const insertQuery = {
+                    ke: form.ke,
+                    uid: form.uid,
+                    mail: form.mail,
+                    pass: doPasswordHash ? s.createHash(form.pass) : form.pass,
+                    details: form.details
+                };
+                await s.knexQueryPromise({
+                    action: "insert",
+                    table: "Users",
+                    insert: insertQuery
+                });
+                s.tx({f:'add_account',details:form.details,ke:form.ke,uid:form.uid,mail:form.mail},'$')
+                response.user = Object.assign({},form)
+                //init user
+                s.loadGroup(form)
+                s.loadGroupApps(form)
+                await loadDiskUseForUser(insertQuery)
+                await loadCloudDiskUseForUser(insertQuery)
+            }else{
+                response.msg = lang["Group with this key exists already"]
+            }
+        }
+        return response
+    }
+    async function legacyEditAdminUser(account, form, existanceCheckBy = 'mail', doPasswordHash = true){
+        // account = target account (mail, uid, ke)
+        // form = changes to be made
+        const response = { ok: false }
+        const { rows: users } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Users",
+            limit: 1,
+            where: [
+                [existanceCheckBy,'=',account[existanceCheckBy]]
+            ]
+        });
+        const user = users[0]
+        if(user){
+            var details = JSON.parse(user.details)
+            if(form.pass && form.pass !== ''){
+               if(form.pass === form.password_again || form.pass_again){
+                   form.pass = doPasswordHash ? s.createHash(form.pass) : form.pass;
+               }else{
+                   response.code = 'PASSWORD_MISMATCH'
+                   response.msg = lang["Passwords Don't Match"]
+                   return response
+               }
+            }else{
+                delete(form.pass);
+            }
+            delete(form.password_again);
+            delete(form.pass_again);
+            delete(form.ke);
+            form.details = s.stringJSON(Object.assign(details,s.parseJSON(form.details)))
+            const { err } = await s.knexQueryPromise({
+                action: "update",
+                table: "Users",
+                update: form,
+                where: [
+                    ['mail','=',account.mail],
+                ]
+            });
+            if(err){
+                console.log(err)
+                response.code = 'UPDATE_ERROR'
+                response.error = err
+                response.msg = lang.AccountEditText1
+            }else{
+                response.ok = true
+                s.tx({f:'edit_account',form:form,ke:account.ke,uid:account.uid},'$')
+                s.unloadGroupApps(account)
+                delete(s.group[account.ke].init);
+                s.loadGroupApps(account)
+            }
+        }else{
+            response.code = 'NOT_FOUND'
+            response.msg = lang['User Not Found']
+        }
+        return response
+    }
+    async function legacyDeleteUser({
+        account,
+        deleteSubAccounts,
+        deleteMonitors,
+        stopMonitors = true,
+        deleteVideos,
+        deleteEvents,
+        systemAction,
+    }){
+        const response = { ok: true }
+        try{
+            await s.knexQueryPromise({
+                action: "delete",
+                table: "Users",
+                where: {
+                    ke: account.ke,
+                    uid: account.uid,
+                    mail: account.mail,
+                }
+            })
+            await s.knexQueryPromise({
+                action: "delete",
+                table: "API",
+                where:  {
+                    ke: account.ke,
+                    uid: account.uid,
+                }
+            })
+            if(deleteSubAccounts){
+                await s.knexQueryPromise({
+                    action: "delete",
+                    table: "Users",
+                    where:  {
+                        ke: account.ke,
+                    }
+                })
+            }
+            if(deleteMonitors || stopMonitors){
+                const { rows: monitors } = await s.knexQueryPromise({
+                    action: "select",
+                    columns: "*",
+                    table: "Monitors",
+                    where:  {
+                        ke: account.ke,
+                    }
+                });
+                if(monitors && monitors[0]){
+                    if(deleteMonitors){
+                        monitors.forEach(function({ ke: groupKey, mid: monitorId }){
+                            deleteMonitor({
+                                ke: groupKey,
+                                mid: monitorId,
+                                user: systemAction ? '$SYSTEM' : account.uid,
+                                deleteFiles: true,
+                            })
+                        })
+                    }else if(stopMonitors){
+                        monitors.forEach(function(monitor){
+                            s.camera('stop',monitor)
+                        })
+                    }
+                }
+            }
+            if(deleteVideos){
+                await s.knexQueryPromise({
+                    action: "delete",
+                    table: "Videos",
+                    where:  {
+                        ke: account.ke,
+                    }
+                })
+                fs.rm(s.dir.videos+account.ke,function(err){
+                    s.debugLog(err)
+                })
+            }
+            if(deleteEvents){
+                await s.knexQueryPromise({
+                    action: "delete",
+                    table: "Events",
+                    where:  {
+                        ke: account.ke,
+                    }
+                })
+            }
+            s.unloadGroupApps(account);
+            delete(s.group[account.ke])
+            s.runExtensionsForArray('onAccountDelete', null, [
+                account,
+                {
+                    deleteSubAccounts,
+                    deleteMonitors,
+                    stopMonitors,
+                    deleteVideos,
+                    deleteEvents,
+                    systemAction,
+                }
+            ]);
+            // delete(s.group[account.ke])
+            s.tx({
+                f: 'delete_account',
+                ke: account.ke,
+                uid: account.uid,
+                mail: account.mail
+            },'$')
+        }catch(err){
+            console.log(err)
+            response.ok = true
+            response.err = err.toString()
+        }
+        return response
+    }
+    async function loadCloudDiskUseForUser(user,callback){
+        var userDetails = JSON.parse(user.details)
+        user.cloudDiskUse = {}
+        user.size = 0
+        user.limit = userDetails.size
+        s.cloudDisksLoaded.forEach(function(storageType){
+            user.cloudDiskUse[storageType] = {
+                usedSpace : 0,
+                usedSpaceVideos : 0,
+                usedSpaceTimelapseFrames : 0,
+                firstCount : 0
+            }
+            if(s.cloudDiskUseStartupExtensions[storageType])s.cloudDiskUseStartupExtensions[storageType](user,userDetails)
+        })
+        async function loadCloudVideos(cback){
+            const { rows: videos, err } = await s.knexQueryPromise({
+                action: "select",
+                columns: "*",
+                table: "Cloud Videos",
+                where: [
+                    ['ke','=',user.ke],
+                    ['status','!=',0],
+                ]
+            });
+            if(videos && videos[0]){
+                videos.forEach(function(video){
+                    var storageType = video.type || JSON.parse(video.details).type
+                    if(!storageType)storageType = 's3'
+                    var videoSize = video.size / 1048576
+                    user.cloudDiskUse[storageType].usedSpace += videoSize
+                    user.cloudDiskUse[storageType].usedSpaceVideos += videoSize
+                    ++user.cloudDiskUse[storageType].firstCount
+                })
+                s.cloudDisksLoaded.forEach(function(storageType){
+                    var firstCount = user.cloudDiskUse[storageType].firstCount
+                    // s.systemLog(lang.startUpText1, user.mail+' : '+firstCount,storageType,user.cloudDiskUse[storageType].usedSpace)
+                    delete(user.cloudDiskUse[storageType].firstCount)
+                })
+            }
+            if(cback)cback()
+        }
+        async function loadCloudTimelapseFrames(cback){
+            const { rows: frames, err } = await s.knexQueryPromise({
+                action: "select",
+                columns: "*",
+                table: "Cloud Timelapse Frames",
+                where: [
+                    ['ke','=',user.ke],
+                ]
+            });
+            if(frames && frames[0]){
+                frames.forEach(function(frame){
+                    try{
+                        var storageType = JSON.parse(frame.details).type
+                        if(!storageType)storageType = 's3'
+                        var frameSize = frame.size / 1048576
+                        user.cloudDiskUse[storageType].usedSpace += frameSize
+                        user.cloudDiskUse[storageType].usedSpaceTimelapseFrames += frameSize
+                    }catch(err){
+                        s.debugLog(err)
+                    }
+                })
+            }
+            if(cback)cback()
+        }
+        await loadCloudVideos()
+        await loadCloudTimelapseFrames()
+        s.group[user.ke].cloudDiskUse = user.cloudDiskUse
+        if(callback)callback()
+    }
+    function loadAddStorageDiskUseForUser(user,data,callback){
+        var videos = data.videos
+        var timelapseFrames = data.timelapseFrames
+        var files = data.files
+        var userDetails = JSON.parse(user.details)
+        var userAddStorageData = s.parseJSON(userDetails.addStorage) || {}
+        var currentStorageNumber = 0
+        for(storage of s.listOfStorage){
+            var path = storage.value
+            if(!path){
+                continue
+            }
+            var storageId = path
+            var storageData = userAddStorageData[storageId] || {}
+            if(!s.group[user.ke].addStorageUse[storageId])s.group[user.ke].addStorageUse[storageId] = {}
+            var storageIndex = s.group[user.ke].addStorageUse[storageId]
+            storageIndex.name = storage.name
+            storageIndex.path = path
+            storageIndex.usedSpace = 0
+            storageIndex.sizeLimit = parseFloat(storageData.limit) || parseFloat(userDetails.size) || 10000
+            storageIndex.videoPercent = parseFloat(storageData.videoPercent) || parseFloat(userDetails.size_video_percent) || 95
+            storageIndex.timelapsePercent = parseFloat(storageData.timelapsePercent) || parseFloat(userDetails.size_timelapse_percent) || 5
+            var usedSpaceVideos = 0
+            var usedSpaceTimelapseFrames = 0
+            var usedSpaceFilebin = 0
+            if(videos && videos[0]){
+                for(video of videos){
+                    if(video.details.dir === storage.value){
+                        usedSpaceVideos += video.size
+                    }
+                }
+            }
+            if(timelapseFrames && timelapseFrames[0]){
+                for(frame of timelapseFrames){
+                    if(frame.details.dir === storage.value){
+                        usedSpaceTimelapseFrames += frame.size
+                    }
+                }
+            }
+            if(files && files[0]){
+                for(file of files){
+                    usedSpaceFilebin += file.size
+                }
+            }
+            storageIndex.usedSpace = (usedSpaceVideos + usedSpaceTimelapseFrames + usedSpaceFilebin) / 1048576
+            storageIndex.usedSpaceVideos = usedSpaceVideos / 1048576
+            storageIndex.usedSpaceFilebin = usedSpaceFilebin / 1048576
+            storageIndex.usedSpaceTimelapseFrames = usedSpaceTimelapseFrames / 1048576
+            // s.systemLog(user.mail+' : '+path+' : '+videos.length,storageIndex.usedSpace)
+            ++currentStorageNumber
+        }
+        if(callback)callback()
+    }
+    async function loadDiskUseForUser(user,callback){
+        s.systemLog(lang.startUpText0, user.mail)
+        var userDetails = JSON.parse(user.details)
+        var usedSpaceVideos = 0
+        var usedSpaceTimelapseFrames = 0
+        var usedSpaceFilebin = 0
+        var addStorageData = {
+            files: [],
+            videos: [],
+            timelapseFrames: [],
+        }
+        s.group[user.ke].sizeLimit = parseFloat(userDetails.size) || 10000
+        s.group[user.ke].sizeLimitVideoPercent = parseFloat(userDetails.size_video_percent) || 90
+        s.group[user.ke].sizeLimitTimelapseFramesPercent = parseFloat(userDetails.size_timelapse_percent) || 5
+        s.group[user.ke].sizeLimitFileBinPercent = parseFloat(userDetails.size_filebin_percent) || 5
+        const { rows: videos, err: errVideos } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Videos",
+            where: [
+                ['ke','=',user.ke],
+                ['status','!=',0],
+            ]
+        });
+        if(videos && videos[0]){
+            videos.forEach(function(video){
+                video.details = s.parseJSON(video.details)
+                if(!video.details.dir){
+                    usedSpaceVideos += video.size
+                }else{
+                    addStorageData.videos.push(video)
+                }
+            })
+        }
+        const { rows: timelapseFrames, err: errFrames } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Timelapse Frames",
+            where: [
+                ['ke','=',user.ke],
+            ]
+        });
+        if(timelapseFrames && timelapseFrames[0]){
+            timelapseFrames.forEach(function(frame){
+                frame.details = s.parseJSON(frame.details)
+                if(!frame.details.dir){
+                    usedSpaceTimelapseFrames += frame.size
+                }else{
+                    addStorageData.timelapseFrames.push(frame)
+                }
+            })
+        }
+        const { rows: files, err: errFiles } = await s.knexQueryPromise({
+            action: "select",
+            columns: "*",
+            table: "Files",
+            where: [
+                ['ke','=',user.ke],
+            ]
+        });
+        if(files && files[0]){
+            files.forEach(function(file){
+                file.details = s.parseJSON(file.details)
+                if(!file.details.dir){
+                    usedSpaceFilebin += file.size
+                }else{
+                    addStorageData.files.push(file)
+                }
+            })
+        }
+        s.group[user.ke].usedSpace = (usedSpaceVideos + usedSpaceTimelapseFrames + usedSpaceFilebin) / 1048576
+        s.group[user.ke].usedSpaceVideos = usedSpaceVideos / 1048576
+        s.group[user.ke].usedSpaceFilebin = usedSpaceFilebin / 1048576
+        s.group[user.ke].usedSpaceTimelapseFrames = usedSpaceTimelapseFrames / 1048576
+        loadAddStorageDiskUseForUser(user,addStorageData)
+        if(callback)callback()
+    }
     return {
         getAdminUser,
-        deleteSetOfVideos: deleteSetOfVideos,
-        deleteSetOfTimelapseFrames: deleteSetOfTimelapseFrames,
-        deleteSetOfFileBinFiles: deleteSetOfFileBinFiles,
-        deleteAddStorageVideos: deleteAddStorageVideos,
-        deleteMainVideos: deleteMainVideos,
-        deleteTimelapseFrames: deleteTimelapseFrames,
+        deleteSetOfVideos,
+        deleteSetOfTimelapseFrames,
+        deleteSetOfFileBinFiles,
+        deleteAddStorageVideos,
+        deleteMainVideos,
+        deleteTimelapseFrames,
         deleteAddStorageTimelapseFrames,
-        deleteFileBinFiles: deleteFileBinFiles,
-        deleteCloudVideos: deleteCloudVideos,
-        deleteCloudTimelapseFrames: deleteCloudTimelapseFrames,
-        resetAllStorageCounters: resetAllStorageCounters,
-        createAdminUser: createAdminUser,
+        deleteFileBinFiles,
+        deleteCloudVideos,
+        deleteCloudTimelapseFrames,
+        resetAllStorageCounters,
+        createAdminUser,
+        legacyCreateAdminUser,
+        legacyEditAdminUser,
+        legacyDeleteUser,
+        loadCloudDiskUseForUser,
+        loadAddStorageDiskUseForUser,
+        loadDiskUseForUser,
     }
 }

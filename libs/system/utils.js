@@ -48,7 +48,6 @@ module.exports = (config) => {
         },
         modifyConfiguration: (postBody, useBase) => {
             return new Promise((resolve, reject) => {
-                console.log(config)
                 const configPath = config.thisIsDocker ? "/config/conf.json" : s.location.config;
                 let configToPost = postBody;
                 if(useBase){
@@ -60,6 +59,7 @@ module.exports = (config) => {
                     }
                 }
                 const configData = JSON.stringify(configToPost, null, 3);
+                s.debugLog(configData)
                 fs.writeFile(configPath, configData, resolve);
             });
         },

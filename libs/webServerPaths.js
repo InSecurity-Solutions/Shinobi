@@ -91,6 +91,11 @@ module.exports = function(s,config,lang,app,io){
     s.getClientIp = function(req){
         return req.headers['cf-connecting-ip']||req.headers["CF-Connecting-IP"]||req.headers["'x-forwarded-for"]||req.connection.remoteAddress;
     }
+    proxy.on('error', function(err, req, res) {
+        try {
+            res.status(502).end('Bad Gateway')
+        } catch(e) {}
+    })
     ////Pages
     app.enable('trust proxy');
     if(config.webPaths.home !== '/'){
@@ -229,7 +234,7 @@ module.exports = function(s,config,lang,app,io){
             }
         }
         // brute check
-        if(s.failedLoginAttempts[req.body.mail] && s.failedLoginAttempts[req.body.mail].failCount >= 5){
+        if(s.failedLoginAttempts[req.ip] && s.failedLoginAttempts[req.ip].failCount >= 5){
             if(req.query.json=='true'){
                 res.end(s.prettyPrint({ok:false}))
             }else{
@@ -245,9 +250,9 @@ module.exports = function(s,config,lang,app,io){
         }
         //
         const renderPage = function(focus,data){
-            if(s.failedLoginAttempts[req.body.mail]){
-                clearTimeout(s.failedLoginAttempts[req.body.mail].timeout)
-                delete(s.failedLoginAttempts[req.body.mail])
+            if(s.failedLoginAttempts[req.ip]){
+                clearTimeout(s.failedLoginAttempts[req.ip].timeout)
+                delete(s.failedLoginAttempts[req.ip])
             }
             if(
                 focus !== config.renderPaths.index
@@ -270,7 +275,7 @@ module.exports = function(s,config,lang,app,io){
                 s.renderPage(req,res,focus,data)
             }
         }
-        const failedAuthentication = function(board,failIdentifier,failMessage){
+        const failedAuthentication = function(board,failIdentifier,failMessage,emailAddress){
             // brute protector
             if(!failIdentifier){
                 s.renderPage(req,res,config.renderPaths.index,{
@@ -284,15 +289,10 @@ module.exports = function(s,config,lang,app,io){
             }
             if(!s.failedLoginAttempts[failIdentifier]){
                 s.failedLoginAttempts[failIdentifier] = {
-                    failCount : 0,
-                    ips : {}
+                    failCount : 0
                 }
             }
             ++s.failedLoginAttempts[failIdentifier].failCount
-            if(!s.failedLoginAttempts[failIdentifier].ips[req.ip]){
-                s.failedLoginAttempts[failIdentifier].ips[req.ip] = 0
-            }
-            ++s.failedLoginAttempts[failIdentifier].ips[req.ip]
             clearTimeout(s.failedLoginAttempts[failIdentifier].timeout)
             s.failedLoginAttempts[failIdentifier].timeout = setTimeout(function(){
                 delete(s.failedLoginAttempts[failIdentifier])
@@ -318,19 +318,20 @@ module.exports = function(s,config,lang,app,io){
                 type: lang['Authentication Failed'],
                 msg: {
                     for: board,
-                    mail: failIdentifier,
+                    mail: emailAddress,
                     ip: req.ip
                 }
             }
             if(board === 'super'){
                 s.userLog(logTo,logData)
             }else{
+                s.userLog(logTo,logData)
                 s.knexQuery({
                     action: "select",
                     columns: "ke,uid,details",
                     table: "Users",
                     where: [
-                        ['mail','=',failIdentifier],
+                        ['mail','=',emailAddress],
                     ]
                 },(err,r) => {
                     if(r && r[0]){
@@ -338,7 +339,6 @@ module.exports = function(s,config,lang,app,io){
                         r.details = JSON.parse(r.details)
                         logData.id = r.uid
                         logData.type = lang['Authentication Failed']
-                        logTo.ke = r.ke
                     }
                     s.userLog(logTo,logData)
                 })
@@ -422,7 +422,7 @@ module.exports = function(s,config,lang,app,io){
                     details: user.details
                 })
             }else{
-                return failedAuthentication(req.body.function,req.body.mail,alternateLoginResponse.msg)
+                return failedAuthentication(req.body.function,req.ip,alternateLoginResponse.msg,req.body.mail)
             }
         }else if(req.body.mail && req.body.pass){
             async function regularLogin(){
@@ -473,7 +473,7 @@ module.exports = function(s,config,lang,app,io){
                         details: user.details
                     })
                 }else{
-                    failedAuthentication(req.body.function,req.body.mail)
+                    failedAuthentication(req.body.function,req.ip,null,req.body.mail)
                 }
             }
             if(req.body.function === 'super' && !config.superUserLoginDisabled){
@@ -488,7 +488,7 @@ module.exports = function(s,config,lang,app,io){
                         currentVersion: s.currentVersion,
                     })
                 }else{
-                    failedAuthentication(req.body.function,req.body.mail)
+                    failedAuthentication(req.body.function,req.ip,null,req.body.mail)
                 }
             }else{
                 regularLogin()
@@ -509,24 +509,24 @@ module.exports = function(s,config,lang,app,io){
             if(twoFactorVerificationResponse.ok){
                 checkRoute(twoFactorVerificationResponse.pageTarget,twoFactorVerificationResponse.info)
             }else{
-                failedAuthentication(lang['2-Factor Authentication'],factorAuthObject.info.mail)
+                failedAuthentication(lang['2-Factor Authentication'],req.ip,null,factorAuthObject.info.mail)
             }
         }else{
-            failedAuthentication(lang['2-Factor Authentication'],req.body.mail)
+            failedAuthentication(lang['2-Factor Authentication'],req.ip,null,req.body.mail)
         }
     })
-    /**
-    * API : Brute Protection Lock Reset by API
-    */
-    app.get([config.webPaths.apiPrefix+':auth/resetBruteProtection/:ke'], function (req,res){
-        s.auth(req.params,function(user){
-            if(s.failedLoginAttempts[user.mail]){
-                clearTimeout(s.failedLoginAttempts[user.mail].timeout)
-                delete(s.failedLoginAttempts[user.mail])
-            }
-            res.end(s.prettyPrint({ok:true}))
-        })
-    })
+    // /**
+    // * API : Brute Protection Lock Reset by API
+    // */
+    // app.get([config.webPaths.apiPrefix+':auth/resetBruteProtection/:ke'], function (req,res){
+    //     s.auth(req.params,function(user){
+    //         if(s.failedLoginAttempts[user.mail]){
+    //             clearTimeout(s.failedLoginAttempts[user.mail].timeout)
+    //             delete(s.failedLoginAttempts[user.mail])
+    //         }
+    //         res.end(s.prettyPrint({ok:true}))
+    //     })
+    // })
     /**
     * API : Get TV Channels (Monitor Streams) json
      */
@@ -709,6 +709,11 @@ module.exports = function(s,config,lang,app,io){
         s.auth(req.params,async (user) => {
             const groupKey = req.params.ke
             const monitorId = req.params.id
+            if(!s.group[groupKey] || !s.group[groupKey].rawMonitorConfigurations[monitorId]){
+                response.msg = 'Not Ready'
+                s.closeJsonResponse(res,response);
+                return
+            }
             const {
                 monitorPermissions,
                 monitorRestrictions,
@@ -1241,30 +1246,29 @@ module.exports = function(s,config,lang,app,io){
                                     req.timeout=req.params.ff*1000
                                 break;
                             }
-                            s.group[r.ke].activeMonitors[r.mid].trigger_timer=setTimeout(async function(){
-                                delete(s.group[r.ke].activeMonitors[r.mid].trigger_timer)
+                            const timerKe = r.ke
+                            const timerMid = r.mid
+                            s.group[timerKe].activeMonitors[timerMid].trigger_timer = setTimeout(async function(){
+                                const liveMonitor = s.group[timerKe] && s.group[timerKe].activeMonitors[timerMid]
+                                if(!liveMonitor) return
+                                delete(liveMonitor.trigger_timer)
+                                const liveConfig = s.group[timerKe].rawMonitorConfigurations[timerMid]
+                                const restoreMode = liveMonitor.currentState && liveMonitor.currentState.mode
+                                if(!restoreMode) return
                                 s.knexQuery({
                                     action: "update",
                                     table: "Monitors",
-                                    update: {
-                                        mode: s.group[r.ke].activeMonitors[r.mid].currentState.mode
-                                    },
-                                    where: [
-                                        ['ke','=',r.ke],
-                                        ['mid','=',r.mid],
-                                    ]
+                                    update: { mode: restoreMode },
+                                    where: [['ke','=',timerKe],['mid','=',timerMid]]
                                 })
-                                r.neglectTriggerTimer=1;
-                                r.mode=s.group[r.ke].activeMonitors[r.mid].currentState.mode;
-                                r.fps=s.group[r.ke].activeMonitors[r.mid].currentState.fps;
-                                await s.camera('stop',s.cleanMonitorObject(r));
-                                if(s.group[r.ke].activeMonitors[r.mid].currentState.mode!=='stop'){
-                                    await s.camera(s.group[r.ke].activeMonitors[r.mid].currentState.mode,s.cleanMonitorObject(r));
+                                const monObj = s.cleanMonitorObject(Object.assign({}, liveConfig, { mode: restoreMode, id: timerMid }))
+                                await s.camera('stop', monObj)
+                                if(restoreMode !== 'stop'){
+                                    await s.camera(restoreMode, monObj)
                                 }
-                                s.group[r.ke].rawMonitorConfigurations[r.mid]=r;
-                                s.tx({f:'monitor_edit',mid:r.mid,ke:r.ke,mon:r},'GRP_'+r.ke);
-                                s.tx({f:'monitor_edit',mid:r.mid,ke:r.ke,mon:r},'STR_'+r.ke);
-                            },req.timeout);
+                                s.tx({f:'monitor_edit',mid:timerMid,ke:timerKe,mon:liveConfig},'GRP_'+timerKe)
+                                s.tx({f:'monitor_edit',mid:timerMid,ke:timerKe,mon:liveConfig},'STR_'+timerKe)
+                            }, req.timeout)
     //                        response.end_at=s.formattedTime(new Date,'YYYY-MM-DD HH:mm:ss').add(req.timeout,'milliseconds');
                         }
                      }else{
@@ -1334,6 +1338,12 @@ module.exports = function(s,config,lang,app,io){
                         fetch(r.href).then(actual => {
                             actual.headers.forEach((v, n) => res.setHeader(n, v));
                             actual.body.pipe(res);
+                            res.on('close', () => {
+                                try{ actual.body.destroy() }catch(e){}
+                            })
+                        }).catch(err => {
+                            console.error('Cloud video fetch error', err)
+                            res.status(502).end('Bad Gateway')
                         })
                     }
                 }else{
@@ -1379,6 +1389,7 @@ module.exports = function(s,config,lang,app,io){
                 clearTimeout(videoRowCacheTimeouts[cacheName])
                 videoRowCacheTimeouts[cacheName] = setTimeout(() => {
                     delete(videoRowCaches[cacheName])
+                    delete(videoRowCacheTimeouts[cacheName])  // <-- add this
                 },60000)
             }
             const sendVideo = (videoRow) => {
@@ -1948,8 +1959,9 @@ module.exports = function(s,config,lang,app,io){
                 }
             })
             res.connection.setTimeout(0);
+            const activeMonitor = s.group[groupKey] && s.group[groupKey].activeMonitors[monitorId]
             req.on('data', function(buffer){
-                s.group[groupKey].activeMonitors[monitorId].spawn.stdin.write(buffer)
+                try{ activeMonitor.spawn.stdin.write(buffer) }catch(e){}
             });
             req.on('end',function(){
                 s.userLog({
@@ -2106,9 +2118,6 @@ module.exports = function(s,config,lang,app,io){
     * Robots.txt
     */
     app.get('/robots.txt', function (req,res){
-        res.on('finish',function(){
-            res.end()
-        })
         fs.createReadStream(s.mainDirectory + '/web/pages/robots.txt').pipe(res)
     })
 }

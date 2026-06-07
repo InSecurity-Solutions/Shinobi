@@ -13,6 +13,7 @@ const HEARTBEAT_INTERVAL = 10000; // 10 seconds
 const SOCKET_CHECK_INTERVAL = 20000; // 20 seconds
 const RECONNECT_DELAY = 2000; // 2 seconds
 const HEARTBEAT_TIMEOUT_MULTIPLIER = 1.5;
+const MAX_RECONNECT_DELAY = 30000;
 
 // Error handling
 process.on("uncaughtException", (error) => {
@@ -34,6 +35,7 @@ class CentralConnection {
     this.stayDisconnected = false;
     this.allMessageHandlers = [];
     this.internalEvents = new EventEmitter();
+    this.reconnectAttempts = 0;
 
     this.initConfig();
     this.initLogging();
@@ -56,6 +58,15 @@ class CentralConnection {
       }
     };
 
+    if (this.config.logCentralManagementActivity) {
+        this.logger.main = (...args) => {
+            parentPort.postMessage({ f: 'systemLog', data: args });
+        }
+    }else{
+        this.logger.main = (...args) => {
+            parentPort.postMessage({ f: 'debugLog', data: args });
+        }
+    }
     // if (this.config.debugLog) {
       this.logger.debugLog = (...args) => {
         parentPort.postMessage({ f: 'debugLog', data: args });
@@ -78,14 +89,21 @@ class CentralConnection {
           data.peerConnectKey = this.peerConnectKey;
           _this.internalEvents.emit('onTriggerNotificationSend', data);
           break;
+        case 'saveLogToCentral':
+          data.data.peerConnectKey = this.peerConnectKey;
+          _this.internalEvents.emit('saveLogToCentral', data.data);
+          break;
         case 'exit':
-          _this.logger.debugLog('Closing Central Connection...');
+          _this.logger.main('Closing Central Connection...');
           process.exit(0);
           break;
       }
     });
     this.internalEvents.on('onTriggerNotificationSend', (data) => {
         this.sendDataToTunnel({ f: 'onTriggerNotificationSend', data });
+    });
+    this.internalEvents.on('saveLogToCentral', (data) => {
+        this.sendDataToTunnel({ f: 'saveLogToCentral', data });
     });
   }
 
@@ -121,12 +139,12 @@ class CentralConnection {
     };
   }
 
-  async getConnectionDetails() {
+  async getConnectionDetails(targetUser) {
     return new Promise((resolve) => {
       this.internalEvents.once('connectDetails', (data) => {
         resolve(data);
       });
-      parentPort.postMessage({ f: 'connectDetailsRequest' });
+      parentPort.postMessage({ f: 'connectDetailsRequest', mail: targetUser });
     });
   }
 
@@ -135,73 +153,79 @@ class CentralConnection {
     await this.startWebsocketConnection();
   }
 
-  async startWebsocketConnection() {
-    this.logger.debugLog('startWebsocketConnection EXECUTE', new Error());
-    console.log('Central : Connecting to Central Server...');
+  startWebsocketConnection() {
+    this.logger.main('Central : Connecting to Central Server...');
+    this.clearAllTimers();
 
     try {
-      this.clearAllTimers();
-      // this.stayDisconnected = true;
-      if (this.tunnelToP2P){
-          this.tunnelToP2P.removeAllListeners('open');
-          this.tunnelToP2P.removeAllListeners('error');
-          this.tunnelToP2P.removeAllListeners('close');
-          this.tunnelToP2P.close();
+      if (this.tunnelToP2P) {
+        this.tunnelToP2P.removeAllListeners('open');
+        this.tunnelToP2P.removeAllListeners('error');
+        this.tunnelToP2P.removeAllListeners('close');
+        this.tunnelToP2P.onmessage = null;
+        this.tunnelToP2P.close();
       }
     } catch (err) {
       console.log('Error closing previous connection:', err);
     }
 
-    // this.stayDisconnected = false;
     this.tunnelToP2P = new WebSocket(this.hostPeerServer);
-
     this.tunnelToP2P.on('open', () => this.onWebsocketOpen());
     this.tunnelToP2P.on('error', (err) => this.onWebsocketError(err));
     this.tunnelToP2P.on('close', () => this.onWebsocketClose());
     this.tunnelToP2P.onmessage = (event) => this.handleWebsocketMessage(event);
-
-    this.setupSocketCheckTimer();
   }
 
   onWebsocketOpen() {
-    console.log('Central : Connected! Authenticating...');
+    this.reconnectAttempts = 0; // Reset backoff on successful connection
+    this.logger.main('Central : Connected! Authenticating...');
     this.authenticateConnection();
   }
 
   onWebsocketError(err) {
-    console.log('Central tunnelToCentral Error:', err);
-    console.log('Central Restarting...');
-    this.disconnectedConnection();
+    this.logger.main(`Central tunnelToCentral Error: ${err.toString()}`);
+    // Don't call disconnectedConnection here — onWebsocketClose will fire after
   }
 
   onWebsocketClose() {
-    console.log('Central Connection Closed!');
+    this.logger.main('Central Connection Closed!');
     this.clearAllTimers();
+
+    if (this.stayDisconnected) return;
+
+    const delay = Math.min(
+      RECONNECT_DELAY * Math.pow(2, this.reconnectAttempts),
+      MAX_RECONNECT_DELAY
+    );
+    this.reconnectAttempts++;
+    this.logger.main(`Central : Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})...`);
+
     this.timers.onClosed = setTimeout(() => {
-      this.disconnectedConnection();
-    }, 5000);
+      this.startWebsocketConnection();
+    }, delay);
   }
 
   async authenticateConnection() {
-    const connectDetails = await this.getConnectionDetails();
     const configData = JSON.parse(await fs.readFile(EXPECTED_CONFIG_PATH, 'utf8'));
+    const mgmtTargetUser = configData.mgmtTargetUser
+    const connectDetails = await this.getConnectionDetails(mgmtTargetUser);
 
     this.sendDataToTunnel({
-      isShinobi: !!this.config.passwordType,
-      peerConnectKey: this.peerConnectKey,
-      connectDetails,
-      ipAddresses: this.getServerIPAddresses(),
-      config: configData,
+        isShinobi: !!this.config.passwordType,
+        peerConnectKey: this.peerConnectKey,
+        connectDetails,
+        ipAddresses: this.getServerIPAddresses(),
+        config: configData,
     });
 
     this.setupHeartbeat();
     this.scheduleHeartbeatCheck();
   }
 
-  sendDataToTunnel(data) {
+  sendDataToTunnel(data, logFailureToSend) {
     if (this.tunnelToP2P.readyState === 1) {
         this.tunnelToP2P.send(bson.serialize(data));
-    }else{
+    }else if(logFailureToSend){
         console.log('Cant Send Data, Tunnel Not Ready!')
     }
   }
@@ -209,16 +233,23 @@ class CentralConnection {
   setupSocketCheckTimer() {
     this.timers.socketCheck = setInterval(() => {
       if (this.tunnelToP2P.readyState !== 1) {
-        this.logger.debugLog('Tunnel NOT Ready! Reconnecting...');
+        this.logger.main('Tunnel NOT Ready! Reconnecting...');
         this.disconnectedConnection();
       }
     }, SOCKET_CHECK_INTERVAL);
   }
 
   setupHeartbeat() {
-    this.clearAllTimers();
+    if (this.timers.heartbeat) clearInterval(this.timers.heartbeat);
+    if (this.timers.heartbeatCheck) clearTimeout(this.timers.heartbeatCheck);
+
     this.timers.heartbeat = setInterval(() => {
       this.sendDataToTunnel({ f: 'ping' });
+      // Start a timeout — if no pong arrives, reconnect
+      this.timers.heartbeatCheck = setTimeout(() => {
+        this.logger.main('Central : Heartbeat timeout, reconnecting...');
+        this.startWebsocketConnection();
+      }, HEARTBEAT_INTERVAL * HEARTBEAT_TIMEOUT_MULTIPLIER);
     }, HEARTBEAT_INTERVAL);
   }
 
@@ -240,12 +271,13 @@ class CentralConnection {
   disconnectedConnection() {
     this.logger.debugLog('stayDisconnected', this.stayDisconnected);
     this.clearAllTimers();
-    this.logger.debugLog('DISCONNECTED!');
+    this.logger.main('Disconnected from Managment Server!');
 
     if (this.stayDisconnected) return;
 
-    this.logger.debugLog('RESTARTING!');
+    this.logger.main('Restarting Connection to Management Server!');
     setTimeout(() => {
+        console.log(`!this.tunnelToP2P || this.tunnelToP2P.readyState !== 1`,!this.tunnelToP2P || this.tunnelToP2P.readyState !== 1)
       if (!this.tunnelToP2P || this.tunnelToP2P.readyState !== 1) {
         this.startWebsocketConnection();
       }
@@ -400,10 +432,15 @@ class CentralConnection {
     this.onIncomingMessage('data', (data, requestId) => this.writeToServer(data, requestId));
     this.onIncomingMessage('resume', (data, requestId) => this.requestConnections[requestId].resume());
     this.onIncomingMessage('pause', (data, requestId) => this.requestConnections[requestId].pause());
-    this.onIncomingMessage('pong', () => {}); // Heartbeat response
+    this.onIncomingMessage('pong', () => {
+      if (this.timers.heartbeatCheck) {
+        clearTimeout(this.timers.heartbeatCheck);
+        this.timers.heartbeatCheck = null;
+      }
+    });
 
     this.onIncomingMessage('init', () => {
-      console.log('Central : Authenticated!');
+      this.logger.main('Central : Authenticated!');
       parentPort.postMessage({ f: 'authenticated' });
     });
 
@@ -431,9 +468,9 @@ class CentralConnection {
     });
 
     this.onIncomingMessage('disconnect', (data) => {
-      console.log('FAILED LICENSE CHECK ON P2P');
+      this.logger.main('Central : FAILED LICENSE CHECK ON CENTRAL');
       this.stayDisconnected = !data?.retryLater;
-      if (data?.retryLater) console.log('Retrying Central Later...');
+      if (data?.retryLater) this.logger.main('Central : Retrying Central Later...');
     });
   }
 }

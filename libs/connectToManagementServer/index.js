@@ -1,9 +1,11 @@
 module.exports = (s,config,lang,app) => {
     if(!config.enableMgmtConnect){
+        s.connectAllManagementServers = () => {}
         return;
     }
     const { modifyConfiguration, getConfiguration } = require('../system/utils.js')(config)
     require('./libs/pairServer.js')(s,config,lang)
+    require('./libs/logging.js')(s,config,lang)
     const {
         getManagementServers,
         addManagementServer,
@@ -13,7 +15,9 @@ module.exports = (s,config,lang,app) => {
         connectAllManagementServers,
         migrateOldConfiguration,
         sendMessageToAllConnectedServers,
+        resetAllManagementServers,
     } = require('./utils.js')(s,config,lang)
+    s.resetAllManagementServers = resetAllManagementServers;
     s.onLoadedUsersAtStartup(() => {
         connectAllManagementServers()
         if(config.managementServer && config.peerConnectKey){
@@ -23,6 +27,9 @@ module.exports = (s,config,lang,app) => {
     })
     s.onTriggerNotificationSend((groupKey, data, files) => {
         sendMessageToAllConnectedServers({ f: 'onTriggerNotificationSend', groupKey, data, files })
+    })
+    s.onSaveLogToCentral((data) => {
+        sendMessageToAllConnectedServers({ f: 'saveLogToCentral', data })
     })
     /**
     * API : Superuser : Get Management Server Settings
@@ -56,6 +63,17 @@ module.exports = (s,config,lang,app) => {
             const peerConnectKey = req.body.peerConnectKey;
             const response = await removeManagementServer(managementServer, peerConnectKey)
             await disconnectFromManagmentServer(managementServer, peerConnectKey)
+            s.closeJsonResponse(res,response)
+        },res,req)
+    })
+
+    /**
+    * API : Restart Management Connections
+    */
+    app.get(config.webPaths.superApiPrefix+':auth/mgmt/restartConnections', async function (req,res){
+        s.superAuth(req.params,async (resp) => {
+            const response = { ok: true }
+            await resetAllManagementServers()
             s.closeJsonResponse(res,response)
         },res,req)
     })

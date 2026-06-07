@@ -89,6 +89,7 @@ module.exports = function(s,config){
         if(config.debugLogVerbose && config.debugLog === true){
             s.debugLog('STACK TRACE, NOT AN ',new Error())
         }
+        console.error(new Date())
         console.error(err)
         // CANNOT USE `dbQuery.toString()` because it breaks the query
         console.error(options)
@@ -105,11 +106,11 @@ module.exports = function(s,config){
             var dbQuery
             switch(options.action){
                 case'select':
-                    options.columns = options.columns.indexOf(',') === -1 ? [options.columns] : options.columns.split(',');
+                    options.columns = options.columns ? options.columns.indexOf(',') === -1 ? [options.columns] : options.columns.split(',') : ['*'];
                     dbQuery = s.databaseEngine.select(...options.columns).from(options.table)
                 break;
                 case'count':
-                    options.columns = options.columns.indexOf(',') === -1 ? [options.columns] : options.columns.split(',');
+                    options.columns = options.columns ? options.columns.indexOf(',') === -1 ? [options.columns] : options.columns.split(',') : ['*'];
                     dbQuery = s.databaseEngine(options.table)
                     dbQuery.count(options.columns)
                 break;
@@ -414,37 +415,37 @@ module.exports = function(s,config){
             }
         })
     }
-    const knexQueryPromise = (options, maxAttempts = 3) => {
-        return new Promise((resolve, reject) => {
-            let attempts = 0;
-            const executeQuery = () => {
-                attempts++;
-                knexQuery(options, (err, rows) => {
-                    if (err) {
-                        if (attempts < maxAttempts) {
-                            console.error(`Database error, attempt : ${attempts},`,err)
-                            executeQuery();
-                        } else {
-                            resolve({
-                                ok: false,
-                                err: err,
-                                rows: null,
-                                attempts: attempts
-                            });
-                        }
-                    } else {
-                        resolve({
-                            ok: true,
-                            err: null,
-                            rows: rows,
-                            attempts: attempts
-                        });
-                    }
-                });
-            };
-            executeQuery();
-        });
-    };
+    const knexQueryPromise = (options) => {
+        return new Promise((resolve,reject) => {
+            knexQuery(options, (err,rows) => {
+                if(
+                    err &&
+                    (
+                        err.code === 'ECONNRESET' ||
+                        err.code === 'ECONNREFUSED'
+                    )
+                ){
+                    console.error('SQL ECONNRESET : Trying Request Again!', new Date())
+                    setTimeout(async function(){
+                        resolve(await knexQueryPromise(options))
+                    }, 1000 * 30)
+                }else{
+                    resolve({
+                        ok: !err,
+                        err: err,
+                        rows: rows,
+                    })
+                }
+            })
+        })
+    }
+    const sqlQueryBetweenTimesWithPermissionsPromise = (options) => {
+        return new Promise((resolve,reject) => {
+            sqlQueryBetweenTimesWithPermissions(options, (response) => {
+                resolve(response)
+            })
+        })
+    }
     const connectDatabase = function(){
         s.databaseEngine = require('knex')(s.databaseOptions)
     }
@@ -539,17 +540,18 @@ module.exports = function(s,config){
         return query
     }
     return {
-        knexQuery: knexQuery,
-        knexQueryPromise: knexQueryPromise,
-        knexError: knexError,
-        cleanSqlWhereObject: cleanSqlWhereObject,
-        processSimpleWhereCondition: processSimpleWhereCondition,
-        processWhereCondition: processWhereCondition,
-        mergeQueryValues: mergeQueryValues,
-        getDatabaseRows: getDatabaseRows,
-        sqlQuery: sqlQuery,
-        connectDatabase: connectDatabase,
-        sqlQueryBetweenTimesWithPermissions: sqlQueryBetweenTimesWithPermissions,
+        knexQuery,
+        knexQueryPromise,
+        knexError,
+        cleanSqlWhereObject,
+        processSimpleWhereCondition,
+        processWhereCondition,
+        mergeQueryValues,
+        getDatabaseRows,
+        sqlQuery,
+        connectDatabase,
+        sqlQueryBetweenTimesWithPermissions,
+        sqlQueryBetweenTimesWithPermissionsPromise,
         currentTimestamp,
         createTable,
         alterColumn,

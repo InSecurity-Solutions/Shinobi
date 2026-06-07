@@ -285,19 +285,24 @@ module.exports = function(s,config,lang,app,io){
                 if(onvifEnabled){
                     const patrolId = `${groupKey}_${monitorId}`;
                     const onvifDevice = await getOnvifDevice(groupKey, monitorId);
-                    const startingPresetToken = s.getPostData(req,'startingPresetToken');
-                    const patrolIndexTimeout = s.getPostData(req,'patrolIndexTimeout');
-                    const speed = s.getPostData(req,'speed');
-                    const activeMonitor = s.group[groupKey].activeMonitors[monitorId];
-                    await startPatrolPresets(patrolId, onvifDevice, startingPresetToken, patrolIndexTimeout, speed, (currentToken) => {
-                        activeMonitor.lastOnvifPresetFromPatrol = currentToken;
-                        s.tx({
-                            f: 'control_ptz_preset_changed',
-                            mid: monitorId,
-                            ke: groupKey,
-                            profileToken: currentToken
-                        },'GRP_'+groupKey);
-                    })
+                    if(onvifDevice){
+                        const startingPresetToken = s.getPostData(req,'startingPresetToken');
+                        const patrolIndexTimeout = s.getPostData(req,'patrolIndexTimeout');
+                        const speed = s.getPostData(req,'speed');
+                        const activeMonitor = s.group[groupKey].activeMonitors[monitorId];
+                        await startPatrolPresets(patrolId, onvifDevice, startingPresetToken, patrolIndexTimeout, speed, (currentToken) => {
+                            activeMonitor.lastOnvifPresetFromPatrol = currentToken;
+                            s.tx({
+                                f: 'control_ptz_preset_changed',
+                                mid: monitorId,
+                                ke: groupKey,
+                                profileToken: currentToken
+                            },'GRP_'+groupKey);
+                        })
+                    }else{
+                        endData.ok = false;
+                        endData.err = lang.ONVIFNotEnabled;
+                    }
                 }else{
                     endData.ok = false;
                     endData.err = lang.ONVIFNotEnabled;

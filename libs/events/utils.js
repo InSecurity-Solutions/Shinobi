@@ -148,13 +148,24 @@ module.exports = (s,config,lang) => {
         eventsCounted.push(eventData)
     }
     const clearEventCounter = (groupKey,monitorId) => {
-        s.group[eventData.ke].activeMonitors[eventData.id].detector_motion_count = []
+        s.group[groupKey].activeMonitors[monitorId].detector_motion_count = []
     }
     const getEventsCounted = (groupKey,monitorId) => {
-        return s.group[eventData.ke].activeMonitors[eventData.id].detector_motion_count.length
+        return s.group[groupKey].activeMonitors[monitorId].detector_motion_count.length
     }
     const hasMatrices = (eventDetails) => {
         return (eventDetails.matrices && eventDetails.matrices.length > 0) && eventDetails.reason !== 'motion'
+    }
+    const safeCompare = (a, op, b) => {
+        switch(op){
+            case '===': return a === b
+            case '!==': return a !== b
+            case '>=':  return parseFloat(a) >= parseFloat(b)
+            case '>':   return parseFloat(a) > parseFloat(b)
+            case '<':   return parseFloat(a) < parseFloat(b)
+            case '<=':  return parseFloat(a) <= parseFloat(b)
+            default: return false
+        }
     }
     const checkEventFilters = (d,monitorDetails,filter) => {
         const eventDetails = d.details
@@ -185,6 +196,7 @@ module.exports = (s,config,lang) => {
             Object.keys(filters).forEach(function(key){
                 var conditionChain = {}
                 var dFilter = filters[key]
+                const haltState = dFilter.actions.halt
                 if(dFilter.enabled === '0')return;
                 var numberOfOpenAndCloseBrackets = 0
                 dFilter.where.forEach(function(condition,place){
@@ -203,7 +215,7 @@ module.exports = (s,config,lang) => {
                     var modifyFilters = function(toCheck,matrixPosition){
                         var param = toCheck[condition.p1]
                         var pass = function(){
-                            if(matrixPosition && dFilter.actions.halt === '1'){
+                            if(matrixPosition && haltState === '1'){
                                 delete(d.details.matrices[matrixPosition])
                             }else{
                                 conditionChain[place].ok = true
@@ -226,9 +238,7 @@ module.exports = (s,config,lang) => {
                             case'>':
                             case'<':
                             case'<=':
-                                if(eval('param '+condition.p2+' "'+condition.p3.replace(/"/g,'\\"')+'"')){
-                                    pass()
-                                }
+                                if(safeCompare(param, condition.p2, condition.p3)){ pass() }
                             break;
                         }
                     }
@@ -258,7 +268,7 @@ module.exports = (s,config,lang) => {
                                 var atSecond = parseInt(doAtTime[2]) - 1 || timeNow.getSeconds()
                                 var nowAddedInSeconds = atHourNow * 60 * 60 + atMinuteNow * 60 + atSecondNow
                                 var conditionAddedInSeconds = atHour * 60 * 60 + atMinute * 60 + atSecond
-                                if(acceptableOperators.indexOf(condition.p2) > -1 && eval('nowAddedInSeconds '+condition.p2+' conditionAddedInSeconds')){
+                                if(acceptableOperators.indexOf(condition.p2) > -1 && safeCompare(nowAddedInSeconds, condition.p2, conditionAddedInSeconds)){
                                     conditionChain[place].ok = true
                                 }
                             }
@@ -283,8 +293,8 @@ module.exports = (s,config,lang) => {
                     }
                 })
                 if(eval(validationString.join(' '))){
-                    if(dFilter.actions.halt !== '1'){
-                        delete(dFilter.actions.halt)
+                    if(haltState === '0' || !haltState){
+                        delete(haltState)
                         Object.keys(dFilter.actions).forEach(function(key){
                             var value = dFilter.actions[key]
                             filter[key] = parseValue(key,value)
@@ -292,12 +302,16 @@ module.exports = (s,config,lang) => {
                         if(dFilter.actions.record === '1'){
                             filter.forceRecord = true
                         }
-                    }else{
+                    }else if(haltState === '1'){
+                        filter.halt = true
+                    }
+                }else{
+                    if(haltState === '2'){
                         filter.halt = true
                     }
                 }
             })
-            if(d.details.matrices && d.details.matrices.length === 0 && d.details.reason !== 'motion' || filter.halt === true){
+            if(filter.halt === true || (d.details.matrices && d.details.matrices.length === 0 && d.details.reason !== 'motion')){
                 return false
             }else if(hasMatrices(d.details)){
                 var reviewedMatrix = []
@@ -324,8 +338,9 @@ module.exports = (s,config,lang) => {
         var detector_lock_timeout
         if(!monitorDetails.detector_lock_timeout||monitorDetails.detector_lock_timeout===''){
             detector_lock_timeout = 2000
+        }else{
+            detector_lock_timeout = parseFloat(monitorDetails.detector_lock_timeout)
         }
-        detector_lock_timeout = parseFloat(monitorDetails.detector_lock_timeout);
         if(!s.group[eventData.ke].activeMonitors[eventData.id].detector_lock_timeout){
             s.group[eventData.ke].activeMonitors[eventData.id].detector_lock_timeout=setTimeout(function(){
                 clearTimeout(s.group[eventData.ke].activeMonitors[eventData.id].detector_lock_timeout)
@@ -373,6 +388,7 @@ module.exports = (s,config,lang) => {
         const theGroup = s.group[groupKey]
         triggerTags.forEach((tag) => {
             const monitorIds = theGroup.tagLegend[tag]
+            if(!monitorIds) return
             monitorIds.forEach((monitorId) => {
                 if(monitorsToTrigger.indexOf(monitorId) === -1)monitorsToTrigger.push(monitorId)
             })
@@ -524,64 +540,45 @@ module.exports = (s,config,lang) => {
         }
         return response;
     }
-    const getEventBasedRecordingUponCompletion = function(options, getNonCut){
+    const getEventBasedRecordingUponCompletion = async function(options, getNonCut){
         const response = {ok: true}
-        return new Promise(async (resolve,reject) => {
-            const groupKey = options.ke
-            const monitorId = options.mid
-            const activeMonitor = s.group[groupKey].activeMonitors[monitorId]
-            if(!activeMonitor || !activeMonitor.eventBasedRecording){
-                return resolve(response)
+        const groupKey = options.ke
+        const monitorId = options.mid
+        const activeMonitor = s.group[groupKey] && s.group[groupKey].activeMonitors[monitorId]
+        if(!activeMonitor || !activeMonitor.eventBasedRecording){
+            return response
+        }
+        const fileTime = options.fileTime || activeMonitor.eventBasedRecordingLastFileTime;
+        if(activeMonitor.eventBasedRecording[fileTime] && activeMonitor.eventBasedRecording[fileTime].process){
+            const eventBasedRecording = activeMonitor.eventBasedRecording[fileTime]
+            const monitorConfig = s.group[groupKey].rawMonitorConfigurations[monitorId]
+            const videoLength = parseInt(monitorConfig.details.detector_send_video_length) || 10
+            const recordingDirectory = s.getVideoDirectory(monitorConfig)
+            const filename = `${fileTime}.mp4`
+            response.filename = filename
+            response.filePath = `${recordingDirectory}${filename}`
+            await new Promise((resolve) => {
+                eventBasedRecording.process.once('exit', () => setTimeout(resolve, 1000))
+            })
+            if(!getNonCut && !isNaN(videoLength)){
+                try{
+                    const cutResponse = await cutVideoLength({ke: groupKey, mid: monitorId, filePath: response.filePath, cutLength: videoLength})
+                    if(cutResponse.ok){
+                        const { ok, fileBinPath, fileBinInsertQuery } = await saveEventBaseRecordingClip({
+                            groupKey, monitorId, filename: cutResponse.filename, filePath: cutResponse.filePath,
+                            details: { source: `${response.filePath}` }
+                        })
+                        response.filename = cutResponse.filename
+                        response.filePath = cutResponse.filePath
+                        if(ok){ response.fileBinPath = fileBinPath; response.fileBinInsertQuery = fileBinInsertQuery; }
+                    }
+                }catch(err){ s.debugLog('getEventBasedRecordingUponCompletion error', err) }
             }
-            const fileTime = options.fileTime || activeMonitor.eventBasedRecordingLastFileTime;
-            if(activeMonitor.eventBasedRecording[fileTime] && activeMonitor.eventBasedRecording[fileTime].process){
-                const eventBasedRecording = activeMonitor.eventBasedRecording[fileTime]
-                const monitorConfig = s.group[groupKey].rawMonitorConfigurations[monitorId]
-                const videoLength = parseInt(monitorConfig.details.detector_send_video_length) || 10
-                const recordingDirectory = s.getVideoDirectory(monitorConfig)
-                const filename = `${fileTime}.mp4`
-                response.filename = `${filename}`
-                response.filePath = `${recordingDirectory}${filename}`
-                eventBasedRecording.process.on('exit', async function(){
-                    setTimeout(async () => {
-                        if(!getNonCut && !isNaN(videoLength)){
-                            const cutResponse = await cutVideoLength({
-                                ke: groupKey,
-                                mid: monitorId,
-                                filePath: response.filePath,
-                                cutLength: videoLength,
-                            })
-                            if(cutResponse.ok){
-                                const { ok, fileBinPath, fileBinInsertQuery } = await saveEventBaseRecordingClip({
-                                    groupKey,
-                                    monitorId,
-                                    filename: cutResponse.filename,
-                                    filePath: cutResponse.filePath,
-                                    details: {
-                                        source: `${response.filePath}`
-                                    }
-                                });
-                                response.filename = cutResponse.filename
-                                response.filePath = cutResponse.filePath
-                                if(ok){
-                                    response.fileBinPath = fileBinPath;
-                                    response.fileBinInsertQuery = fileBinInsertQuery;
-                                }
-                            }else{
-                                s.debugLog('cutResponse',cutResponse)
-                            }
-                        }
-                        resolve(response)
-                        for (var i = 0; i < s.onEventBasedRecordingCompleteExtensions.length; i++) {
-                            const extender = s.onEventBasedRecordingCompleteExtensions[i]
-                            await extender(response,monitorConfig)
-                        }
-                    },1000)
-                })
-            }else{
-                resolve(response)
+            for(const extender of s.onEventBasedRecordingCompleteExtensions){
+                await extender(response, monitorConfig)
             }
-        })
+        }
+        return response
     }
     const getEventBasedRecordingsUponCompletion = function(groupKey, monitorIds, withPath = false, asObject = true, getNonCut){
         return new Promise((resolve) => {
@@ -739,6 +736,8 @@ module.exports = (s,config,lang) => {
                         type: logTitleText,
                         msg: lang["Clear Recorder Process"]
                     });
+                    const proc = activeMonitor.eventBasedRecording[fileTime].process
+                    proc.removeAllListeners()
                     if(!overlappingRecordings)delete(activeMonitor.eventBasedRecordingLastFileTime)
                     clearTimeout(activeMonitor.eventBasedRecording[fileTime].timeout)
                     clearTimeout(activeMonitor.recordingChecker)
@@ -751,7 +750,7 @@ module.exports = (s,config,lang) => {
     const closeEventBasedRecording = function(e){
         const activeMonitor = s.group[e.ke].activeMonitors[e.id]
         const eventBasedRecordings = activeMonitor.eventBasedRecording;
-        for(fileTime in eventBasedRecordings){
+        for(const fileTime in eventBasedRecordings){
             if(eventBasedRecordings[fileTime].process){
                 clearTimeout(eventBasedRecordings[fileTime].timeout)
                 eventBasedRecordings[fileTime].allowEnd = true
@@ -805,7 +804,7 @@ module.exports = (s,config,lang) => {
             if(chosenDetector && !(chosenDetector.includes('all'))){
                 const pluginsGettingIt = chosenDetector.split(',').map(item => item.trim()).filter(item => !!item);
                 sendToDetector = (data) => {
-                    for(pluginName of pluginsGettingIt){
+                    for(const pluginName of pluginsGettingIt){
                         s.sendToDetector(pluginName, {
                             f : 'frame',
                             mon : monitorDetails,
@@ -883,7 +882,7 @@ module.exports = (s,config,lang) => {
             monitorDetails.detector_obj_count_in_region !== '1'
         ){
             didCountingAlready = true
-            countObjects(eventDetails.matrices)
+            countObjects(d)
         }
         if(filter.useLock){
             const passedMotionLock = checkMotionLock(d,monitorDetails)
@@ -897,7 +896,7 @@ module.exports = (s,config,lang) => {
                 eventDetails.matrices = matricesInRegions
                 if(matricesInRegions.length === 0)return;
                 if(filter.countObjects && monitorDetails.detector_obj_count === '1' && monitorDetails.detector_obj_count_in_region === '1' && !didCountingAlready){
-                    countObjects(eventDetails.matrices)
+                    countObjects(d)
                 }
             }
             if(monitorDetails.detector_object_ignore_not_move === '1'){
@@ -999,7 +998,7 @@ module.exports = (s,config,lang) => {
     async function moveAssociatedMonitorPtzTargets(groupKey, monitorId){
         const response = { ok: true, responseFromDevices: {} };
         const triggerMonitorsPtzTargets = getAssociatedMonitorPtzTargets(groupKey, monitorId);
-        for(targetMonitorId in triggerMonitorsPtzTargets){
+        for(const targetMonitorId in triggerMonitorsPtzTargets){
             const presetToken = triggerMonitorsPtzTargets[targetMonitorId]
             const onvifEnabled = s.group[groupKey].rawMonitorConfigurations[targetMonitorId].details.is_onvif === '1';
             if(onvifEnabled){

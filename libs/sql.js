@@ -18,6 +18,7 @@ module.exports = function(s,config){
         sqlQuery,
         connectDatabase,
         sqlQueryBetweenTimesWithPermissions,
+        sqlQueryBetweenTimesWithPermissionsPromise,
     } = require('./database/utils.js')(s,config)
     s.onBeforeDatabaseLoadExtensions.forEach(function(extender){
         extender(config)
@@ -28,5 +29,6 @@ module.exports = function(s,config){
     s.sqlQuery = sqlQuery
     s.connectDatabase = connectDatabase
     s.sqlQueryBetweenTimesWithPermissions = sqlQueryBetweenTimesWithPermissions
+    s.sqlQueryBetweenTimesWithPermissionsPromise = sqlQueryBetweenTimesWithPermissionsPromise
     require('./database/preQueries.js')(s,config)
 }

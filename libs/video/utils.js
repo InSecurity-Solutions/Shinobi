@@ -70,7 +70,6 @@ module.exports = (s,config,lang) => {
                 let videosFound = 0;
                 const videosDirectory = s.getVideoDirectory(monitor)
                 const tempDirectory = s.getStreamsDirectory(monitor)
-
                 // Write the `sh` script
                 try{
                     fs.writeFileSync(
@@ -1012,6 +1011,17 @@ module.exports = (s,config,lang) => {
             return false;
         }
     };
+    function isApplicableVideosDirectory(givenDirectory, addStorageOnly){
+        if(!addStorageOnly && (givenDirectory === '' || !givenDirectory))return true
+        let canDo = false;
+        const addStorageLocations = (s.dir.addStorage).map(item => item.path);
+        for(aLocation of addStorageLocations){
+            if(givenDirectory === aLocation.replace('__DIR__', s.mainDirectory)){
+                canDo = true
+            }
+        }
+        return canDo
+    }
     return {
         reEncodeVideoAndReplace,
         stitchMp4Files,
@@ -1032,5 +1042,6 @@ module.exports = (s,config,lang) => {
         checkMoovAtEnd,
         hasMoovAtom,
         convertAviToMp4,
+        isApplicableVideosDirectory,
     }
 }
