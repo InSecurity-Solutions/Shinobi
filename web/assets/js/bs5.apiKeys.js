@@ -1,3 +1,11 @@
+function getApiKeys(callback){
+    return new Promise((resolve) => {
+        $.getJSON(getApiPrefix('api') + '/list',function(data){
+            resolve(data.keys);
+            if(callback)callback(data.keys);
+        })
+    })
+}
 $(document).ready(function(e){
     //api window
     var theWindow = $('#apis')
@@ -116,11 +124,6 @@ $(document).ready(function(e){
             monitors[permissionType].push(monitorId)
         })
         return monitors
-    }
-    function getApiKeys(callback){
-        $.getJSON(getApiPrefix('api') + '/list',function(data){
-            callback(data.keys)
-        })
     }
     function addApiKey(){
         var formValues = theWindowForm.serializeObject()

@@ -94,7 +94,6 @@ module.exports = function(s,config,lang){
                     callback2(utime + stime);
                 }).catch((err) => {
                     s.debugLog(err)
-                    clearInterval(0)
                 })
             }
             getUsage(function(startTime){
@@ -232,14 +231,15 @@ module.exports = function(s,config,lang){
                         })
                         snapProcess.on('error', (data) => {
                             console.log(data)
-                            processKill(snapProcess)
+                            clearTimeout(snapProcessTimeout)
+                            snapProcess.terminate()
                         })
                         snapProcess.on('exit', (code) => {
                             clearTimeout(snapProcessTimeout)
                             sendTempImage()
                         })
                         var snapProcessTimeout = setTimeout(function(){
-                            processKill(snapProcess)
+                            snapProcess.terminate()
                         },dynamicTimeout)
                     }catch(err){
                         console.log(err)
@@ -343,6 +343,7 @@ module.exports = function(s,config,lang){
                                     s.userLog(monitor,{type:"Buffer Merge",msg:data.toString()})
                                 })
                                 merger.on('close',function(){
+                                    merger.removeAllListeners()
                                     s.file('delete',allts)
                                     copiedItems.forEach(function(copiedItem){
                                         s.file('delete',copiedItem)
@@ -350,7 +351,6 @@ module.exports = function(s,config,lang){
                                     setTimeout(function(){
                                         s.file('delete',mergedFilepath)
                                     },1000 * 60 * 3)
-                                    delete(merger)
                                     if(callback)callback(mergedFilepath,mergedFile)
                                     resolve({
                                         filePath: mergedFilepath,
@@ -435,6 +435,7 @@ module.exports = function(s,config,lang){
                         },{type:lang['Videos Merge'],msg:data.toString()}, true)
                     })
                     merger.on('close',function(){
+                        merger.removeAllListeners()
                         s.file('delete',mergedRawFilepath)
                         s.file('delete',tempScriptPath)
                         setTimeout(function(){
@@ -442,7 +443,6 @@ module.exports = function(s,config,lang){
                                 if(!err)s.file('delete',mergedFilepath)
                             })
                         },1000 * 60 * 60 * 24)
-                        delete(merger)
                         callback(mergedFilepath,mergedFile)
                     })
                 })
@@ -454,7 +454,7 @@ module.exports = function(s,config,lang){
         return items
     }
     s.cameraControlOptionsFromUrl = function(e,monitorConfig){
-        URLobject = URL.parse(e)
+        const URLobject = URL.parse(e)
         if(monitorConfig.details.control_url_method === 'ONVIF' && monitorConfig.details.control_base_url === ''){
             if(monitorConfig.details.onvif_port === ''){
                 monitorConfig.details.onvif_port = 8000
@@ -490,54 +490,58 @@ module.exports = function(s,config,lang){
         return options
     }
     s.cameraSendSnapshot = async (e,options) => {
-        options = Object.assign({
-            flags: '-s 500x500'
-        },options || {})
-        s.checkDetails(e)
-        if(e.ke && config.doSnapshot === true){
-            if(s.group[e.ke] && s.group[e.ke].rawMonitorConfigurations && s.group[e.ke].rawMonitorConfigurations[e.mid] && s.group[e.ke].rawMonitorConfigurations[e.mid].mode !== 'stop'){
-                async function getRaw(){
-                    var pathDir = s.dir.streams+e.ke+'/'+e.mid+'/'
-                    const {screenShot, isStaticFile} = await s.getRawSnapshotFromMonitor(s.group[e.ke].rawMonitorConfigurations[e.mid],options)
-                    if(screenShot){
-                        s.tx({
-                            f: 'monitor_snapshot',
-                            snapshot: screenShot.toString('base64'),
-                            snapshot_format: 'b64',
-                            mid: e.mid,
-                            ke: e.ke
-                        },'GRP_'+e.ke)
-                    }else{
-                        s.debugLog('Damaged Snapshot Data')
-                        s.tx({f:'monitor_snapshot',snapshot:e.mon.name,snapshot_format:'plc',mid:e.mid,ke:e.ke},'GRP_'+e.ke)
+        try{
+            options = Object.assign({
+                flags: '-s 500x500'
+            },options || {})
+            s.checkDetails(e)
+            if(e.ke && config.doSnapshot === true){
+                if(s.group[e.ke] && s.group[e.ke].rawMonitorConfigurations && s.group[e.ke].rawMonitorConfigurations[e.mid] && s.group[e.ke].rawMonitorConfigurations[e.mid].mode !== 'stop'){
+                    async function getRaw(){
+                        var pathDir = s.dir.streams+e.ke+'/'+e.mid+'/'
+                        const {screenShot, isStaticFile} = await s.getRawSnapshotFromMonitor(s.group[e.ke].rawMonitorConfigurations[e.mid],options)
+                        if(screenShot){
+                            s.tx({
+                                f: 'monitor_snapshot',
+                                snapshot: screenShot.toString('base64'),
+                                snapshot_format: 'b64',
+                                mid: e.mid,
+                                ke: e.ke
+                            },'GRP_'+e.ke)
+                        }else{
+                            s.debugLog('Damaged Snapshot Data')
+                            s.tx({f:'monitor_snapshot',snapshot:e.mon.name,snapshot_format:'plc',mid:e.mid,ke:e.ke},'GRP_'+e.ke)
+                        }
                     }
-                }
-                const onvifDevice = s.group[e.ke].activeMonitors[e.mid].onvifConnection || (await s.createOnvifDevice({ id: e.mid, ke: e.ke })).device;
-                if(onvifDevice){
-                    try{
-                        const screenShot = await s.getSnapshotFromOnvif({
-                            ke: e.ke,
-                            mid: e.mid,
-                        });
-                        s.tx({
-                            f: 'monitor_snapshot',
-                            snapshot: screenShot.toString('base64'),
-                            snapshot_format: 'b64',
-                            mid: e.mid,
-                            ke: e.ke
-                        },'GRP_'+e.ke)
-                    }catch(err){
-                        s.debugLog(err)
+                    const onvifDevice = s.group[e.ke].activeMonitors[e.mid].onvifConnection || (await s.createOnvifDevice({ id: e.mid, ke: e.ke })).device;
+                    if(onvifDevice){
+                        try{
+                            const screenShot = await s.getSnapshotFromOnvif({
+                                ke: e.ke,
+                                mid: e.mid,
+                            });
+                            s.tx({
+                                f: 'monitor_snapshot',
+                                snapshot: screenShot.toString('base64'),
+                                snapshot_format: 'b64',
+                                mid: e.mid,
+                                ke: e.ke
+                            },'GRP_'+e.ke)
+                        }catch(err){
+                            s.debugLog(err)
+                            await getRaw()
+                        }
+                    }else{
                         await getRaw()
                     }
                 }else{
-                    await getRaw()
+                    s.tx({f:'monitor_snapshot',snapshot:'Disabled',snapshot_format:'plc',mid:e.mid,ke:e.ke},'GRP_'+e.ke)
                 }
             }else{
-                s.tx({f:'monitor_snapshot',snapshot:'Disabled',snapshot_format:'plc',mid:e.mid,ke:e.ke},'GRP_'+e.ke)
+                s.tx({f:'monitor_snapshot',snapshot:e.mon.name,snapshot_format:'plc',mid:e.mid,ke:e.ke},'GRP_'+e.ke)
             }
-        }else{
-            s.tx({f:'monitor_snapshot',snapshot:e.mon.name,snapshot_format:'plc',mid:e.mid,ke:e.ke},'GRP_'+e.ke)
+        }catch(err){
+            s.debugLog(err)
         }
     }
     s.getCameraSnapshot = async (e,options) => {
@@ -567,10 +571,14 @@ module.exports = function(s,config,lang){
         var endData = {
             ok: false
         }
-        if(!form.mid || !s.timeReady){
-            endData.msg = !s.timeReady ? lang.notReadyYet : lang['No Monitor ID Present in Form']
+        if(
+            !form.mid
+             // || !s.timeReady
+         ){
+            // endData.msg = !s.timeReady ? lang.notReadyYet : lang['No Monitor ID Present in Form']
+            endData.msg = lang['No Monitor ID Present in Form']
             if(callback)callback(endData);
-            return
+            return endData
         }
         cleanStringsInObject(form)
         form.mid = `${form.mid}`.replace(/[^\w\s]/gi,'').replace(/ /g,'')
@@ -717,6 +725,11 @@ module.exports = function(s,config,lang){
                     let totalTime = 0;
                     const timer = setInterval(function () {
                         totalTime += checkTime;
+                        if(!activeMonitor || !s.group[groupId]){
+                            clearInterval(timer)
+                            resolve(false)
+                            return
+                        }
                         if (activeMonitor.subStreamOutputReady || totalTime >= monitorTimeout) {
                             clearInterval(timer);
                             resolve(activeMonitor.subStreamOutputReady);
@@ -839,7 +852,6 @@ module.exports = function(s,config,lang){
                         monitorRestrictions.push(['or','mid','=',v])
                     }
                 })
-                console.log(monitorRestrictions)
             }catch(er){
             }
         }else if(

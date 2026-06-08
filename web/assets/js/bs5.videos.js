@@ -61,7 +61,7 @@ function createVideoLinks(video,options){
         queryString = ''
     }
     video.ext = video.ext ? video.ext : 'mp4'
-    if(details.type === 'googd'){
+    if(details.type === 'googd' || video.type === 'googd'){
         video.href = undefined
     }else if(!video.ext && video.href){
         video.ext = video.href.split('.')

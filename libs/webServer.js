@@ -9,6 +9,7 @@ module.exports = function(s,config,lang,io){
         transports: ['websocket'],
         pingTimeout: config.socketIoPingTimeout || 130000,
         pingInterval: config.socketIoPingInterval || 60000,
+        maxHttpBufferSize: config.socketIoMaxHttpBufferSize || 1e6,
     }
     require('./monitor/websocket.js')(s,config,lang,io);
     require('./video/websocket.js')(s,config,lang,io);

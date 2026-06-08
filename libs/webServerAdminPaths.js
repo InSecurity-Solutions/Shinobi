@@ -70,6 +70,7 @@ module.exports = function(s,config,lang,app){
                        return
                     }
                     form.mid = req.params.id.replace(/[^\w\s]/gi,'').replace(/ /g,'')
+                    form.ke = req.params.ke.replace(/[^\w\s]/gi,'').replace(/ /g,'')
                     if(form && form.name){
                         s.checkDetails(form)
                         form.ke = req.params.ke

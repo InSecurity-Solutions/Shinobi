@@ -161,6 +161,7 @@ module.exports = function(s,config,lang,io){
             const onSuccess = (r) => {
                 r = r[0];
                 const Emitter = createStreamEmitter(d,cn)
+                if(!Emitter) return
                 validatedAndBindAuthenticationToSocketConnection(cn,d,true)
                 var contentWriter
                 cn.closeSocketVideoStream = function(){
@@ -194,6 +195,7 @@ module.exports = function(s,config,lang,io){
             const onSuccess = (r) => {
                 r=r[0];
                 const Emitter = createStreamEmitter(d,cn)
+                if(!Emitter) return
                 validatedAndBindAuthenticationToSocketConnection(cn,d,true)
                 var contentWriter
                 cn.closeSocketVideoStream = function(){
@@ -211,7 +213,7 @@ module.exports = function(s,config,lang,io){
             }
         })
         //unique MP4 socket stream
-        cn.on('MP4', function(d, cb) {
+        cn.once('MP4', function(d, cb) {
             if (!s.group[d.ke] || !s.group[d.ke].activeMonitors || !s.group[d.ke].activeMonitors[d.id]) {
                 cn.disconnect();
                 return;
@@ -221,14 +223,24 @@ module.exports = function(s,config,lang,io){
             let mp4frag;
             let onSegment;
             let onInitialized;
+            let cleanedUp = false;
+
+            // Max number of segments that may be buffered in the socket's
+            // writable queue before we consider the client dead/too slow.
+            // Each mp4 segment is ~50-200kB; 10 queued = 0.5-2MB per client.
+            const MAX_BUFFERED_SEGMENTS = 10;
 
             var tx = function(z){cn.emit('data',z);}
             const cleanup = () => {
+                if (cleanedUp) return;
+                cleanedUp = true;
                 if (mp4frag) {
                     if (onSegment) mp4frag.removeListener('segment', onSegment);
                     if (onInitialized) mp4frag.removeListener('initialized', onInitialized);
+                    mp4frag = null;
                 }
                 cn.removeAllListeners('MP4Command');
+                cn.socketVideoStream = null;
             };
 
             const onFail = (msg) => {
@@ -249,41 +261,60 @@ module.exports = function(s,config,lang,io){
 
                 // Define handlers
                 onSegment = function(data) {
-                    if (cn.connected) {
-                        cn.emit('segment', data);
+                    if (!cn.connected || cleanedUp) return;
+                    // Check how many packets are already buffered in the socket's
+                    // writable queue. If the client is too slow or has gone away
+                    // without a clean disconnect, the buffer grows unboundedly.
+                    // Image 1 from heap snapshot showed 91 chunks queued on one socket.
+                    try {
+                        const buffered = cn.conn.transport.socket._writableState.buffered;
+                        if (buffered && buffered.length > MAX_BUFFERED_SEGMENTS) {
+                            s.debugLog(`MP4 client buffer overflow (${buffered.length} chunks), disconnecting ${cn.id}`);
+                            cleanup();
+                            cn.disconnect();
+                            return;
+                        }
+                    } catch(e) {
+                        // transport structure not accessible, skip check
                     }
+                    cn.emit('segment', data);
                 };
 
                 onInitialized = function() {
-                    if (cn.connected) {
+                    if (cn.connected && !cleanedUp) {
                         cn.emit('mime', mp4frag.mime);
                         mp4frag.removeListener('initialized', onInitialized);
                     }
                 };
 
-                // Handle socket disconnect
-                cn.on('disconnect', cleanup);
+                // Mark as active MP4 stream so global disconnect handler routes correctly
+                cn.socketVideoStream = true;
+                cn.closeSocketVideoStream = cleanup;
 
-                // MP4 command handler
+                // Handle socket disconnect — once only, guarded by cleanedUp flag
+                cn.once('disconnect', cleanup);
+
+                // MP4 command handler — registered once per connection
                 cn.on('MP4Command', function(msg) {
-                    if (!cn.connected) return;
+                    if (!cn.connected || cleanedUp) return;
 
                     try {
                         switch (msg) {
-                            case 'mime':
+                            case 'mime': {
                                 const mime = mp4frag.mime;
                                 if (mime) {
-                                    setImmediate(() => cn.emit('mime', mime)); // Defer to next tick
+                                    setImmediate(() => cn.emit('mime', mime));
                                 } else {
                                     mp4frag.on('initialized', onInitialized);
                                 }
                                 break;
-
-                            case 'initialization':
-                                setImmediate(() => cn.emit('initialization', mp4frag.initialization));
+                            }
+                            case 'initialization': {
+                                const initialization = mp4frag.initialization;
+                                setImmediate(() => cn.emit('initialization', initialization));
                                 break;
-
-                            case 'segment':
+                            }
+                            case 'segment': {
                                 const segment = mp4frag.segment;
                                 if (segment) {
                                     setImmediate(() => cn.emit('segment', segment));
@@ -291,26 +322,21 @@ module.exports = function(s,config,lang,io){
                                     mp4frag.once('segment', onSegment);
                                 }
                                 break;
-
-                            case 'segments':
-                                // Remove existing listener to avoid duplicates
+                            }
+                            case 'segments': {
                                 mp4frag.removeListener('segment', onSegment);
-                                // Add listener for future segments
                                 mp4frag.on('segment', onSegment);
-
-                                // Send current segment if available
                                 const currentSegment = mp4frag.segment;
                                 if (currentSegment) {
                                     setImmediate(() => cn.emit('segment', currentSegment));
                                 }
                                 break;
-
+                            }
                             case 'pause':
                                 mp4frag.removeListener('segment', onSegment);
                                 break;
 
                             case 'resume':
-                                // Ensure we don't add duplicate listeners
                                 mp4frag.removeListener('segment', onSegment);
                                 mp4frag.on('segment', onSegment);
                                 break;
@@ -326,9 +352,6 @@ module.exports = function(s,config,lang,io){
                 });
 
                 if (cb) cb(null, true);
-            };
-            cn.closeSocketVideoStream = function() {
-                cleanup();
             };
             if (s.group[d.ke] && s.group[d.ke].users && s.group[d.ke].users[d.auth]) {
                 onSuccess(s.group[d.ke].users[d.auth]);
@@ -434,7 +457,7 @@ module.exports = function(s,config,lang,io){
                                 ]
                             },(err,r) => {
                                 if(r && r[0]){
-                                    details = JSON.parse(r[0].details)
+                                    var details = JSON.parse(r[0].details)
                                     details.monitorOrder = d.monitorOrder
                                     s.knexQuery({
                                         action: "update",
@@ -465,7 +488,7 @@ module.exports = function(s,config,lang,io){
                                 if(r && r[0]){
                                     const monitorListOrder = {}
                                     const orderKeys = Object.keys(d.monitorListOrder)
-                                    details = JSON.parse(r[0].details)
+                                    var details = JSON.parse(r[0].details)
                                     orderKeys.forEach((orderKey) => {
                                         const monitorIds = d.monitorListOrder[orderKey]
                                         const uniqueList = {}
@@ -667,9 +690,7 @@ module.exports = function(s,config,lang,io){
 					    },(err,r) => {
 					        if(err) {
 					            console.log(err)
-					            setTimeout(function(){
-					                callback({total:0, limit:pageSize, videos:[]})
-					            },2000)
+					            callback({total:0, limit:pageSize, videos:[]})
 					        } else {
 					            s.buildVideoLinks(r,{
 					                videoParam: videoSet === 'cloud' ? `cloudVideos` : "videos",
@@ -815,6 +836,10 @@ module.exports = function(s,config,lang,io){
                                 })
                                 updateProcess.stdout.on('data',function(data){
                                     s.systemLog('Update Info',data.toString())
+                                })
+                                updateProcess.on('close', function(){
+                                    updateProcess.removeAllListeners()
+                                    delete updateProcess
                                 })
                             break;
                             case'restart':
@@ -992,7 +1017,6 @@ module.exports = function(s,config,lang,io){
                 break;
             }
         })
-         //functions for retrieving cron announcements
         cn.on('disconnect', function () {
             if(cn.socketVideoStream){
                 cn.closeSocketVideoStream()
@@ -1007,16 +1031,15 @@ module.exports = function(s,config,lang,io){
                         })
                     }
                 }else if(!cn.embedded){
-                    if(s.group[cn.ke].users[cn.auth]){
+                    if(s.group[cn.ke] && s.group[cn.ke].users && s.group[cn.ke].users[cn.auth]){
                         s.tx({f:'user_status_change',ke:cn.ke,uid:cn.uid,status:0})
                         s.userLog({ke:cn.ke,mid:'$USER'},{type:lang['Websocket Disconnected'],msg:{mail:s.group[cn.ke].users[cn.auth].mail,id:cn.uid,ip:cn.ip}})
                         delete(s.group[cn.ke].users[cn.auth]);
                     }
-                    if(s.group[cn.ke].dashcamUsers && s.group[cn.ke].dashcamUsers[cn.auth])delete(s.group[cn.ke].dashcamUsers[cn.auth]);
+                    if(s.group[cn.ke] && s.group[cn.ke].dashcamUsers && s.group[cn.ke].dashcamUsers[cn.auth]){
+                        delete(s.group[cn.ke].dashcamUsers[cn.auth]);
+                    }
                 }
-            }
-            if(cn.cron){
-                delete(s.cron);
             }
             s.onWebSocketDisconnectionExtensions.forEach(function(extender){
                 extender(cn)

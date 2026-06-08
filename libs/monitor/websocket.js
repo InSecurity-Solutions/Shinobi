@@ -3,7 +3,7 @@ module.exports = function(s,config,lang,io){
     s.onOtherWebSocketMessages(async (d,cn,tx) => {
         const authKey = cn.auth
         const groupKey = cn.ke
-        const user = s.group[groupKey].users[authKey];
+        const user = s.group[groupKey] && s.group[groupKey].users && s.group[groupKey].users[authKey];
         const monitorId = d.mid || d.id;
         const callbackId = d.callbackId;
         const response = { f: 'callback', callbackId, args: [true] }
@@ -36,7 +36,7 @@ module.exports = function(s,config,lang,io){
                 }else{
                     const cannotSeeImportantSettings = (isRestrictedApiKey && apiKeyPermissions.edit_monitors_disallowed) || userPermissions.monitor_create_disallowed;
                     const monitors = await getMonitors(groupKey, monitorId, authKey, isRestricted, monitorPermissions, monitorRestrictions, cannotSeeImportantSettings, d.search)
-                    response.args = [false, monitors]
+                    response.args = [monitors]
                 }
                 tx(response);
             break;

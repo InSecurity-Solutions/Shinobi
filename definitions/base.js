@@ -2482,6 +2482,12 @@ module.exports = function(s,config,lang){
                                   color: 'grey',
                               },
                               {
+                                  label: lang['Auto Open on Load'],
+                                  class: 'cursor-pointer',
+                                  attributes: 'shinobi-switch="autoOpenOnLoad" ui-change-target=".dot" on-class="dot-green" off-class="dot-grey"',
+                                  color: 'grey',
+                              },
+                              {
                                   label: lang['Maintain Grid'],
                                   class: 'cursor-pointer',
                                   attributes: 'shinobi-switch="liveGridMaintainGrid" ui-change-target=".dot" on-class="dot-green" off-class="dot-grey"',
