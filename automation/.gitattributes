@@ -1,0 +1,4 @@
+# Scripts shell e cloud-init DEVEM ter fim de linha LF (rodam em Linux).
+*.sh text eol=lf
+install-shinobi.sh text eol=lf
+cloud-init/* text eol=lf

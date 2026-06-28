@@ -1,0 +1,47 @@
+#cloud-config
+# Template de cloud-init (NoCloud). Os __PLACEHOLDERS__ sao substituidos pelo
+# Deploy-ShinobiVM.ps1 ao gerar o seed CIDATA. NAO commitar a versao renderizada.
+hostname: __HOSTNAME__
+timezone: __TIMEZONE__
+
+users:
+  - name: __OSUSER__
+    sudo: "ALL=(ALL) NOPASSWD:ALL"
+    groups: [sudo]
+    shell: /bin/bash
+    lock_passwd: false
+    ssh_authorized_keys:
+__SSHKEYS__
+
+ssh_pwauth: true
+chpasswd:
+  expire: false
+  users:
+    - name: __OSUSER__
+      password: __OSPASS__
+      type: text
+
+package_update: true
+package_upgrade: false
+packages:
+  - git
+  - curl
+
+write_files:
+  - path: /etc/shinobi-install.env
+    permissions: "0600"
+    content: |
+      SHINOBI_DIR="__INSTALLDIR__"
+      SHINOBI_REPO="__REPO__"
+      SHINOBI_BRANCH="__BRANCH__"
+      SHINOBI_SUPERUSER_EMAIL="__SUPEREMAIL__"
+      SHINOBI_SUPERUSER_MD5="__SUPERMD5__"
+      SHINOBI_DB_NAME="__DBNAME__"
+      SHINOBI_DB_USER="__DBUSER__"
+      SHINOBI_DB_PASSWORD="__DBPASS__"
+
+runcmd:
+  - [ bash, -c, "set -e; . /etc/shinobi-install.env; git clone -b \"$SHINOBI_BRANCH\" \"$SHINOBI_REPO\" \"$SHINOBI_DIR\"" ]
+  - [ bash, -c, "cd \"$(. /etc/shinobi-install.env; echo $SHINOBI_DIR)\" && bash automation/install-shinobi.sh 2>&1 | tee /var/log/shinobi-install.log" ]
+
+final_message: "Shinobi NeoVigia - cloud-init finalizado em $UPTIME s. Acesse http://<IP>:8080/super"

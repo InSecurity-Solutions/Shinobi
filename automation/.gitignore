@@ -1,0 +1,13 @@
+# Segredos e artefatos da automacao - NUNCA versionar
+.secrets.*.txt
+shinobi.config.psd1
+*.vhd
+*.vhdx
+*.tar.gz
+*.img
+work/
+downloads/
+
+# Versao renderizada do cloud-init (contem senhas)
+cloud-init/user-data
+cloud-init/meta-data
