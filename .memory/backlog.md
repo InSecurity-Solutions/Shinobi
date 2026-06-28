@@ -28,7 +28,9 @@
 | BL-008 | Avaliar migracao dos binarios ffmpeg p/ Git LFS | ⏳ Pendente | — | — | ffmpeg/ffprobe ~75MB cada no repo |
 | BL-009 | Auditar deps + mapear requisitos de deploy | ✅ Entregue | 2026-06-27 | 2026-06-27 | 11 vulns (0 criticas); deploy nativo Ubuntu/Hyper-V |
 | BL-010 | Criar skill /shinobi em pt-BR | ✅ Entregue | 2026-06-27 | 2026-06-27 | .claude/skills/shinobi (SKILL + deploy + conceitos + api) |
-| BL-011 | Automatizar instalacao/implementacao (Hyper-V + Shinobi) | 🔄 Em andamento | 2026-06-27 | — | VM Shinobi-NeoVigia criada (192.168.1.71); cloud-init instalando; validando :8080 |
+| BL-011 | Automatizar instalacao/implementacao (Hyper-V + Shinobi) | ✅ Entregue | 2026-06-27 | 2026-06-28 | VM Shinobi-NeoVigia @192.168.1.71 :8080 HTTP200; automation/ versionado; DT-005 |
+| BL-012 | Trocar senha padrao do Superuser e revisar exposicao | ⏳ Pendente | — | — | nasce com senha forte gerada; trocar no 1o acesso |
+| BL-013 | Cadastro automatico de cameras via API (estagio 4) | ⏳ Pendente | — | — | opcional; precisa lista de RTSP |
 
 ---
 

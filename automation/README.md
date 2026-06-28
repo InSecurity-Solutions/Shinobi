@@ -75,6 +75,9 @@ Veja `shinobi.config.example.psd1`. Destaques:
 - **Segurança:** senhas geradas em runtime, nunca commitadas; `super.json` nasce com senha forte (nada de `admin/admin`); UFW libera só SSH + 8080.
 
 ## Solução de problemas
+- **cloud-init não roda (VM ociosa, sem `/home/Shinobi`, SSH recusa banner):** a imagem `-azure` fixa `datasource_list: [ Azure ]` e ignora o seed NoCloud → cloud-init trava em `init-local` (`datasource: null`). O script já corrige isso automaticamente via `Invoke-NoCloudPatch` (monta o VHDX no WSL e força `datasource_list: [ NoCloud, None ]`). Se rodar sem WSL, aplique o patch manualmente antes do 1º boot. Diagnóstico: montar o ext4 da VM no WSL e ler `/var/lib/cloud/data/status.json` e `/var/log/cloud-init.log`.
+- **`Convert-VHD` falha (0xC03A001A):** o `.vhd` extraído do tar vem sparse/comprimido. O script materializa um `.vhd` limpo via cópia FileStream antes de converter.
+- **`bash\r` / script não roda no Linux:** fim de linha CRLF. `automation/.gitattributes` força LF nos `.sh`.
 - **VM não dá boot (Gen2):** o boot UEFI da cloud image falhou. Tente `Generation = 1` na config (fallback), ou use a ISO live-server + autoinstall.
 - **Script não pega o IP:** integration services pode não reportar. Abra o console (`vmconnect`) ou veja o lease DHCP no roteador; a instalação continua normalmente.
 - **`:8080` não responde:** `pm2 logs camera` e `cat /var/log/shinobi-install.log` dentro da VM.

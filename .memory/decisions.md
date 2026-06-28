@@ -39,6 +39,13 @@
 - **Alternativas descartadas:** (a) Usar o fork pessoal do GitLab (insecurity-solutions/Shinobi) como central — redundante; (b) Mirror completo (~100 branches) no GitHub — poluiria o repo com branches de WIP. Optado por master + tags.
 - **Fluxo de atualizacao:** `git fetch upstream` -> revisar `git log master..upstream/master --oneline` -> decidir junto -> merge/reset -> `git push origin master`.
 
+### DT-005 — Imagem Ubuntu e correcao do cloud-init no Hyper-V
+- **O que:** A automacao usa a cloud image Ubuntu 22.04 "Azure VHD" (unica em formato VHD; convertida p/ VHDX via Convert-VHD nativo). Essa imagem fixa `datasource_list: [ Azure ]` e, no Hyper-V, ignora o seed NoCloud -> cloud-init trava em init-local (datasource=null), nao cria usuario, nao gera host keys, nao roda o install. Correcao: patch offline (montando o VHDX via WSL ext4) escrevendo `/etc/cloud/cloud.cfg.d/99-nocloud.cfg` com `datasource_list: [ NoCloud, None ]` e limpando `/var/lib/cloud/*`. Implementado na funcao Invoke-NoCloudPatch do Deploy-ShinobiVM.ps1.
+- **Por que:** Era a unica imagem VHD oficial (evita dependencia de qemu-img p/ converter o qcow2 generico). O patch torna o touchless confiavel no Hyper-V.
+- **Quando:** 2026-06-28
+- **Alternativas descartadas:** (a) imagem generica qcow2 -> exigiria qemu-img (tooling extra); (b) ISO live-server + autoinstall -> exigiria repack de grub (oscdimg/ADK).
+- **Outras correcoes da automacao:** o `.vhd` extraido do tar vem sparse+comprimido (Convert-VHD recusa, 0xC03A001A) -> materializado via copia FileStream; `.gitattributes` forca LF nos `.sh` (senao quebram no Linux com `\r`).
+
 ---
 
 ## Decisoes de Negocio
