@@ -39,7 +39,8 @@
 | BL-017 | API key Shinobi p/ NeoVigia | ⏳ Pendente | — | — | M2M via tailnet |
 | BL-020 | Criar conta Admin Shinobi (form bugado) | ✅ Entregue | 2026-06-28 | 2026-06-28 | via DB; op@neovigia.local; DT-008 |
 | BL-021 | Avaliar Frigate (FOSS) como motor de producao | 🔄 Em andamento | 2026-06-28 | — | Docker+Frigate na VM; UI :5000 via tailnet; DT-007 |
-| BL-022 | Camera de teste (celular IP Webcam) no Shinobi/Frigate | ⏳ Pendente | — | — | valida fluxo ponta-a-ponta; rtsp 100.87.63.18 |
+| BL-022 | Camera de teste (celular) AO VIVO no Frigate | ✅ Entregue | 2026-06-28 | 2026-06-29 | pipeline celular->Tailscale->Frigate->web validado |
+| BL-023 | Tuning producao: substream p/ detect + hwaccel/Coral | ⏳ Pendente | — | — | resolve alta CPU do FFmpeg; edge grava hi-res |
 
 ---
 
