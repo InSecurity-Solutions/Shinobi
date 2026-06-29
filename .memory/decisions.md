@@ -46,6 +46,13 @@
 - **Alternativas descartadas:** (a) imagem generica qcow2 -> exigiria qemu-img (tooling extra); (b) ISO live-server + autoinstall -> exigiria repack de grub (oscdimg/ADK).
 - **Outras correcoes da automacao:** o `.vhd` extraido do tar vem sparse+comprimido (Convert-VHD recusa, 0xC03A001A) -> materializado via copia FileStream; `.gitattributes` forca LF nos `.sh` (senao quebram no Linux com `\r`).
 
+### DT-006 — Conectividade site-remoto e acesso externo via Tailscale (overlay)
+- **O que:** Cameras+mini-NVR ficam num site remoto; o Shinobi roda no site central. Conexao por **Tailscale** (overlay WireGuard, fura CGNAT, sem port-forward). VM Shinobi no tailnet em **100.85.135.1** (IP estavel, imune ao DHCP da LAN). UFW travado: `:8080` so via interface `tailscale0` (LAN/WAN bloqueados — comprovado). Device no site remoto sera **subnet-router** anunciando a subnet das cameras (script automation/remote-subnet-router.sh); a VM ja esta com `--accept-routes` (RouteAll=true). NeoVigia consumira a API do Shinobi pelo tailnet (privado + API key).
+- **Por que:** Acesso e M2M (NeoVigia->API), nao precisa nada publico. Gravacao fica no edge (mini-NVR), Shinobi faz live view+eventos (banda baixa). Resultado: superficie de ataque ~zero.
+- **Quando:** 2026-06-28
+- **Alternativas descartadas:** RTSP/`:8080` expostos na internet (inseguro); WireGuard puro (precisa IP publico/port-forward, ruim com CGNAT); Headscale self-hosted (mais setup — pode ser adotado depois p/ soberania).
+- **Pendente:** API key do Shinobi p/ NeoVigia; reserva DHCP/IP estatico na LAN (follow-up, ja mitigado pelo IP de tailnet); opcional travar SSH so no tailnet.
+
 ---
 
 ## Decisoes de Negocio

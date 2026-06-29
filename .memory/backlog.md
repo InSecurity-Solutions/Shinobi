@@ -31,6 +31,10 @@
 | BL-011 | Automatizar instalacao/implementacao (Hyper-V + Shinobi) | ✅ Entregue | 2026-06-27 | 2026-06-28 | VM Shinobi-NeoVigia @192.168.1.71 :8080 HTTP200; automation/ versionado; DT-005 |
 | BL-012 | Trocar senha padrao do Superuser e revisar exposicao | ⏳ Pendente | — | — | nasce com senha forte gerada; trocar no 1o acesso |
 | BL-013 | Cadastro automatico de cameras via API (estagio 4) | ⏳ Pendente | — | — | opcional; precisa lista de RTSP |
+| BL-014 | Conectividade Tailscale (Fase 1: VM no tailnet + UFW) | ✅ Entregue | 2026-06-28 | 2026-06-28 | 100.85.135.1; :8080 so via tailnet; DT-006 |
+| BL-015 | Fase 2: subnet-router no site remoto (cameras) | ⏳ Pendente | — | — | rodar remote-subnet-router.sh + aprovar rota; precisa subnet das cameras |
+| BL-016 | Fase 3: cadastrar canais do NVR no Shinobi (RTSP) | ⏳ Pendente | — | — | sub-stream, Watch-Only + eventos; precisa IP/RTSP/credenciais NVR |
+| BL-017 | API key Shinobi p/ NeoVigia | ⏳ Pendente | — | — | M2M via tailnet |
 
 ---
 
