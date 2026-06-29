@@ -1,0 +1,39 @@
+# Frigate config — piloto NeoVigia
+# Doc: https://docs.frigate.video/configuration/
+# Detector CPU (piloto). Em produção: Coral USB / GPU p/ IA pesada.
+
+mqtt:
+  enabled: false
+
+detectors:
+  cpu1:
+    type: cpu
+
+# ---- Câmeras ----
+# Piloto: celular S23 como câmera de teste, via Tailscale (app "IP Webcam").
+# Troque o path pelo RTSP real do NVR/HAIZ quando a ponte do poste subir.
+cameras:
+  teste_celular:
+    enabled: true
+    ffmpeg:
+      inputs:
+        - path: rtsp://100.87.63.18:8080/h264_ulaw.sdp
+          roles:
+            - detect
+    detect:
+      enabled: true
+      width: 640
+      height: 480
+      fps: 5
+    # Objetos a detectar (IA). Ajustar conforme caso de uso.
+    objects:
+      track:
+        - person
+        - car
+
+# Gravação opcional (desligada no piloto p/ economizar disco)
+record:
+  enabled: false
+
+snapshots:
+  enabled: true

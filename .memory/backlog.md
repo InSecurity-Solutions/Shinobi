@@ -37,6 +37,9 @@
 | BL-018 | Especificar Mini NVR ICSEE + cams HAIZ (amanha) | ⏳ Pendente | — | — | RTSP, codec/bitrate, ONDE esta o reconhecimento (cam vs NVR), PoE, storage |
 | BL-019 | Definir arquitetura de borda NeoVigia (proprio) | ⏳ Pendente | — | — | edge node substituir NVR? IA na cam/NVR/central? Pi5/OrangePi5 NPU vs Shinobi central |
 | BL-017 | API key Shinobi p/ NeoVigia | ⏳ Pendente | — | — | M2M via tailnet |
+| BL-020 | Criar conta Admin Shinobi (form bugado) | ✅ Entregue | 2026-06-28 | 2026-06-28 | via DB; op@neovigia.local; DT-008 |
+| BL-021 | Avaliar Frigate (FOSS) como motor de producao | 🔄 Em andamento | 2026-06-28 | — | Docker+Frigate na VM; UI :5000 via tailnet; DT-007 |
+| BL-022 | Camera de teste (celular IP Webcam) no Shinobi/Frigate | ⏳ Pendente | — | — | valida fluxo ponta-a-ponta; rtsp 100.87.63.18 |
 
 ---
 

@@ -1,0 +1,20 @@
+# Frigate (NVR + IA de detecção) — piloto NeoVigia
+# Roda na VM (Ubuntu) atrás do Tailscale. UI em :5000 (liberar só via tailscale0).
+# Subir: cd /opt/frigate && docker compose up -d
+services:
+  frigate:
+    container_name: frigate
+    restart: unless-stopped
+    image: ghcr.io/blakeblackshear/frigate:stable
+    shm_size: "256mb"
+    volumes:
+      - ./config:/config
+      - ./media:/media/frigate
+      - /etc/localtime:/etc/localtime:ro
+    ports:
+      - "5000:5000"       # Web UI (HTTP)
+      - "8554:8554"       # RTSP restream (go2rtc)
+      - "8555:8555/tcp"   # WebRTC
+      - "8555:8555/udp"
+    environment:
+      - FRIGATE_RTSP_PASSWORD=trocar_esta_senha

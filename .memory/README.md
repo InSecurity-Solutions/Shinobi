@@ -37,6 +37,7 @@
 | backlog.md | Vivo | Backlog unificado |
 | decisions.md | Vivo | Decisoes com justificativa |
 | prd-v1.md | Referencia | PRD do projeto |
+| arquitetura-neovigia.md | Referencia | Arquitetura multi-tenant (broker + entitlements) sobre engine headless |
 
 ## Workflow de entrada
 1. Conteudo chega (reuniao, chat, Slack, outra IA)

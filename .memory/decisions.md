@@ -53,9 +53,28 @@
 - **Alternativas descartadas:** RTSP/`:8080` expostos na internet (inseguro); WireGuard puro (precisa IP publico/port-forward, ruim com CGNAT); Headscale self-hosted (mais setup — pode ser adotado depois p/ soberania).
 - **Pendente:** API key do Shinobi p/ NeoVigia; reserva DHCP/IP estatico na LAN (follow-up, ja mitigado pelo IP de tailnet); opcional travar SSH so no tailnet.
 
+### DT-007 — Licenciamento do Shinobi e avaliacao do Frigate como motor de producao
+- **O que:** Descoberto que o Shinobi NAO e FOSS — e "Shinobi Open Source Software License Agreement" (source-available). Uso COMERCIAL exige assinatura paga; teto de 15 monitores no build nao-ativado (enforcement em libs/checker/utils.js); "free" so p/ pessoal/educacao/testes (5 cams, 14 dias). Como o NeoVigia e comercial, Shinobi em producao = pago. Decisao: usar Shinobi so no piloto e avaliar **Frigate** (Apache-2.0, livre p/ comercial, IA forte) como motor de producao — rodando em Docker na mesma VM, atras do Tailscale (UI :5000 so via tailscale0).
+- **Por que:** Evitar custo recorrente de licenca + casar com o plano de "sistema proprio" do NeoVigia. Toda a infra (VM, Tailscale, UFW, arquitetura de borda) e agnostica de motor e reaproveitada.
+- **Quando:** 2026-06-28
+- **Alternativas descartadas:** Pagar Shinobi Pro/Enterprise (custo); ZoneMinder (GPL, UX antiga/pesada); iSpy/Agent DVR (freemium, pago p/ comercial). Frigate escolhido p/ avaliacao por ser FOSS + IA nativa.
+- **Correcao:** afirmacao anterior de "Shinobi 100% free e open" estava incorreta (ver DT-007).
+
+### DT-008 — Criacao de conta Admin do Shinobi via DB (workaround)
+- **O que:** O formulario "registerAdmin" do Superuser falha com "undefined" (legacyCreateAdminUser seta ok:true antes de passos que estouram). Admin criado via INSERT direto na tabela Users (ke/uid aleatorios, pass=sha256 hex, details=getDefaultUserDetails) + pm2 restart. Login validado via API. Conta: op@neovigia.local (credenciais no runbook, fora do Git).
+- **Por que:** Desbloquear o piloto sem depender do form bugado.
+- **Quando:** 2026-06-28
+- **Alternativas descartadas:** insistir no form da UI (bug nao resolvido nesta versao).
+
 ---
 
 ## Decisoes de Negocio
+
+### DN-002 — NeoVigia: plataforma multi-tenant SOBRE engine headless (não dentro dele)
+- **O que:** O modelo comercial (Grupo→Casa→Acessos, avulso, promo/trial, cobrança, CRM) e a UI/UX são da **aplicação NeoVigia**, não do engine. Engine (Frigate) fica headless; NeoVigia faz identidade, ACL/entitlements com validade, broker de stream e front próprio. Detalhe completo em [[arquitetura-neovigia]].
+- **Por que:** Nenhum NVR pronto entrega esse modelo; enfiar no engine vira fork insustentável. Separar camadas = onde está o IP do NeoVigia + liberdade de UI + troca de engine sem reescrever o negócio.
+- **Quando:** 2026-06-28
+- **Alternativas descartadas:** Usar o multi-account do Shinobi como base (não cobre Casa/trial/cobrança + licença comercial paga); customizar a UI do engine p/ o cliente (acoplamento ruim).
 
 ### DN-001 — Shinobi como motor de video do NeoVigia
 - **O que:** Este fork do Shinobi 2.0 sera o motor de video (CCTV/NVR) do produto NeoVigia
