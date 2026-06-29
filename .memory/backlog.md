@@ -32,8 +32,10 @@
 | BL-012 | Trocar senha padrao do Superuser e revisar exposicao | ⏳ Pendente | — | — | nasce com senha forte gerada; trocar no 1o acesso |
 | BL-013 | Cadastro automatico de cameras via API (estagio 4) | ⏳ Pendente | — | — | opcional; precisa lista de RTSP |
 | BL-014 | Conectividade Tailscale (Fase 1: VM no tailnet + UFW) | ✅ Entregue | 2026-06-28 | 2026-06-28 | 100.85.135.1; :8080 so via tailnet; DT-006 |
-| BL-015 | Fase 2: subnet-router no site remoto (cameras) | ⏳ Pendente | — | — | rodar remote-subnet-router.sh + aprovar rota; precisa subnet das cameras |
-| BL-016 | Fase 3: cadastrar canais do NVR no Shinobi (RTSP) | ⏳ Pendente | — | — | sub-stream, Watch-Only + eventos; precisa IP/RTSP/credenciais NVR |
+| BL-015 | Fase 2: ponte/edge no poste (cameras) | ⏳ Pendente | — | — | piloto: 1 NVR ICSEE, 2 postes (3+4 cams=7). Poste c/ 12V/USB+LAN livre; uplink 4G ou fibra/radio Claro/Vivo |
+| BL-016 | Fase 3: cadastrar canais do NVR no Shinobi (RTSP) | ⏳ Pendente | — | — | sub-stream, Watch-Only + eventos; cams HAIZ + NVR ICSEE (XMEye/iCSee) |
+| BL-018 | Especificar Mini NVR ICSEE + cams HAIZ (amanha) | ⏳ Pendente | — | — | RTSP, codec/bitrate, ONDE esta o reconhecimento (cam vs NVR), PoE, storage |
+| BL-019 | Definir arquitetura de borda NeoVigia (proprio) | ⏳ Pendente | — | — | edge node substituir NVR? IA na cam/NVR/central? Pi5/OrangePi5 NPU vs Shinobi central |
 | BL-017 | API key Shinobi p/ NeoVigia | ⏳ Pendente | — | — | M2M via tailnet |
 
 ---
