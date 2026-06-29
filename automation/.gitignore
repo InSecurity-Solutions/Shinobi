@@ -1,5 +1,5 @@
 # Segredos e artefatos da automacao - NUNCA versionar
-.secrets.*.txt
+.secrets.*
 shinobi.config.psd1
 *.vhd
 *.vhdx
